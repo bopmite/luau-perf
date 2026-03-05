@@ -1,7 +1,11 @@
 [package]
-name = "luperf"
+name = "luauperf"
 version = "0.1.0"
 edition = "2021"
+
+[[bin]]
+name = "luauperf"
+path = "src/main.rs"
 
 [dependencies]
 full_moon = { version = "2", features = ["luau"] }

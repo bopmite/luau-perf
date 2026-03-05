@@ -66,10 +66,10 @@ fn has_flag(args: &[String], flag: &str, value: &str) -> bool {
 }
 
 fn usage() {
-    eprintln!("luperf — static performance analyzer for Luau\n");
-    eprintln!("usage: luperf <path> [options]\n");
+    eprintln!("luauperf — static performance analyzer for Luau\n");
+    eprintln!("usage: luauperf <path> [options]\n");
     eprintln!("  --format json    JSON output");
     eprintln!("  --list-rules     show all rules");
-    eprintln!("  --init           create default luperf.toml");
+    eprintln!("  --init           create default luauperf.toml");
     eprintln!("  -h, --help       this message");
 }

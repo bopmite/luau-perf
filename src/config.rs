@@ -30,10 +30,12 @@ pub fn load(target: &Path) -> Config {
     };
 
     for ancestor in dir.ancestors() {
-        let p = ancestor.join("luperf.toml");
-        if p.exists() {
-            let content = std::fs::read_to_string(&p).unwrap_or_default();
-            return toml::from_str(&content).unwrap_or_default();
+        let candidates = [ancestor.join("luauperf.toml"), ancestor.join("luperf.toml")];
+        for p in &candidates {
+            if p.exists() {
+                let content = std::fs::read_to_string(p).unwrap_or_default();
+                return toml::from_str(&content).unwrap_or_default();
+            }
         }
     }
 
@@ -41,7 +43,7 @@ pub fn load(target: &Path) -> Config {
 }
 
 pub fn write_default() {
-    let content = r#"# luperf.toml
+    let content = r#"# luauperf.toml
 
 [rules]
 # "error", "warn", or "allow"
@@ -53,10 +55,10 @@ pub fn write_default() {
 exclude = ["Packages/", "Generated/"]
 "#;
 
-    if Path::new("luperf.toml").exists() {
-        eprintln!("luperf.toml already exists");
+    if Path::new("luauperf.toml").exists() {
+        eprintln!("luauperf.toml already exists");
     } else {
-        std::fs::write("luperf.toml", content).expect("failed to write luperf.toml");
-        eprintln!("created luperf.toml");
+        std::fs::write("luauperf.toml", content).expect("failed to write luauperf.toml");
+        eprintln!("created luauperf.toml");
     }
 }
