@@ -1,57 +1,107 @@
-# luperf
+# luauperf
 
-Static performance analyzer for Luau. Catches perf anti-patterns before they hit production.
+static performance linter for luau. catches the shit that makes your roblox game run at 12fps.
 
-## Install
+96 rules. 492 files in 0.27 seconds. zero runtime dependencies.
 
-```
+## what it does
+
+scans your `.lua` / `.luau` files and flags performance antipatterns — allocations in loops, untracked connections (memory leaks), deprecated APIs, missing `--!native` headers, and things that prevent the luau VM from using FASTCALL/GETIMPORT optimizations.
+
+not a type checker. not a formatter. just perf.
+
+## install
+
+```bash
 cargo install --path .
 ```
 
-## Usage
+or grab a binary from releases.
 
+## usage
+
+```bash
+# lint a directory
+luauperf src/
+
+# lint a single file
+luauperf src/Server/Services/GunService.luau
+
+# json output (for CI / editor integration)
+luauperf src/ --format json
+
+# list all 96 rules
+luauperf --list-rules
+
+# generate config
+luauperf --init
 ```
-luperf src/
-luperf src/Server/Services/
-luperf path/to/file.luau
-luperf src/ --format json
-luperf --list-rules
-luperf --init
-```
 
-## Rules
+## config
 
-| Rule | Default | What it catches |
-|------|---------|-----------------|
-| `complexity::table_find_in_loop` | error | `table.find()` in loops — O(n) per iteration |
-| `complexity::get_descendants_in_loop` | warn | `GetDescendants`/`GetChildren`/`FindFirstChild` in loops |
-| `complexity::table_remove_shift` | warn | `table.remove(t, 1)` — O(n) shift |
-| `cache::magnitude_over_squared` | warn | `.Magnitude` — uses sqrt, compare squared instead |
-| `cache::uncached_get_service` | warn | `game:GetService()` inside function body |
-| `cache::tween_info_in_function` | warn | `TweenInfo.new()` inside function — cache at module level |
-| `cache::raycast_params_in_function` | warn | `RaycastParams.new()` inside function — cache and reuse |
-| `cache::instance_new_in_loop` | warn | `Instance.new()` in loop — pre-allocate or Clone |
-| `memory::untracked_connection` | error | `:Connect()` result not stored |
-| `memory::untracked_task_spawn` | warn | `task.spawn`/`task.delay` not tracked |
-| `roblox::deprecated_wait` | error | `wait()` — use `task.wait()` |
-| `roblox::deprecated_spawn` | error | `spawn()`/`delay()` — use `task.*` |
-| `roblox::debris_add_item` | warn | `Debris:AddItem()` — use `task.delay` + `Destroy()` |
-| `roblox::missing_native` | warn | Missing `--!native` header |
-| `alloc::string_concat_in_loop` | warn | `..` in loops — use `table.concat` |
-| `network::fire_in_loop` | error | Remote events fired in loops — batch them |
-
-## Config
-
-Create `luperf.toml` in your project root (`luperf --init`):
+drop a `luauperf.toml` in your project root:
 
 ```toml
 [rules]
-memory::untracked_task_spawn = "allow"
+# override severity per rule: "error", "warn", or "allow"
+roblox::missing_strict = "allow"
 cache::magnitude_over_squared = "error"
+roblox::pcall_in_loop = "warn"
 
-exclude = ["Packages/", "Generated/"]
+# exclude paths (substring match)
+exclude = ["Packages/", "Generated/", "node_modules/"]
 ```
 
-## License
+## 96 rules, 14 categories
 
-MIT
+| category | count | what it catches |
+|----------|-------|----------------|
+| `complexity` | 10 | O(n²) patterns, unnecessary work in hot loops |
+| `cache` | 15 | things you should compute once and reuse |
+| `memory` | 7 | connection leaks, untracked threads, missing cleanup |
+| `roblox` | 16 | deprecated APIs, engine-specific footguns |
+| `alloc` | 7 | heap allocations in hot paths (strings, closures, tables) |
+| `native` | 6 | things that break `--!native` codegen |
+| `math` | 5 | deprecated math APIs, manual builtins |
+| `string` | 6 | string allocations, deprecated patterns |
+| `table` | 6 | deprecated table APIs, O(n) shifts |
+| `network` | 2 | remote events/functions fired in loops |
+| `physics` | 2 | expensive spatial queries in loops |
+| `render` | 5 | GUI/particle/beam creation in loops |
+| `instance` | 4 | Instance API misuse (2-arg new, .Parent in loop) |
+| `style` | 5 | code quality signals with perf implications |
+
+full list with descriptions: [RULES.md](RULES.md)
+
+**severity levels:**
+- `error` — almost certainly a bug or major perf hit
+- `warn` — probably a problem, worth looking at
+- `allow` — off by default, turn on in config if you want
+
+## how it works
+
+parses luau with [full_moon](https://github.com/Kampfkarren/full-moon), walks the AST with a visitor that tracks loop/function depth. some rules use source text matching for patterns easier to detect outside the AST. parallel file processing via rayon.
+
+~1500 lines of rust. no LSP, no daemon, no background process. runs, prints, exits.
+
+## ci
+
+```yaml
+- name: perf lint
+  run: luauperf src/ --format json > perf-lint.json
+```
+
+exits 1 if any `error` severity issues found.
+
+## building from source
+
+```bash
+git clone https://github.com/YOUR_USERNAME/luauperf
+cd luauperf
+cargo build --release
+# binary at target/release/luauperf
+```
+
+## license
+
+MIT — see [LICENSE](LICENSE)
