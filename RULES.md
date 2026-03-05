@@ -1,6 +1,6 @@
 # rules
 
-all 96 rules organized by category. severity in brackets.
+organized by category. severity in brackets.
 
 rules marked `[allow]` are off by default — enable them in `luauperf.toml` if you want.
 
