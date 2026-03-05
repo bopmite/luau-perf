@@ -2,9 +2,11 @@ use full_moon::ast::*;
 use full_moon::tokenizer;
 use full_moon::visitors::Visitor;
 
+#[allow(dead_code)]
 pub struct CallCtx {
     pub in_loop: bool,
     pub in_func: bool,
+    pub loop_depth: u32,
 }
 
 struct Walker<F> {
@@ -33,6 +35,7 @@ impl<F: FnMut(&FunctionCall, &CallCtx)> Visitor for Walker<F> {
         let ctx = CallCtx {
             in_loop: self.loop_depth > 0,
             in_func: self.func_depth > 0,
+            loop_depth: self.loop_depth,
         };
         (self.cb)(node, &ctx);
     }
@@ -103,6 +106,69 @@ pub fn is_bare_call(call: &FunctionCall, name: &str) -> bool {
     }
     let suffixes: Vec<_> = call.suffixes().collect();
     suffixes.len() == 1 && matches!(suffixes[0], Suffix::Call(Call::AnonymousCall(_)))
+}
+
+// --- Argument inspection helpers ---
+
+pub fn call_args(call: &FunctionCall) -> Option<&FunctionArgs> {
+    let mut last_call = None;
+    for suffix in call.suffixes() {
+        if let Suffix::Call(c) = suffix {
+            last_call = Some(c);
+        }
+    }
+    match last_call? {
+        Call::AnonymousCall(args) => Some(args),
+        Call::MethodCall(mc) => Some(mc.args()),
+        _ => None,
+    }
+}
+
+pub fn call_arg_count(call: &FunctionCall) -> usize {
+    match call_args(call) {
+        Some(FunctionArgs::Parentheses { arguments, .. }) => arguments.len(),
+        Some(FunctionArgs::String(_)) => 1,
+        Some(FunctionArgs::TableConstructor(_)) => 1,
+        _ => 0,
+    }
+}
+
+pub fn nth_arg<'a>(call: &'a FunctionCall, n: usize) -> Option<&'a Expression> {
+    match call_args(call)? {
+        FunctionArgs::Parentheses { arguments, .. } => arguments.iter().nth(n),
+        _ => None,
+    }
+}
+
+pub fn nth_arg_is_true(call: &FunctionCall, n: usize) -> bool {
+    match nth_arg(call, n) {
+        Some(expr) => format!("{expr}").trim() == "true",
+        None => false,
+    }
+}
+
+pub fn first_string_arg(call: &FunctionCall) -> Option<String> {
+    let expr = nth_arg(call, 0)?;
+    expr_to_string(expr)
+}
+
+pub fn expr_to_string(expr: &Expression) -> Option<String> {
+    let s = format!("{expr}");
+    let s = s.trim();
+    if s.len() >= 2 {
+        if (s.starts_with('"') && s.ends_with('"')) || (s.starts_with('\'') && s.ends_with('\'')) {
+            return Some(s[1..s.len() - 1].to_string());
+        }
+    }
+    None
+}
+
+pub fn is_likely_for_iterator(source: &str, pos: usize) -> bool {
+    let before = &source[..pos];
+    let line_start = before.rfind('\n').map(|i| i + 1).unwrap_or(0);
+    let line_prefix = &source[line_start..pos];
+    let trimmed = line_prefix.trim_start();
+    trimmed.starts_with("for ") && trimmed.contains(" in ")
 }
 
 // --- Statement walker (for tracking "not assigned" context) ---

@@ -31,10 +31,17 @@ pub fn run(path: &Path, config: &Config) -> (usize, Vec<Diagnostic>) {
     let n = files.len();
     let rules = crate::rules::all();
 
-    let mut diags: Vec<Diagnostic> = files
-        .par_iter()
-        .flat_map(|file| lint_file(file, &rules, config))
-        .collect();
+    let pool = rayon::ThreadPoolBuilder::new()
+        .stack_size(8 * 1024 * 1024)
+        .build()
+        .expect("failed to build rayon pool");
+
+    let mut diags: Vec<Diagnostic> = pool.install(|| {
+        files
+            .par_iter()
+            .flat_map(|file| lint_file(file, &rules, config))
+            .collect()
+    });
 
     diags.sort_by(|a, b| a.file.cmp(&b.file).then(a.line.cmp(&b.line)));
 
