@@ -96,6 +96,22 @@ pub fn is_method_call(call: &FunctionCall, method: &str) -> bool {
     false
 }
 
+pub fn method_call_arg_count(call: &FunctionCall, method: &str) -> usize {
+    for suffix in call.suffixes() {
+        if let Suffix::Call(Call::MethodCall(mc)) = suffix {
+            if tok_text(mc.name()) == method {
+                return match mc.args() {
+                    FunctionArgs::Parentheses { arguments, .. } => arguments.len(),
+                    FunctionArgs::String(_) => 1,
+                    FunctionArgs::TableConstructor(_) => 1,
+                    _ => 0,
+                };
+            }
+        }
+    }
+    0
+}
+
 pub fn is_bare_call(call: &FunctionCall, name: &str) -> bool {
     let tok = match prefix_token(call) {
         Some(t) => t,

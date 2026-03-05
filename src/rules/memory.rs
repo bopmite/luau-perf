@@ -21,7 +21,7 @@ impl Rule for UntrackedConnection {
                 Stmt::FunctionCall(c) => c,
                 _ => return,
             };
-            if visit::is_method_call(call, "Connect") || visit::is_method_call(call, "Once") {
+            if visit::is_method_call(call, "Connect") && visit::method_call_arg_count(call, "Connect") == 1 {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
                     msg: ":Connect() result not stored — track for cleanup to prevent memory leaks".into(),
@@ -62,8 +62,15 @@ impl Rule for ConnectInLoop {
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
-        visit::each_call(ast, |call, ctx| {
-            if ctx.in_loop && (visit::is_method_call(call, "Connect") || visit::is_method_call(call, "Once")) {
+        visit::each_stmt(ast.nodes(), false, &mut |stmt, in_loop| {
+            if !in_loop {
+                return;
+            }
+            let call = match stmt {
+                Stmt::FunctionCall(c) => c,
+                _ => return,
+            };
+            if visit::is_method_call(call, "Connect") && visit::method_call_arg_count(call, "Connect") == 1 {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
                     msg: ":Connect() in loop — creates N connections, likely a memory leak".into(),

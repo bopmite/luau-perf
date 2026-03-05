@@ -40,14 +40,14 @@ luauperf --init
 Drop a `luauperf.toml` in your project root:
 
 ```toml
-[rules]
-# Override severity per rule: "error", "warn", or "allow".
-roblox::missing_strict = "allow"
-cache::magnitude_over_squared = "error"
-roblox::pcall_in_loop = "warn"
-
 # Exclude paths (substring match).
 exclude = ["Packages/", "Generated/", "node_modules/"]
+
+[rules]
+# Override severity per rule: "error", "warn", or "allow".
+"roblox::missing_strict" = "allow"
+"cache::magnitude_over_squared" = "error"
+"roblox::pcall_in_loop" = "warn"
 ```
 
 ## Rules
