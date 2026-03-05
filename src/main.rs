@@ -42,21 +42,21 @@ fn main() {
         }
     }
 
-    let denies = diags.iter().filter(|d| d.severity == lint::Severity::Deny).count();
-    let warns = diags.len() - denies;
+    let errors = diags.iter().filter(|d| d.severity == lint::Severity::Error).count();
+    let warns = diags.len() - errors;
 
     if !json {
         if diags.is_empty() {
             eprintln!("\x1b[32m✓\x1b[0m {} files clean ({:.2}s)", n_files, elapsed.as_secs_f64());
         } else {
             eprintln!(
-                "\n\x1b[1m{}\x1b[0m issues ({} deny, {} warn) across {} files ({:.2}s)",
-                diags.len(), denies, warns, n_files, elapsed.as_secs_f64()
+                "\n\x1b[1m{}\x1b[0m issues ({} error, {} warn) across {} files ({:.2}s)",
+                diags.len(), errors, warns, n_files, elapsed.as_secs_f64()
             );
         }
     }
 
-    if denies > 0 {
+    if errors > 0 {
         process::exit(1);
     }
 }

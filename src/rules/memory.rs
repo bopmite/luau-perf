@@ -7,7 +7,7 @@ pub struct UntrackedTaskSpawn;
 
 impl Rule for UntrackedConnection {
     fn id(&self) -> &'static str { "memory::untracked_connection" }
-    fn severity(&self) -> Severity { Severity::Deny }
+    fn severity(&self) -> Severity { Severity::Error }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();

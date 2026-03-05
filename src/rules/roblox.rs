@@ -8,7 +8,7 @@ pub struct MissingNative;
 
 impl Rule for DeprecatedWait {
     fn id(&self) -> &'static str { "roblox::deprecated_wait" }
-    fn severity(&self) -> Severity { Severity::Deny }
+    fn severity(&self) -> Severity { Severity::Error }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -26,7 +26,7 @@ impl Rule for DeprecatedWait {
 
 impl Rule for DeprecatedSpawn {
     fn id(&self) -> &'static str { "roblox::deprecated_spawn" }
-    fn severity(&self) -> Severity { Severity::Deny }
+    fn severity(&self) -> Severity { Severity::Error }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();

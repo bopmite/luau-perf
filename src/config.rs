@@ -44,11 +44,11 @@ pub fn write_default() {
     let content = r#"# luperf.toml
 
 [rules]
-# "deny", "warn", or "allow"
-# complexity::table_find_in_loop = "deny"
+# "error", "warn", or "allow"
+# complexity::table_find_in_loop = "error"
 # cache::magnitude_over_squared = "warn"
-# memory::untracked_connection = "deny"
-# roblox::deprecated_wait = "deny"
+# memory::untracked_connection = "error"
+# roblox::deprecated_wait = "error"
 
 exclude = ["Packages/", "Generated/"]
 "#;

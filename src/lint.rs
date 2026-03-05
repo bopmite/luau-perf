@@ -5,7 +5,7 @@ use std::path::PathBuf;
 pub enum Severity {
     Allow,
     Warn,
-    Deny,
+    Error,
 }
 
 pub struct Diagnostic {
@@ -20,7 +20,7 @@ pub struct Diagnostic {
 impl Diagnostic {
     pub fn print(&self) {
         let (color, label) = match self.severity {
-            Severity::Deny => ("\x1b[31m", "deny"),
+            Severity::Error => ("\x1b[31m", "error"),
             Severity::Warn => ("\x1b[33m", "warn"),
             Severity::Allow => return,
         };
@@ -42,7 +42,7 @@ pub fn print_json(diagnostics: &[Diagnostic]) {
             print!(",");
         }
         let sev = match d.severity {
-            Severity::Deny => "deny",
+            Severity::Error => "error",
             Severity::Warn => "warn",
             Severity::Allow => "allow",
         };

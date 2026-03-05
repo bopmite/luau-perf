@@ -31,7 +31,7 @@ pub fn all() -> Vec<Box<dyn Rule>> {
 pub fn print_all() {
     for rule in all() {
         let sev = match rule.severity() {
-            Severity::Deny => "\x1b[31mdeny\x1b[0m",
+            Severity::Error => "\x1b[31merror\x1b[0m",
             Severity::Warn => "\x1b[33mwarn\x1b[0m",
             Severity::Allow => "allow",
         };

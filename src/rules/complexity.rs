@@ -7,7 +7,7 @@ pub struct TableRemoveShift;
 
 impl Rule for TableFindInLoop {
     fn id(&self) -> &'static str { "complexity::table_find_in_loop" }
-    fn severity(&self) -> Severity { Severity::Deny }
+    fn severity(&self) -> Severity { Severity::Error }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
