@@ -4,9 +4,7 @@ A static performance linter for Luau.
 
 ## What it does
 
-Scans your `.lua` / `.luau` files and flags performance antipatterns - allocations in loops, untracked connections (memory leaks), deprecated APIs, missing `--!native` headers, and things that prevent the Luau VM from using FASTCALL/GETIMPORT optimizations.
-
-Not a type checker. Not a formatter. Just perf.
+Scans `.lua` / `.luau` files for performance antipatterns - allocations in loops, untracked connections, deprecated APIs, missing `--!native` headers, and things that prevent FASTCALL/GETIMPORT optimizations.
 
 ## Install
 
@@ -37,7 +35,7 @@ luauperf src/ --fix
 
 ## Config
 
-Drop a `luauperf.toml` in your project root:
+Add a `luauperf.toml` to your project root:
 
 ```toml
 # Exclude paths (substring match).
@@ -75,21 +73,6 @@ Full list: [RULES.md](RULES.md), or run `luauperf --list-rules`.
 - `error` - Almost certainly a bug or major perf issue.
 - `warn` - Probably a problem, worth looking at.
 - `allow` - Off by default, turn on in config if you want them.
-
-## How it works
-
-Parses Luau with [full_moon](https://github.com/Kampfkarren/full-moon), walks the AST with a visitor that tracks loop and function depth. Some rules use source text matching for patterns that are easier to detect outside the AST. File processing is parallelized with Rayon.
-
-No LSP, no daemon, no background process. Runs, prints, exits.
-
-## CI
-
-```yaml
-- name: Perf lint
-  run: luauperf src/ --format json > perf-lint.json
-```
-
-Exits 1 if any `error` severity issues are found.
 
 ## Building from source
 
