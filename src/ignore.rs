@@ -109,6 +109,12 @@ fn parse_directive(comment: &str, directive: &str) -> Option<Option<HashSet<Stri
     }
     let rest = &comment[directive.len()..];
 
+    let rest = if let Some(idx) = rest.find("--") {
+        rest[..idx].trim_end()
+    } else {
+        rest
+    };
+
     if rest.is_empty() {
         return Some(None);
     }
@@ -605,6 +611,70 @@ local d = wait()
     #[test]
     fn file_directive_bare() {
         let result = parse_directive("luauperf-ignore-file", FILE_PREFIX);
+        assert!(result.unwrap().is_none());
+    }
+
+    // ===== Reason messages =====
+
+    #[test]
+    fn inline_ignore_with_reason() {
+        let src = "local x = wait() -- luauperf-ignore: roblox::deprecated_wait -- legacy code\n";
+        let ig = Ignores::parse(src);
+        assert!(ig.is_ignored(1, "roblox::deprecated_wait"));
+        assert!(!ig.is_ignored(1, "alloc::closure_in_loop"));
+    }
+
+    #[test]
+    fn inline_ignore_multiple_rules_with_reason() {
+        let src = "foo() -- luauperf-ignore: roblox::deprecated_wait, alloc::closure_in_loop -- intentional\n";
+        let ig = Ignores::parse(src);
+        assert!(ig.is_ignored(1, "roblox::deprecated_wait"));
+        assert!(ig.is_ignored(1, "alloc::closure_in_loop"));
+    }
+
+    #[test]
+    fn next_line_ignore_with_reason() {
+        let src = "-- luauperf-ignore-next-line: roblox::deprecated_wait -- cant change this\nlocal x = wait()\n";
+        let ig = Ignores::parse(src);
+        assert!(ig.is_ignored(2, "roblox::deprecated_wait"));
+        assert!(!ig.is_ignored(2, "alloc::closure_in_loop"));
+    }
+
+    #[test]
+    fn bare_ignore_with_reason() {
+        let src = "local x = wait() -- luauperf-ignore -- too noisy\n";
+        let ig = Ignores::parse(src);
+        assert!(ig.is_ignored(1, "roblox::deprecated_wait"));
+        assert!(ig.is_ignored(1, "anything"));
+    }
+
+    #[test]
+    fn file_ignore_with_reason() {
+        let src = "-- luauperf-ignore-file: roblox::deprecated_wait -- legacy module\nlocal x = wait()\n";
+        let ig = Ignores::parse(src);
+        assert!(ig.is_ignored(2, "roblox::deprecated_wait"));
+        assert!(!ig.is_ignored(2, "alloc::closure_in_loop"));
+    }
+
+    #[test]
+    fn reason_with_commas_not_parsed_as_rules() {
+        let src = "foo() -- luauperf-ignore: alloc::string_interp_in_loop -- needs to be ignored, doesnt work otherwise\n";
+        let ig = Ignores::parse(src);
+        assert!(ig.is_ignored(1, "alloc::string_interp_in_loop"));
+        assert!(!ig.is_ignored(1, "doesnt work otherwise"));
+    }
+
+    #[test]
+    fn directive_with_reason_parsed() {
+        let result = parse_directive("luauperf-ignore: foo::bar -- some reason", PREFIX);
+        let rules = result.unwrap().unwrap();
+        assert!(rules.contains("foo::bar"));
+        assert_eq!(rules.len(), 1);
+    }
+
+    #[test]
+    fn directive_bare_with_reason_parsed() {
+        let result = parse_directive("luauperf-ignore -- some reason", PREFIX);
         assert!(result.unwrap().is_none());
     }
 }
