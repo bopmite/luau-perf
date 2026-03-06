@@ -16,16 +16,13 @@ cargo install --path .
 
 Or grab a binary from releases.
 
-## Usage
+## Getting started
 
 ```bash
-# Lint a directory.
+# Lint a directory
 luauperf src/
 
-# Lint a single file.
-luauperf src/Server/Services/GunService.luau
-
-# JSON output for CI or editor integration.
+# JSON output for CI or editor integration
 luauperf src/ --format json
 
 # See all available rules.
@@ -33,6 +30,9 @@ luauperf --list-rules
 
 # Generate a config file.
 luauperf --init
+
+# Attempt to automatically fix warnings and errors
+luauperf src/ --fix
 ```
 
 ## Config
