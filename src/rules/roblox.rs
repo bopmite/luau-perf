@@ -1025,10 +1025,18 @@ impl Rule for YieldInConnectCallback {
             if !trimmed.contains(":Connect(function") && !trimmed.contains(":Once(function") {
                 continue;
             }
-            for j in (i + 1)..lines.len().min(i + 30) {
+            let mut depth: i32 = 0;
+            for j in (i + 1)..lines.len().min(i + 50) {
                 let inner = lines[j].trim();
-                if inner == "end)" || inner == "end) " { break; }
-                if inner.contains("task.wait(") || inner.contains(":WaitForChild(") || inner.contains("task.delay(") {
+                let opens = inner.matches("function(").count() + inner.matches("function ()").count();
+                let closes = inner.matches("end)").count() + inner.matches("end,").count();
+                if depth == 0 && closes > 0 && opens == 0 {
+                    break;
+                }
+                depth += opens as i32;
+                depth -= closes as i32;
+                if depth > 0 { continue; }
+                if inner.contains("task.wait(") || inner.contains(":WaitForChild(") {
                     let byte_pos: usize = lines[..j].iter().map(|l| l.len() + 1).sum();
                     hits.push(Hit {
                         pos: byte_pos,

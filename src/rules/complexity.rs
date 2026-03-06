@@ -471,9 +471,13 @@ impl Rule for FilterThenFirst {
                 let inner = lines[j].trim();
                 if inner == "end" { break; }
                 if inner.starts_with("if ") && (inner.contains(":IsA(") || inner.contains(".Name ==") || inner.contains(".ClassName ==")) {
+                    let mut found_collect = false;
                     for k in (j + 1)..lines.len().min(j + 5) {
                         let deeper = lines[k].trim();
-                        if deeper.starts_with("return ") || deeper.starts_with("break") {
+                        if deeper.starts_with("table.insert") || deeper.contains("[#") {
+                            found_collect = true;
+                        }
+                        if (deeper.starts_with("return ") || deeper.starts_with("break")) && !found_collect {
                             let byte_pos: usize = lines[..i].iter().map(|l| l.len() + 1).sum();
                             hits.push(Hit {
                                 pos: byte_pos,
