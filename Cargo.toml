@@ -2,6 +2,12 @@
 name = "luauperf"
 version = "0.1.0"
 edition = "2021"
+description = "A static performance linter for Luau"
+license = "MIT"
+repository = "https://github.com/bopmite/luau-perf"
+readme = "README.md"
+keywords = ["luau", "roblox", "linter", "performance"]
+categories = ["development-tools", "command-line-utilities"]
 
 [[bin]]
 name = "luauperf"
