@@ -41,8 +41,6 @@ impl<F: FnMut(&FunctionCall, &CallCtx)> Visitor for Walker<F> {
     }
 }
 
-// --- FunctionCall extraction ---
-
 pub fn prefix_token(call: &FunctionCall) -> Option<&tokenizer::TokenReference> {
     match call.prefix() {
         Prefix::Name(tok) => Some(tok),
@@ -124,8 +122,6 @@ pub fn is_bare_call(call: &FunctionCall, name: &str) -> bool {
     suffixes.len() == 1 && matches!(suffixes[0], Suffix::Call(Call::AnonymousCall(_)))
 }
 
-// --- Argument inspection helpers ---
-
 pub fn call_args(call: &FunctionCall) -> Option<&FunctionArgs> {
     let mut last_call = None;
     for suffix in call.suffixes() {
@@ -187,8 +183,6 @@ pub fn is_likely_for_iterator(source: &str, pos: usize) -> bool {
     trimmed.starts_with("for ") && trimmed.contains(" in ")
 }
 
-// --- Statement walker (for tracking "not assigned" context) ---
-
 pub fn each_stmt(block: &Block, in_loop: bool, f: &mut impl FnMut(&Stmt, bool)) {
     for stmt in block.stmts() {
         f(stmt, in_loop);
@@ -220,8 +214,6 @@ fn walk_children(stmt: &Stmt, in_loop: bool, f: &mut impl FnMut(&Stmt, bool)) {
     }
 }
 
-// --- Source-text based helpers (for patterns hard to match via AST) ---
-
 pub fn find_pattern_positions(source: &str, pattern: &str) -> Vec<usize> {
     let mut positions = Vec::new();
     let mut start = 0;
@@ -239,7 +231,6 @@ fn in_string_or_comment(source: &str, pos: usize) -> bool {
     let before = &source[..pos];
     let line_start = before.rfind('\n').map(|i| i + 1).unwrap_or(0);
     let line = &source[line_start..pos];
-    // inside a line comment
     if line.contains("--") {
         if let Some(comment_start) = line.find("--") {
             if line_start + comment_start < pos {
@@ -247,8 +238,25 @@ fn in_string_or_comment(source: &str, pos: usize) -> bool {
             }
         }
     }
-    // rough string check: odd number of quotes before position on same line
     let single_quotes = line.chars().filter(|&c| c == '\'').count();
     let double_quotes = line.chars().filter(|&c| c == '"').count();
     single_quotes % 2 != 0 || double_quotes % 2 != 0
+}
+
+/// Snap a byte offset down to the nearest valid UTF-8 char boundary.
+pub fn floor_char(s: &str, i: usize) -> usize {
+    let mut i = i.min(s.len());
+    while i > 0 && !s.is_char_boundary(i) {
+        i -= 1;
+    }
+    i
+}
+
+/// Snap a byte offset up to the nearest valid UTF-8 char boundary.
+pub fn ceil_char(s: &str, i: usize) -> usize {
+    let mut i = i.min(s.len());
+    while i < s.len() && !s.is_char_boundary(i) {
+        i += 1;
+    }
+    i
 }

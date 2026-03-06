@@ -8,6 +8,13 @@ pub struct RepeatedGsub;
 pub struct TostringInLoop;
 pub struct TableCreatePreferred;
 pub struct ExcessiveStringSplit;
+pub struct CoroutineWrapInLoop;
+pub struct TableCreateForDict;
+pub struct MutableUpvalueClosure;
+pub struct UnpackInLoop;
+pub struct RepeatedStringByte;
+pub struct StringInterpInLoop;
+pub struct SelectInLoop;
 
 impl Rule for ClosureInLoop {
     fn id(&self) -> &'static str { "alloc::closure_in_loop" }
@@ -31,11 +38,20 @@ impl Rule for ClosureInLoop {
                 }
                 let line_start = line_starts[line];
                 let before_match = source[line_start..pos].trim();
-                !before_match.is_empty()
+                if before_match.is_empty() {
+                    return false;
+                }
+                // Don't flag closures passed as callback arguments - common pattern
+                // e.g. :Connect(function(), task.spawn(function(), etc.
+                let before_char = source[..pos].trim_end();
+                if before_char.ends_with('(') || before_char.ends_with(',') {
+                    return false;
+                }
+                true
             })
             .map(|pos| Hit {
                 pos,
-                msg: "closure created in loop — allocates each iteration, extract outside loop".into(),
+                msg: "closure created in loop - allocates each iteration, extract outside loop".into(),
             })
             .collect()
     }
@@ -59,12 +75,20 @@ impl Rule for StringConcatInLoop {
         concat_positions
             .into_iter()
             .filter(|&pos| {
+                // Skip "..." (varargs) - check if a third dot follows
+                if pos + 2 < source.len() && source.as_bytes()[pos + 2] == b'.' {
+                    return false;
+                }
+                // Also skip if preceded by a dot (we matched the last two dots of "...")
+                if pos > 0 && source.as_bytes()[pos - 1] == b'.' {
+                    return false;
+                }
                 let line = line_starts.partition_point(|&s| s <= pos).saturating_sub(1);
                 line < loop_depth.len() && loop_depth[line] > 0
             })
             .map(|pos| Hit {
                 pos,
-                msg: "string concatenation (..) in loop — use table.concat or buffer".into(),
+                msg: "string concatenation (..) in loop - use table.concat or buffer".into(),
             })
             .collect()
     }
@@ -90,7 +114,7 @@ impl Rule for StringFormatInLoop {
             if ctx.in_loop && (visit::is_dot_call(call, "string", "format") || visit::is_method_call(call, "format")) {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
-                    msg: "string.format() in loop — allocates a new string each iteration".into(),
+                    msg: "string.format() in loop - allocates a new string each iteration".into(),
                 });
             }
         });
@@ -117,7 +141,7 @@ impl Rule for RepeatedGsub {
             if prev_line != usize::MAX && (line == prev_line || line == prev_line + 1) {
                 hits.push(Hit {
                     pos,
-                    msg: "chained :gsub() calls — each allocates a new string, consider string.gsub with pattern alternation or buffer".into(),
+                    msg: "chained :gsub() calls - each allocates a new string, consider string.gsub with pattern alternation or buffer".into(),
                 });
             }
             prev_line = line;
@@ -136,7 +160,7 @@ impl Rule for TostringInLoop {
             if ctx.in_loop && visit::is_bare_call(call, "tostring") {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
-                    msg: "tostring() in loop — allocates a new string each call".into(),
+                    msg: "tostring() in loop - allocates a new string each call".into(),
                 });
             }
         });
@@ -158,7 +182,7 @@ impl Rule for TableCreatePreferred {
             if line < loop_depth.len() && loop_depth[line] > 0 {
                 hits.push(Hit {
                     pos,
-                    msg: "{} in loop — use table.create(n) with pre-allocated size if array size is known".into(),
+                    msg: "{} in loop - use table.create(n) with pre-allocated size if array size is known".into(),
                 });
             }
         }
@@ -176,11 +200,418 @@ impl Rule for ExcessiveStringSplit {
             if ctx.in_loop && (visit::is_dot_call(call, "string", "split") || visit::is_method_call(call, "split")) {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
-                    msg: "string.split() in loop — allocates new table per call, split once outside loop".into(),
+                    msg: "string.split() in loop - allocates new table per call, split once outside loop".into(),
                 });
             }
         });
         hits
+    }
+}
+
+impl Rule for CoroutineWrapInLoop {
+    fn id(&self) -> &'static str { "alloc::coroutine_wrap_in_loop" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        visit::each_call(ast, |call, ctx| {
+            if ctx.in_loop && visit::is_dot_call(call, "coroutine", "wrap") {
+                hits.push(Hit {
+                    pos: visit::call_pos(call),
+                    msg: "coroutine.wrap() in loop - ~200x slower than a closure, allocates coroutine per iteration".into(),
+                });
+            }
+        });
+        hits
+    }
+}
+
+impl Rule for TableCreateForDict {
+    fn id(&self) -> &'static str { "alloc::table_create_for_dict" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let create_positions = visit::find_pattern_positions(source, "table.create(");
+        if create_positions.is_empty() {
+            return vec![];
+        }
+
+        let mut hits = Vec::new();
+        for &pos in &create_positions {
+            // Look ahead for string-keyed assignments within 300 chars
+            let after_start = pos;
+            let after_end = visit::ceil_char(source, (after_start + 400).min(source.len()));
+            let after = &source[after_start..after_end];
+            let before_start = visit::floor_char(source, pos.saturating_sub(60));
+            let before = &source[before_start..pos];
+            let has_assignment = before.contains("= ") || before.contains("=\t");
+            if !has_assignment {
+                continue;
+            }
+            let mut string_key_count = 0;
+            for line in after.lines().skip(1).take(10) {
+                let trimmed = line.trim();
+                if trimmed.is_empty() || trimmed.starts_with("--") {
+                    continue;
+                }
+                if trimmed == "end" || trimmed.starts_with("return") {
+                    break;
+                }
+                if (trimmed.contains('.') && trimmed.contains(" = "))
+                    || (trimmed.contains("[\"") && trimmed.contains("\"] = "))
+                {
+                    string_key_count += 1;
+                }
+            }
+
+            if string_key_count >= 2 {
+                hits.push(Hit {
+                    pos,
+                    msg: "table.create(n) followed by string-key assignments - table.create only preallocates array part, useless for dicts".into(),
+                });
+            }
+        }
+        hits
+    }
+}
+
+impl Rule for MutableUpvalueClosure {
+    fn id(&self) -> &'static str { "alloc::mutable_upvalue_closure" }
+    fn severity(&self) -> Severity { Severity::Allow }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        // Simplified heuristic: detect a local variable that is both:
+        // 1. reassigned (appears in `varname = ` after initial declaration)
+        // 2. referenced inside a function() ... end block
+        // This forces NEWCLOSURE instead of DUPCLOSURE
+        let mut hits = Vec::new();
+        for pos in visit::find_pattern_positions(source, "function(") {
+            let before_start = visit::floor_char(source, pos.saturating_sub(500));
+            let before = &source[before_start..pos];
+
+            // Look for reassignment pattern: a local that's reassigned before this function
+            // Heuristic: find lines like "varname = " (no local prefix) in the preceding code
+            let mut reassigned_locals: Vec<&str> = Vec::new();
+            for line in before.lines() {
+                let trimmed = line.trim();
+                if trimmed.starts_with("local ") || trimmed.starts_with("--") || trimmed.is_empty() {
+                    continue;
+                }
+                if let Some(eq_pos) = trimmed.find(" = ") {
+                    let lhs = trimmed[..eq_pos].trim();
+                    if !lhs.is_empty()
+                        && !lhs.contains('.')
+                        && !lhs.contains('[')
+                        && !lhs.contains(':')
+                        && !lhs.contains('(')
+                        && lhs.chars().all(|c| c.is_alphanumeric() || c == '_')
+                    {
+                        let decl_pattern = format!("local {lhs}");
+                        if before.contains(&decl_pattern) {
+                            reassigned_locals.push(lhs);
+                        }
+                    }
+                }
+            }
+
+            if reassigned_locals.is_empty() {
+                continue;
+            }
+            let func_end = visit::ceil_char(source, (pos + 500).min(source.len()));
+            let func_body = &source[pos..func_end];
+            for local_name in &reassigned_locals {
+                if func_body.contains(local_name) {
+                    hits.push(Hit {
+                        pos,
+                        msg: format!("closure captures reassigned local '{local_name}' - forces NEWCLOSURE (allocation) instead of DUPCLOSURE (free)"),
+                    });
+                    break;
+                }
+            }
+        }
+        hits
+    }
+}
+
+impl Rule for UnpackInLoop {
+    fn id(&self) -> &'static str { "alloc::unpack_in_loop" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        visit::each_call(ast, |call, ctx| {
+            if !ctx.in_loop {
+                return;
+            }
+            if visit::is_bare_call(call, "unpack") || visit::is_dot_call(call, "table", "unpack") {
+                hits.push(Hit {
+                    pos: visit::call_pos(call),
+                    msg: "unpack() in loop - creates temporary values on stack each iteration, cache results outside loop".into(),
+                });
+            }
+        });
+        hits
+    }
+}
+
+impl Rule for RepeatedStringByte {
+    fn id(&self) -> &'static str { "alloc::repeated_string_byte" }
+    fn severity(&self) -> Severity { Severity::Allow }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        // Detect multiple string.byte(s, i) calls on same variable in a loop
+        // Could use single string.byte(s, 1, -1)
+        let byte_positions = visit::find_pattern_positions(source, "string.byte(");
+        if byte_positions.len() < 2 {
+            return vec![];
+        }
+
+        let loop_depth = build_loop_depth_map(source);
+        let line_starts = line_start_offsets(source);
+        let mut hits = Vec::new();
+        let mut loop_calls: Vec<(usize, String)> = Vec::new();
+        for &pos in &byte_positions {
+            let line = line_starts.partition_point(|&s| s <= pos).saturating_sub(1);
+            if line >= loop_depth.len() || loop_depth[line] == 0 {
+                continue;
+            }
+            let after = &source[pos + "string.byte(".len()..];
+            if let Some(comma_or_close) = after.find(|c: char| c == ',' || c == ')') {
+                let first_arg = after[..comma_or_close].trim().to_string();
+                if !first_arg.is_empty() {
+                    loop_calls.push((pos, first_arg));
+                }
+            }
+        }
+        let mut counts: std::collections::HashMap<&str, (usize, usize)> = std::collections::HashMap::new();
+        for (pos, arg) in &loop_calls {
+            let entry = counts.entry(arg.as_str()).or_insert((0, *pos));
+            entry.0 += 1;
+        }
+        for (arg, (count, pos)) in &counts {
+            if *count >= 3 {
+                hits.push(Hit {
+                    pos: *pos,
+                    msg: format!("string.byte({arg}, i) called {count}x in loop - use string.byte({arg}, 1, -1) once to get all bytes"),
+                });
+            }
+        }
+        hits
+    }
+}
+
+impl Rule for StringInterpInLoop {
+    fn id(&self) -> &'static str { "alloc::string_interp_in_loop" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        // Detect backtick string interpolation (`...{expr}...`) inside loops
+        // Backtick strings allocate a new string each time, just like concatenation
+        let backtick_positions = visit::find_pattern_positions(source, "`");
+        if backtick_positions.is_empty() {
+            return vec![];
+        }
+
+        let loop_depth = build_loop_depth_map(source);
+        let line_starts = line_start_offsets(source);
+        let mut hits = Vec::new();
+        let mut skip_until = 0usize;
+
+        for &pos in &backtick_positions {
+            if pos < skip_until {
+                continue;
+            }
+            let line = line_starts.partition_point(|&s| s <= pos).saturating_sub(1);
+            if line >= loop_depth.len() || loop_depth[line] == 0 {
+                continue;
+            }
+            let after_end = visit::ceil_char(source, (pos + 200).min(source.len()));
+            let after = &source[pos + 1..after_end];
+            if let Some(close) = after.find('`') {
+                let interp = &after[..close];
+                if interp.contains('{') {
+                    hits.push(Hit {
+                        pos,
+                        msg: "string interpolation in loop - allocates a new string each iteration, same as concatenation".into(),
+                    });
+                    skip_until = pos + 1 + close + 1;
+                }
+            }
+        }
+        hits
+    }
+}
+
+impl Rule for SelectInLoop {
+    fn id(&self) -> &'static str { "alloc::select_in_loop" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        visit::each_call(ast, |call, ctx| {
+            if ctx.in_loop && visit::is_bare_call(call, "select") {
+                hits.push(Hit {
+                    pos: visit::call_pos(call),
+                    msg: "select() in loop - O(n) per call on varargs, cache results outside loop".into(),
+                });
+            }
+        });
+        hits
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::lint::Rule;
+
+    fn parse(src: &str) -> full_moon::ast::Ast {
+        full_moon::parse(src).unwrap()
+    }
+
+    #[test]
+    fn string_concat_in_loop_detected() {
+        let src = "for i = 1, 10 do\n  local s = a .. b\nend";
+        let ast = parse(src);
+        let hits = StringConcatInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn varargs_not_flagged_as_concat() {
+        let src = "for i = 1, 10 do\n  local args = ...\nend";
+        let ast = parse(src);
+        let hits = StringConcatInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn string_concat_outside_loop_ok() {
+        let src = "local s = a .. b";
+        let ast = parse(src);
+        let hits = StringConcatInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn closure_in_loop_callback_ok() {
+        let src = "for i = 1, 10 do\n  event:Connect(function() end)\nend";
+        let ast = parse(src);
+        let hits = ClosureInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn coroutine_wrap_in_loop_detected() {
+        let src = "for i = 1, 10 do\n  local co = coroutine.wrap(fn)\nend";
+        let ast = parse(src);
+        let hits = CoroutineWrapInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn coroutine_wrap_outside_loop_ok() {
+        let src = "local co = coroutine.wrap(fn)";
+        let ast = parse(src);
+        let hits = CoroutineWrapInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn table_create_for_dict_detected() {
+        let src = "local t = table.create(10)\nt.name = \"foo\"\nt.value = 42";
+        let ast = parse(src);
+        let hits = TableCreateForDict.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn table_create_for_array_ok() {
+        let src = "local t = table.create(10)\nt[1] = \"foo\"\nt[2] = 42";
+        let ast = parse(src);
+        let hits = TableCreateForDict.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn mutable_upvalue_detected() {
+        let src = "local count = 0\ncount = count + 1\nlocal fn = function() return count end";
+        let ast = parse(src);
+        let hits = MutableUpvalueClosure.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+        assert!(hits[0].msg.contains("NEWCLOSURE"));
+    }
+
+    #[test]
+    fn immutable_upvalue_ok() {
+        let src = "local count = 0\nlocal fn = function() return count end";
+        let ast = parse(src);
+        let hits = MutableUpvalueClosure.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn unpack_in_loop_detected() {
+        let src = "for i = 1, 10 do\n  local a, b = unpack(t)\nend";
+        let ast = parse(src);
+        let hits = UnpackInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn unpack_outside_loop_ok() {
+        let src = "local a, b = unpack(t)";
+        let ast = parse(src);
+        let hits = UnpackInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn table_unpack_in_loop_detected() {
+        let src = "for i = 1, 10 do\n  local a, b = table.unpack(t)\nend";
+        let ast = parse(src);
+        let hits = UnpackInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn string_interp_in_loop_detected() {
+        let src = "for i = 1, 10 do\n  local s = `hello {name}`\nend";
+        let ast = parse(src);
+        let hits = StringInterpInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn string_interp_outside_loop_ok() {
+        let src = "local s = `hello {name}`";
+        let ast = parse(src);
+        let hits = StringInterpInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn backtick_no_interp_not_flagged() {
+        let src = "for i = 1, 10 do\n  local s = `hello world`\nend";
+        let ast = parse(src);
+        let hits = StringInterpInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn select_in_loop_detected() {
+        let src = "for i = 1, n do\n  local v = select(i, ...)\nend";
+        let ast = parse(src);
+        let hits = SelectInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn select_outside_loop_ok() {
+        let src = "local n = select(\"#\", ...)";
+        let ast = parse(src);
+        let hits = SelectInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 0);
     }
 }
 

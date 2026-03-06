@@ -20,7 +20,7 @@ impl Rule for LenOverHash {
                 if !src.contains("table") {
                     hits.push(Hit {
                         pos: visit::call_pos(call),
-                        msg: "string.len(s) / s:len() — use #s instead (faster, no function call)".into(),
+                        msg: "string.len(s) / s:len() - use #s instead (faster, no function call)".into(),
                     });
                 }
             }
@@ -39,7 +39,7 @@ impl Rule for RepInLoop {
             if ctx.in_loop && (visit::is_dot_call(call, "string", "rep") || visit::is_method_call(call, "rep")) {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
-                    msg: "string.rep() in loop — allocates a new string each iteration".into(),
+                    msg: "string.rep() in loop - allocates a new string each iteration".into(),
                 });
             }
         });
@@ -60,7 +60,7 @@ impl Rule for GsubForFind {
             if inside.contains(", \"\"") || inside.contains(", ''") {
                 hits.push(Hit {
                     pos,
-                    msg: ":gsub(pattern, \"\") to strip chars — use string.find() if only checking existence".into(),
+                    msg: ":gsub(pattern, \"\") to strip chars - use string.find() if only checking existence".into(),
                 });
             }
         }
@@ -85,7 +85,7 @@ impl Rule for LowerUpperInLoop {
             if is_case {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
-                    msg: "string.lower/upper in loop — allocates new string per call, cache if input is constant".into(),
+                    msg: "string.lower/upper in loop - allocates new string per call, cache if input is constant".into(),
                 });
             }
         });
@@ -108,7 +108,7 @@ impl Rule for ByteComparison {
                         if s.trim() == e.trim() {
                             hits.push(Hit {
                                 pos: visit::call_pos(call),
-                                msg: "string.sub(s, i, i) for single char — use string.byte(s, i) for comparison (no allocation)".into(),
+                                msg: "string.sub(s, i, i) for single char - use string.byte(s, i) for comparison (no allocation)".into(),
                             });
                         }
                     }
@@ -133,7 +133,7 @@ impl Rule for SubForSingleChar {
                         if s.trim() == "1" || s.trim() == "-1" {
                             hits.push(Hit {
                                 pos: visit::call_pos(call),
-                                msg: "string.sub for single char extraction — use string.byte for comparisons (avoids allocation)".into(),
+                                msg: "string.sub for single char extraction - use string.byte for comparisons (avoids allocation)".into(),
                             });
                         }
                     }
@@ -141,5 +141,79 @@ impl Rule for SubForSingleChar {
             }
         });
         hits
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::lint::Rule;
+
+    fn parse(src: &str) -> full_moon::ast::Ast {
+        full_moon::parse(src).unwrap()
+    }
+
+    #[test]
+    fn len_over_hash_detected() {
+        let src = "local n = string.len(s)";
+        let ast = parse(src);
+        let hits = LenOverHash.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn hash_operator_not_flagged() {
+        let src = "local n = #s";
+        let ast = parse(src);
+        let hits = LenOverHash.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn rep_in_loop_detected() {
+        let src = "for i = 1, 10 do\n  local s = string.rep(\"x\", i)\nend";
+        let ast = parse(src);
+        let hits = RepInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn rep_outside_loop_ok() {
+        let src = "local s = string.rep(\"x\", 10)";
+        let ast = parse(src);
+        let hits = RepInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn gsub_for_find_detected() {
+        let src = "local clean = s:gsub(\"%s\", \"\")";
+        let ast = parse(src);
+        let hits = GsubForFind.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn gsub_with_replacement_not_flagged() {
+        let src = "local s = s:gsub(\"old\", \"new\")";
+        let ast = parse(src);
+        let hits = GsubForFind.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn lower_in_loop_detected() {
+        let src = "for i = 1, 10 do\n  local l = string.lower(s)\nend";
+        let ast = parse(src);
+        let hits = LowerUpperInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn lower_outside_loop_ok() {
+        let src = "local l = string.lower(s)";
+        let ast = parse(src);
+        let hits = LowerUpperInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 0);
     }
 }

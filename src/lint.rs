@@ -19,11 +19,17 @@ pub struct Diagnostic {
     pub fix: Option<crate::fix::Fix>,
 }
 
-pub fn print_report(diagnostics: &[Diagnostic], base: &Path, n_files: usize, elapsed: Duration) {
+pub fn print_report(diagnostics: &[Diagnostic], base: &Path, n_files: usize, elapsed: Duration, parse_errors: usize) {
     if diagnostics.is_empty() {
+        let extra = if parse_errors > 0 {
+            format!(" · \x1b[33m{parse_errors} skipped (parse errors)\x1b[0m")
+        } else {
+            String::new()
+        };
         eprintln!(
-            "\n {} files checked · no issues · {:.2}s",
+            "\n {} files checked · no issues{} · {:.2}s",
             n_files,
+            extra,
             elapsed.as_secs_f64()
         );
         return;
@@ -104,10 +110,16 @@ pub fn print_report(diagnostics: &[Diagnostic], base: &Path, n_files: usize, ela
 
     let summary_color = if errors > 0 { "\x1b[1;31m" } else { "\x1b[1;33m" };
 
+    let skip_part = if parse_errors > 0 {
+        format!(" · \x1b[33m{parse_errors} skipped\x1b[0m")
+    } else {
+        String::new()
+    };
+
     eprintln!();
     eprintln!(" \x1b[90m{}\x1b[0m", "─".repeat(60));
     eprintln!(
-        " {summary_color}{} {}\x1b[0m  ({}, {}) in {} files · {:.2}s",
+        " {summary_color}{} {}\x1b[0m  ({}, {}) in {} files{} · {:.2}s",
         diagnostics.len(),
         if diagnostics.len() == 1 {
             "issue"
@@ -117,8 +129,32 @@ pub fn print_report(diagnostics: &[Diagnostic], base: &Path, n_files: usize, ela
         err_part,
         warn_part,
         n_files,
+        skip_part,
         elapsed.as_secs_f64()
     );
+}
+
+pub fn print_summary(diagnostics: &[Diagnostic], n_files: usize, elapsed: Duration, parse_errors: usize) {
+    let errors = diagnostics.iter().filter(|d| d.severity == Severity::Error).count();
+    let warns = diagnostics.len() - errors;
+
+    let skip_part = if parse_errors > 0 {
+        format!(" · {parse_errors} skipped")
+    } else {
+        String::new()
+    };
+
+    if diagnostics.is_empty() {
+        eprintln!(
+            " {} files · no issues{} · {:.2}s",
+            n_files, skip_part, elapsed.as_secs_f64()
+        );
+    } else {
+        eprintln!(
+            " {} files · {} errors · {} warnings{} · {:.2}s",
+            n_files, errors, warns, skip_part, elapsed.as_secs_f64()
+        );
+    }
 }
 
 pub fn print_json(diagnostics: &[Diagnostic]) {

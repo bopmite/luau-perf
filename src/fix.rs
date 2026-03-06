@@ -19,6 +19,10 @@ pub fn compute_fix(rule_id: &str, source: &str, pos: usize) -> Option<Fix> {
         "math::floor_division" => fix_floor_division(source, pos),
         "string::len_over_hash" => fix_len_over_hash(source, pos),
         "table::getn_deprecated" => fix_getn_deprecated(source, pos),
+        "math::fmod_over_modulo" => fix_fmod_over_modulo(source, pos),
+        "roblox::missing_optimize" => fix_missing_optimize(source),
+        "table::foreach_deprecated" => fix_foreach_deprecated(source, pos),
+        "table::maxn_deprecated" => fix_maxn_deprecated(source, pos),
         _ => None,
     }
 }
@@ -159,7 +163,7 @@ fn fix_len_over_hash(source: &str, pos: usize) -> Option<Fix> {
     let close = find_matching_paren(source, after_paren)?;
     let inside = source.get(after_paren..close)?;
     if !inside.trim().is_empty() {
-        return None; // has arguments, not a simple :len()
+        return None;
     }
 
     Some(Fix {
@@ -171,6 +175,102 @@ fn fix_len_over_hash(source: &str, pos: usize) -> Option<Fix> {
 
 fn fix_getn_deprecated(source: &str, pos: usize) -> Option<Fix> {
     let prefix = "table.getn(";
+    let slice = source.get(pos..pos + prefix.len())?;
+    if slice != prefix {
+        return None;
+    }
+
+    let after = pos + prefix.len();
+    let close = find_matching_paren(source, after)?;
+    let arg = source.get(after..close)?.trim();
+    if arg.is_empty() {
+        return None;
+    }
+
+    Some(Fix {
+        start: pos,
+        end: close + 1,
+        replacement: format!("#{arg}"),
+    })
+}
+
+fn fix_fmod_over_modulo(source: &str, pos: usize) -> Option<Fix> {
+    let prefix = "math.fmod(";
+    let slice = source.get(pos..pos + prefix.len())?;
+    if slice != prefix {
+        return None;
+    }
+
+    let after_paren = pos + prefix.len();
+    let close = find_matching_paren(source, after_paren)?;
+    let inside = source.get(after_paren..close)?;
+
+    let comma_idx = inside.find(',')?;
+    let a = inside[..comma_idx].trim();
+    let b = inside[comma_idx + 1..].trim();
+    if a.is_empty() || b.is_empty() {
+        return None;
+    }
+    if a.contains(',') || b.contains(',') {
+        return None;
+    }
+
+    Some(Fix {
+        start: pos,
+        end: close + 1,
+        replacement: format!("{a} % {b}"),
+    })
+}
+
+fn fix_missing_optimize(source: &str) -> Option<Fix> {
+    if let Some(native_pos) = source.find("--!native") {
+        let line_end = source[native_pos..].find('\n').map(|i| native_pos + i + 1)?;
+        Some(Fix {
+            start: line_end,
+            end: line_end,
+            replacement: "--!optimize 2\n".into(),
+        })
+    } else {
+        Some(Fix {
+            start: 0,
+            end: 0,
+            replacement: "--!optimize 2\n".into(),
+        })
+    }
+}
+
+fn fix_foreach_deprecated(source: &str, pos: usize) -> Option<Fix> {
+    // table.foreach(t, fn) → for k, v in pairs(t) do fn(k, v) end
+    let is_foreachi = source.get(pos..)?.starts_with("table.foreachi(");
+    let prefix = if is_foreachi { "table.foreachi(" } else { "table.foreach(" };
+    if !source.get(pos..)?.starts_with(prefix) {
+        return None;
+    }
+
+    let after_paren = pos + prefix.len();
+    let close = find_matching_paren(source, after_paren)?;
+    let inside = source.get(after_paren..close)?;
+
+    let comma_idx = inside.find(',')?;
+    let table_arg = inside[..comma_idx].trim();
+    let func_arg = inside[comma_idx + 1..].trim();
+    if table_arg.is_empty() || func_arg.is_empty() {
+        return None;
+    }
+    if func_arg.contains(',') || func_arg.contains('(') {
+        return None;
+    }
+
+    let (iter_fn, k_var) = if is_foreachi { ("ipairs", "i") } else { ("pairs", "k") };
+    Some(Fix {
+        start: pos,
+        end: close + 1,
+        replacement: format!("for {k_var}, v in {iter_fn}({table_arg}) do {func_arg}({k_var}, v) end"),
+    })
+}
+
+fn fix_maxn_deprecated(source: &str, pos: usize) -> Option<Fix> {
+    let prefix = "table.maxn(";
     let slice = source.get(pos..pos + prefix.len())?;
     if slice != prefix {
         return None;
@@ -220,12 +320,11 @@ pub fn apply_fixes(
     for (path, mut fixes) in fixes_by_file {
         fixes.sort_by(|a, b| b.start.cmp(&a.start));
 
-        // Merge same-position insertions (e.g. --!native + --!strict at pos 0)
         merge_same_position(&mut fixes);
 
         if has_overlaps(&fixes) {
             eprintln!(
-                " \x1b[33mskipping\x1b[0m {} — overlapping fixes detected",
+                " \x1b[33mskipping\x1b[0m {} - overlapping fixes detected",
                 path.display()
             );
             continue;
@@ -486,5 +585,50 @@ mod tests {
     fn test_unfixable_rule_returns_none() {
         let src = "something";
         assert!(compute_fix("complexity::table_find_in_loop", src, 0).is_none());
+    }
+
+    #[test]
+    fn test_fix_fmod_over_modulo() {
+        let src = "math.fmod(a, b)";
+        let fix = compute_fix("math::fmod_over_modulo", src, 0).unwrap();
+        let mut result = src.to_string();
+        result.replace_range(fix.start..fix.end, &fix.replacement);
+        assert_eq!(result, "a % b");
+    }
+
+    #[test]
+    fn test_fix_missing_optimize_after_native() {
+        let src = "--!native\nlocal x = 1\n";
+        let fix = compute_fix("roblox::missing_optimize", src, 0).unwrap();
+        assert_eq!(fix.start, 10);
+        assert_eq!(fix.end, 10);
+        assert_eq!(fix.replacement, "--!optimize 2\n");
+    }
+
+    #[test]
+    fn test_fix_foreach_deprecated() {
+        let src = "table.foreach(myTable, myFunc)";
+        let fix = compute_fix("table::foreach_deprecated", src, 0).unwrap();
+        let mut result = src.to_string();
+        result.replace_range(fix.start..fix.end, &fix.replacement);
+        assert_eq!(result, "for k, v in pairs(myTable) do myFunc(k, v) end");
+    }
+
+    #[test]
+    fn test_fix_foreachi_deprecated() {
+        let src = "table.foreachi(myTable, myFunc)";
+        let fix = compute_fix("table::foreach_deprecated", src, 0).unwrap();
+        let mut result = src.to_string();
+        result.replace_range(fix.start..fix.end, &fix.replacement);
+        assert_eq!(result, "for i, v in ipairs(myTable) do myFunc(i, v) end");
+    }
+
+    #[test]
+    fn test_fix_maxn_deprecated() {
+        let src = "table.maxn(myTable)";
+        let fix = compute_fix("table::maxn_deprecated", src, 0).unwrap();
+        let mut result = src.to_string();
+        result.replace_range(fix.start..fix.end, &fix.replacement);
+        assert_eq!(result, "#myTable");
     }
 }

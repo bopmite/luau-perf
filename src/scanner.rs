@@ -24,7 +24,15 @@ fn discover(path: &Path) -> Vec<PathBuf> {
         .collect()
 }
 
-pub fn run(path: &Path, config: &Config, fix_mode: bool) -> (usize, Vec<Diagnostic>, usize, usize) {
+pub struct RunResult {
+    pub n_files: usize,
+    pub diags: Vec<Diagnostic>,
+    pub files_fixed: usize,
+    pub fixes_applied: usize,
+    pub parse_errors: usize,
+}
+
+pub fn run(path: &Path, config: &Config, fix_mode: bool, dry_run: bool) -> RunResult {
     let files: Vec<PathBuf> = discover(path)
         .into_iter()
         .filter(|f| !config.is_excluded(f))
@@ -38,25 +46,33 @@ pub fn run(path: &Path, config: &Config, fix_mode: bool) -> (usize, Vec<Diagnost
         .build()
         .expect("failed to build rayon pool");
 
+    let parse_errors = std::sync::atomic::AtomicUsize::new(0);
+
     let mut diags: Vec<Diagnostic> = pool.install(|| {
         files
             .par_iter()
-            .flat_map(|file| lint_file(file, &rules, config, fix_mode))
+            .flat_map(|file| lint_file(file, &rules, config, fix_mode, &parse_errors))
             .collect()
     });
 
     diags.sort_by(|a, b| a.file.cmp(&b.file).then(a.line.cmp(&b.line)));
 
-    let (files_fixed, fixes_applied) = if fix_mode {
+    let (files_fixed, fixes_applied) = if fix_mode && !dry_run {
         apply_all_fixes(&mut diags)
     } else {
         (0, 0)
     };
 
-    (n, diags, files_fixed, fixes_applied)
+    RunResult {
+        n_files: n,
+        diags,
+        files_fixed,
+        fixes_applied,
+        parse_errors: parse_errors.load(std::sync::atomic::Ordering::Relaxed),
+    }
 }
 
-fn lint_file(path: &Path, rules: &[Box<dyn Rule>], config: &Config, fix_mode: bool) -> Vec<Diagnostic> {
+fn lint_file(path: &Path, rules: &[Box<dyn Rule>], config: &Config, fix_mode: bool, parse_errors: &std::sync::atomic::AtomicUsize) -> Vec<Diagnostic> {
     let source = match std::fs::read_to_string(path) {
         Ok(s) => s,
         Err(_) => return vec![],
@@ -64,7 +80,10 @@ fn lint_file(path: &Path, rules: &[Box<dyn Rule>], config: &Config, fix_mode: bo
 
     let ast = match full_moon::parse(&source) {
         Ok(ast) => ast,
-        Err(_) => return vec![],
+        Err(_) => {
+            parse_errors.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            return vec![];
+        }
     };
 
     let idx = LineIndex::new(&source);

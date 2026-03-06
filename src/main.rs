@@ -19,12 +19,24 @@ fn main() {
         "--help" | "-h" => return usage(),
         "--list-rules" => return rules::print_all(),
         "--init" => return config::write_default(),
+        "--explain" => {
+            if let Some(rule_id) = args.get(1) {
+                return rules::explain(rule_id);
+            } else {
+                eprintln!("\x1b[31merror\x1b[0m: --explain requires a rule ID");
+                eprintln!("Example: luauperf --explain roblox::deprecated_wait");
+                process::exit(1);
+            }
+        }
         _ => {}
     }
 
     let path = PathBuf::from(&args[0]);
     let json = has_flag(&args, "--format", "json");
     let fix_mode = args.iter().any(|a| a == "--fix");
+    let dry_run = args.iter().any(|a| a == "--dry-run");
+    let quiet = args.iter().any(|a| a == "--quiet" || a == "-q");
+    let max_warnings = parse_usize_flag(&args, "--max-warnings");
 
     if !path.exists() {
         eprintln!("\x1b[31merror\x1b[0m: '{}' does not exist", path.display());
@@ -33,10 +45,19 @@ fn main() {
 
     let cfg = config::load(&path);
     let t = Instant::now();
-    let (n_files, diags, files_fixed, fixes_applied) = scanner::run(&path, &cfg, fix_mode);
+    let result = scanner::run(&path, &cfg, fix_mode, dry_run);
     let elapsed = t.elapsed();
 
-    if fix_mode && fixes_applied > 0 {
+    let scanner::RunResult { n_files, diags, files_fixed, fixes_applied, parse_errors } = result;
+
+    if fix_mode && dry_run {
+        let fixable = diags.iter().filter(|d| d.fix.is_some()).count();
+        eprintln!(
+            "\n \x1b[1;33mDry run\x1b[0m: {} fixable {} found (no changes written)",
+            fixable,
+            if fixable == 1 { "issue" } else { "issues" },
+        );
+    } else if fix_mode && fixes_applied > 0 {
         eprintln!(
             "\n \x1b[1;32mFixed\x1b[0m {} {} in {} {}",
             fixes_applied,
@@ -48,8 +69,10 @@ fn main() {
 
     if json {
         lint::print_json(&diags);
+    } else if quiet {
+        lint::print_summary(&diags, n_files, elapsed, parse_errors);
     } else if !diags.is_empty() {
-        lint::print_report(&diags, &path, n_files, elapsed);
+        lint::print_report(&diags, &path, n_files, elapsed, parse_errors);
     } else if fix_mode {
         eprintln!(
             "\n {} files checked · no remaining issues · {:.2}s",
@@ -57,11 +80,22 @@ fn main() {
             elapsed.as_secs_f64()
         );
     } else {
-        lint::print_report(&diags, &path, n_files, elapsed);
+        lint::print_report(&diags, &path, n_files, elapsed, parse_errors);
     }
 
     if diags.iter().any(|d| d.severity == lint::Severity::Error) {
         process::exit(1);
+    }
+
+    if let Some(max) = max_warnings {
+        let warn_count = diags.iter().filter(|d| d.severity == lint::Severity::Warn).count();
+        if warn_count > max {
+            eprintln!(
+                "\n \x1b[1;31merror\x1b[0m: {} warnings exceed --max-warnings {}",
+                warn_count, max,
+            );
+            process::exit(1);
+        }
     }
 }
 
@@ -69,12 +103,22 @@ fn has_flag(args: &[String], flag: &str, value: &str) -> bool {
     args.windows(2).any(|w| w[0] == flag && w[1] == value)
 }
 
+fn parse_usize_flag(args: &[String], flag: &str) -> Option<usize> {
+    args.windows(2)
+        .find(|w| w[0] == flag)
+        .and_then(|w| w[1].parse().ok())
+}
+
 fn usage() {
-    eprintln!("luauperf — static performance analyzer for Luau\n");
+    eprintln!("luauperf - static performance analyzer for Luau\n");
     eprintln!("usage: luauperf <path> [options]\n");
-    eprintln!("  --fix            auto-fix safely fixable issues");
-    eprintln!("  --format json    JSON output");
-    eprintln!("  --list-rules     show all rules");
-    eprintln!("  --init           create default luauperf.toml");
-    eprintln!("  -h, --help       this message");
+    eprintln!("  --fix              auto-fix safely fixable issues");
+    eprintln!("  --fix --dry-run    show what --fix would change without writing");
+    eprintln!("  --format json      JSON output");
+    eprintln!("  --quiet, -q        only show summary, no individual diagnostics");
+    eprintln!("  --max-warnings N   exit 1 if more than N warnings");
+    eprintln!("  --list-rules       show all rules");
+    eprintln!("  --explain <id>     explain a specific rule");
+    eprintln!("  --init             create default luauperf.toml");
+    eprintln!("  -h, --help         this message");
 }

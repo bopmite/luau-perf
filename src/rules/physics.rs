@@ -24,7 +24,7 @@ impl Rule for SpatialQueryInLoop {
             if is_spatial {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
-                    msg: "spatial query in loop — expensive physics operation, consider batching or caching".into(),
+                    msg: "spatial query in loop - expensive physics operation, consider batching or caching".into(),
                 });
             }
         });
@@ -42,10 +42,52 @@ impl Rule for MoveToInLoop {
             if ctx.in_loop && visit::is_method_call(call, "MoveTo") {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
-                    msg: ":MoveTo() in loop — consider workspace:BulkMoveTo() for batch part movement".into(),
+                    msg: ":MoveTo() in loop - consider workspace:BulkMoveTo() for batch part movement".into(),
                 });
             }
         });
         hits
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::lint::Rule;
+
+    fn parse(src: &str) -> full_moon::ast::Ast {
+        full_moon::parse(src).unwrap()
+    }
+
+    #[test]
+    fn spatial_query_in_loop_detected() {
+        let src = "for i = 1, 10 do\n  workspace:Raycast(origin, dir)\nend";
+        let ast = parse(src);
+        let hits = SpatialQueryInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn spatial_query_outside_loop_ok() {
+        let src = "local result = workspace:Raycast(origin, dir)";
+        let ast = parse(src);
+        let hits = SpatialQueryInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn move_to_in_loop_detected() {
+        let src = "for _, part in parts do\n  part:MoveTo(pos)\nend";
+        let ast = parse(src);
+        let hits = MoveToInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn move_to_outside_loop_ok() {
+        let src = "model:MoveTo(pos)";
+        let ast = parse(src);
+        let hits = MoveToInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 0);
     }
 }

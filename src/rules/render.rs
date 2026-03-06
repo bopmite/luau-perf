@@ -28,7 +28,7 @@ impl Rule for GuiCreationInLoop {
                 if src.contains(class) {
                     hits.push(Hit {
                         pos: visit::call_pos(call),
-                        msg: format!("GUI instance ({class}) created in loop — pre-create or use Clone()"),
+                        msg: format!("GUI instance ({class}) created in loop - pre-create or use Clone()"),
                     });
                     return;
                 }
@@ -52,7 +52,7 @@ impl Rule for BeamTrailInLoop {
             if src.contains("Beam") || src.contains("Trail") {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
-                    msg: "Beam/Trail created in loop — pre-create and reuse".into(),
+                    msg: "Beam/Trail created in loop - pre-create and reuse".into(),
                 });
             }
         });
@@ -74,7 +74,7 @@ impl Rule for ParticleEmitterInLoop {
             if src.contains("ParticleEmitter") {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
-                    msg: "ParticleEmitter created in loop — pre-create and reuse via :Emit()".into(),
+                    msg: "ParticleEmitter created in loop - pre-create and reuse via :Emit()".into(),
                 });
             }
         });
@@ -96,7 +96,7 @@ impl Rule for BillboardGuiInLoop {
             if src.contains("BillboardGui") {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
-                    msg: "BillboardGui created in loop — pre-create template and Clone()".into(),
+                    msg: "BillboardGui created in loop - pre-create template and Clone()".into(),
                 });
             }
         });
@@ -126,12 +126,62 @@ impl Rule for TransparencyChangeInLoop {
                 if line < loop_depth.len() && loop_depth[line] > 0 {
                     hits.push(Hit {
                         pos,
-                        msg: format!("{pattern} in loop — consider TweenService or NumberSequence for smooth transitions"),
+                        msg: format!("{pattern} in loop - consider TweenService or NumberSequence for smooth transitions"),
                     });
                 }
             }
         }
         hits
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::lint::Rule;
+
+    fn parse(src: &str) -> full_moon::ast::Ast {
+        full_moon::parse(src).unwrap()
+    }
+
+    #[test]
+    fn gui_creation_in_loop_detected() {
+        let src = "for i = 1, 10 do\n  local f = Instance.new(\"Frame\")\nend";
+        let ast = parse(src);
+        let hits = GuiCreationInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn gui_creation_outside_loop_ok() {
+        let src = "local f = Instance.new(\"Frame\")";
+        let ast = parse(src);
+        let hits = GuiCreationInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn non_gui_in_loop_not_flagged() {
+        let src = "for i = 1, 10 do\n  local p = Instance.new(\"Part\")\nend";
+        let ast = parse(src);
+        let hits = GuiCreationInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn transparency_in_loop_detected() {
+        let src = "for i = 1, 10 do\n  part.Transparency = i / 10\nend";
+        let ast = parse(src);
+        let hits = TransparencyChangeInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn transparency_outside_loop_ok() {
+        let src = "part.Transparency = 0.5";
+        let ast = parse(src);
+        let hits = TransparencyChangeInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 0);
     }
 }
 
