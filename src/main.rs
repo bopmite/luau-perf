@@ -1,4 +1,5 @@
 mod config;
+mod fix;
 mod lint;
 mod rules;
 mod scanner;
@@ -23,6 +24,7 @@ fn main() {
 
     let path = PathBuf::from(&args[0]);
     let json = has_flag(&args, "--format", "json");
+    let fix_mode = args.iter().any(|a| a == "--fix");
 
     if !path.exists() {
         eprintln!("\x1b[31merror\x1b[0m: '{}' does not exist", path.display());
@@ -31,32 +33,34 @@ fn main() {
 
     let cfg = config::load(&path);
     let t = Instant::now();
-    let (n_files, diags) = scanner::run(&path, &cfg);
+    let (n_files, diags, files_fixed, fixes_applied) = scanner::run(&path, &cfg, fix_mode);
     let elapsed = t.elapsed();
+
+    if fix_mode && fixes_applied > 0 {
+        eprintln!(
+            "\n \x1b[1;32mFixed\x1b[0m {} {} in {} {}",
+            fixes_applied,
+            if fixes_applied == 1 { "issue" } else { "issues" },
+            files_fixed,
+            if files_fixed == 1 { "file" } else { "files" },
+        );
+    }
 
     if json {
         lint::print_json(&diags);
+    } else if !diags.is_empty() {
+        lint::print_report(&diags, &path, n_files, elapsed);
+    } else if fix_mode {
+        eprintln!(
+            "\n {} files checked · no remaining issues · {:.2}s",
+            n_files,
+            elapsed.as_secs_f64()
+        );
     } else {
-        for d in &diags {
-            d.print();
-        }
+        lint::print_report(&diags, &path, n_files, elapsed);
     }
 
-    let errors = diags.iter().filter(|d| d.severity == lint::Severity::Error).count();
-    let warns = diags.len() - errors;
-
-    if !json {
-        if diags.is_empty() {
-            eprintln!("\x1b[32m✓\x1b[0m {} files clean ({:.2}s)", n_files, elapsed.as_secs_f64());
-        } else {
-            eprintln!(
-                "\n\x1b[1m{}\x1b[0m issues ({} error, {} warn) across {} files ({:.2}s)",
-                diags.len(), errors, warns, n_files, elapsed.as_secs_f64()
-            );
-        }
-    }
-
-    if errors > 0 {
+    if diags.iter().any(|d| d.severity == lint::Severity::Error) {
         process::exit(1);
     }
 }
@@ -68,6 +72,7 @@ fn has_flag(args: &[String], flag: &str, value: &str) -> bool {
 fn usage() {
     eprintln!("luauperf — static performance analyzer for Luau\n");
     eprintln!("usage: luauperf <path> [options]\n");
+    eprintln!("  --fix            auto-fix safely fixable issues");
     eprintln!("  --format json    JSON output");
     eprintln!("  --list-rules     show all rules");
     eprintln!("  --init           create default luauperf.toml");

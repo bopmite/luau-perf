@@ -131,12 +131,41 @@ pub fn all() -> Vec<Box<dyn Rule>> {
 }
 
 pub fn print_all() {
-    for rule in all() {
+    let rules = all();
+    let mut current_cat = "";
+
+    for rule in &rules {
+        let id = rule.id();
+        let cat = id.split("::").next().unwrap_or(id);
+        let name = id.split("::").nth(1).unwrap_or(id);
+
+        if cat != current_cat {
+            if !current_cat.is_empty() {
+                println!();
+            }
+            println!(" \x1b[1m{}\x1b[0m", cat);
+            current_cat = cat;
+        }
+
         let sev = match rule.severity() {
             Severity::Error => "\x1b[31merror\x1b[0m",
-            Severity::Warn => "\x1b[33mwarn\x1b[0m",
-            Severity::Allow => "allow",
+            Severity::Warn => "\x1b[33m warn\x1b[0m",
+            Severity::Allow => " allow",
         };
-        println!("  {:<45} [{sev}]", rule.id());
+        println!("   {:<42} {sev}", name);
     }
+
+    println!();
+    println!(
+        " \x1b[90m{} rules across {} categories\x1b[0m",
+        rules.len(),
+        {
+            let mut cats: Vec<&str> = rules
+                .iter()
+                .map(|r| r.id().split("::").next().unwrap_or(""))
+                .collect();
+            cats.dedup();
+            cats.len()
+        }
+    );
 }

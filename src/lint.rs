@@ -1,4 +1,5 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -15,24 +16,109 @@ pub struct Diagnostic {
     pub severity: Severity,
     pub rule: &'static str,
     pub message: String,
+    pub fix: Option<crate::fix::Fix>,
 }
 
-impl Diagnostic {
-    pub fn print(&self) {
-        let (color, label) = match self.severity {
-            Severity::Error => ("\x1b[31m", "error"),
-            Severity::Warn => ("\x1b[33m", "warn"),
-            Severity::Allow => return,
-        };
-        println!(
-            "\x1b[90m{}:{}:{}\x1b[0m {color}[{label}]\x1b[0m {} \x1b[90m({})\x1b[0m",
-            self.file.display(),
-            self.line,
-            self.col,
-            self.message,
-            self.rule,
+pub fn print_report(diagnostics: &[Diagnostic], base: &Path, n_files: usize, elapsed: Duration) {
+    if diagnostics.is_empty() {
+        eprintln!(
+            "\n {} files checked · no issues · {:.2}s",
+            n_files,
+            elapsed.as_secs_f64()
         );
+        return;
     }
+
+    let mut groups: Vec<(&PathBuf, Vec<&Diagnostic>)> = Vec::new();
+    for d in diagnostics {
+        if d.severity == Severity::Allow {
+            continue;
+        }
+        match groups.last_mut() {
+            Some((f, diags)) if *f == &d.file => diags.push(d),
+            _ => groups.push((&d.file, vec![d])),
+        }
+    }
+
+    let base_dir = if base.is_file() {
+        base.parent().unwrap_or(Path::new("."))
+    } else {
+        base
+    };
+
+    println!();
+
+    for (i, (file, diags)) in groups.iter().enumerate() {
+        if i > 0 {
+            println!();
+        }
+
+        let short = file.strip_prefix(base_dir).unwrap_or(file);
+        println!(" \x1b[1;4m{}\x1b[0m", short.display());
+
+        let max_line = diags.iter().map(|d| d.line.to_string().len()).max().unwrap_or(0);
+        let max_col = diags.iter().map(|d| d.col.to_string().len()).max().unwrap_or(0);
+
+        for d in diags {
+            let line_s = format!("{:>w$}", d.line, w = max_line);
+            let col_s = format!("{:<w$}", d.col, w = max_col);
+
+            let (sev_color, sev_label) = match d.severity {
+                Severity::Error => ("\x1b[1;31m", "error"),
+                Severity::Warn => ("\x1b[33m", " warn"),
+                Severity::Allow => continue,
+            };
+
+            println!(
+                "   \x1b[90m{line_s}:{col_s}\x1b[0m  {sev_color}{sev_label}\x1b[0m  {}  \x1b[90m({})\x1b[0m",
+                d.message, d.rule,
+            );
+        }
+    }
+
+    let errors = diagnostics
+        .iter()
+        .filter(|d| d.severity == Severity::Error)
+        .count();
+    let warns = diagnostics.len() - errors;
+
+    let err_part = if errors > 0 {
+        format!(
+            "\x1b[31m{} {}\x1b[0m",
+            errors,
+            if errors == 1 { "error" } else { "errors" }
+        )
+    } else {
+        "0 errors".to_string()
+    };
+
+    let warn_part = if warns > 0 {
+        format!(
+            "\x1b[33m{} {}\x1b[0m",
+            warns,
+            if warns == 1 { "warning" } else { "warnings" }
+        )
+    } else {
+        "0 warnings".to_string()
+    };
+
+    let summary_color = if errors > 0 { "\x1b[1;31m" } else { "\x1b[1;33m" };
+
+    eprintln!();
+    eprintln!(" \x1b[90m{}\x1b[0m", "─".repeat(60));
+    eprintln!(
+        " {summary_color}{} {}\x1b[0m  ({}, {}) in {} files · {:.2}s",
+        diagnostics.len(),
+        if diagnostics.len() == 1 {
+            "issue"
+        } else {
+            "issues"
+        },
+        err_part,
+        warn_part,
+        n_files,
+        elapsed.as_secs_f64()
+    );
 }
 
 pub fn print_json(diagnostics: &[Diagnostic]) {
