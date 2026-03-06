@@ -1,5 +1,6 @@
 use crate::config::Config;
 use crate::fix;
+use crate::ignore::Ignores;
 use crate::lint::{Diagnostic, LineIndex, Rule, Severity};
 use rayon::prelude::*;
 use std::collections::HashMap;
@@ -87,6 +88,7 @@ fn lint_file(path: &Path, rules: &[Box<dyn Rule>], config: &Config, fix_mode: bo
     };
 
     let idx = LineIndex::new(&source);
+    let ignores = Ignores::parse(&source);
 
     rules
         .iter()
@@ -98,14 +100,17 @@ fn lint_file(path: &Path, rules: &[Box<dyn Rule>], config: &Config, fix_mode: bo
 
             rule.check(&source, &ast)
                 .into_iter()
-                .map(|hit| {
+                .filter_map(|hit| {
                     let (line, col) = idx.resolve(hit.pos);
+                    if ignores.is_ignored(line, rule.id()) {
+                        return None;
+                    }
                     let fix = if fix_mode {
                         fix::compute_fix(rule.id(), &source, hit.pos)
                     } else {
                         None
                     };
-                    Diagnostic {
+                    Some(Diagnostic {
                         file: path.to_path_buf(),
                         line,
                         col,
@@ -113,7 +118,7 @@ fn lint_file(path: &Path, rules: &[Box<dyn Rule>], config: &Config, fix_mode: bo
                         rule: rule.id(),
                         message: hit.msg,
                         fix,
-                    }
+                    })
                 })
                 .collect::<Vec<_>>()
         })

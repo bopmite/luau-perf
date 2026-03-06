@@ -1,5 +1,6 @@
 mod config;
 mod fix;
+mod ignore;
 mod lint;
 mod rules;
 mod scanner;

@@ -74,6 +74,29 @@ Full list: [RULES.md](RULES.md), or run `luauperf --list-rules`.
 - `warn` - Probably a problem, worth looking at.
 - `allow` - Off by default, turn on in config if you want them.
 
+## Inline ignores
+
+Suppress specific rules per-line, per-next-line, or per-file with comments:
+
+```lua
+-- Ignore specific rules on this line
+local x = wait() -- luauperf-ignore: roblox::deprecated_wait
+
+-- Ignore all rules on this line
+local y = wait() -- luauperf-ignore
+
+-- Ignore specific rules on the next line
+-- luauperf-ignore-next-line: alloc::closure_in_loop
+local fn = function() end
+
+-- Ignore rules for the entire file (must be in the file header)
+--!native
+--!strict
+-- luauperf-ignore-file: roblox::deprecated_wait, style::print_in_hot_path
+```
+
+File-level ignores must appear in the header (before any code), but can be placed after `--!native`, `--!strict`, `--!optimize` directives and other comments.
+
 ## Building from source
 
 ```bash
