@@ -15,6 +15,12 @@ pub struct UnpackInLoop;
 pub struct RepeatedStringByte;
 pub struct StringInterpInLoop;
 pub struct SelectInLoop;
+pub struct TableInsertKnownSize;
+pub struct BufferOverStringPack;
+pub struct TaskSpawnInLoop;
+pub struct GsubFunctionInLoop;
+pub struct TypeofInLoop;
+pub struct SetmetatableInLoop;
 
 impl Rule for ClosureInLoop {
     fn id(&self) -> &'static str { "alloc::closure_in_loop" }
@@ -102,6 +108,22 @@ fn line_start_offsets(source: &str) -> Vec<usize> {
         }
     }
     starts
+}
+
+fn build_loop_depth_map(source: &str) -> Vec<u32> {
+    let mut depth: u32 = 0;
+    let mut depths = Vec::new();
+    for line in source.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("for ") || trimmed.starts_with("while ") || trimmed.starts_with("repeat") {
+            depth += 1;
+        }
+        depths.push(depth);
+        if trimmed == "end" || trimmed.starts_with("end ") || trimmed.starts_with("until ") || trimmed == "until" {
+            depth = depth.saturating_sub(1);
+        }
+    }
+    depths
 }
 
 impl Rule for StringFormatInLoop {
@@ -460,6 +482,149 @@ impl Rule for SelectInLoop {
     }
 }
 
+impl Rule for TableInsertKnownSize {
+    fn id(&self) -> &'static str { "alloc::table_insert_known_size" }
+    fn severity(&self) -> Severity { Severity::Allow }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        let lines: Vec<&str> = source.lines().collect();
+        for (i, line) in lines.iter().enumerate() {
+            let trimmed = line.trim();
+            if !trimmed.starts_with("for ") || !trimmed.contains(" = ") {
+                continue;
+            }
+            let has_empty_table = if i > 0 {
+                let prev = lines[i - 1].trim();
+                prev.contains("= {}") || prev.contains("= { }")
+            } else {
+                false
+            };
+            if !has_empty_table {
+                continue;
+            }
+            for j in (i + 1)..lines.len().min(i + 20) {
+                let inner = lines[j].trim();
+                if inner == "end" || inner.starts_with("end ") {
+                    break;
+                }
+                if inner.contains("table.insert(") {
+                    let byte_pos: usize = lines[..i].iter().map(|l| l.len() + 1).sum();
+                    hits.push(Hit {
+                        pos: byte_pos,
+                        msg: "table.insert in numeric for with known bounds - use table.create(n) + index assignment for preallocation".into(),
+                    });
+                    break;
+                }
+            }
+        }
+        hits
+    }
+}
+
+impl Rule for BufferOverStringPack {
+    fn id(&self) -> &'static str { "alloc::buffer_over_string_pack" }
+    fn severity(&self) -> Severity { Severity::Allow }
+
+    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        visit::each_call(ast, |call, ctx| {
+            if ctx.in_loop && (visit::is_dot_call(call, "string", "pack") || visit::is_dot_call(call, "string", "unpack")) {
+                hits.push(Hit {
+                    pos: visit::call_pos(call),
+                    msg: "string.pack/unpack in loop allocates a string per call - use buffer library (buffer.writeu32/readu32) for zero-allocation binary I/O".into(),
+                });
+            }
+        });
+        hits
+    }
+}
+
+impl Rule for TaskSpawnInLoop {
+    fn id(&self) -> &'static str { "alloc::task_spawn_in_loop" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        visit::each_call(ast, |call, ctx| {
+            if !ctx.in_loop { return; }
+            if visit::is_dot_call(call, "task", "spawn") || visit::is_dot_call(call, "task", "defer") {
+                hits.push(Hit {
+                    pos: visit::call_pos(call),
+                    msg: "task.spawn/defer in loop creates a new coroutine per iteration (~247x overhead vs direct call) - call the function directly if it doesn't need to yield".into(),
+                });
+            }
+        });
+        hits
+    }
+}
+
+impl Rule for GsubFunctionInLoop {
+    fn id(&self) -> &'static str { "alloc::gsub_function_in_loop" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        let loop_depth = build_loop_depth_map(source);
+        let line_starts = line_start_offsets(source);
+        let patterns = [":gsub(", "string.gsub("];
+        for pat in &patterns {
+            for pos in visit::find_pattern_positions(source, pat) {
+                let line = line_starts.partition_point(|&s| s <= pos).saturating_sub(1);
+                if line < loop_depth.len() && loop_depth[line] > 0 {
+                    let after = &source[pos + pat.len()..];
+                    if let Some(comma1) = after.find(", ") {
+                        let rest = &after[comma1 + 2..];
+                        if rest.trim_start().starts_with("function") {
+                            hits.push(Hit {
+                                pos,
+                                msg: "gsub with function replacement in loop - each call invokes the function per match + allocates closure, consider caching or using buffer".into(),
+                            });
+                        }
+                    }
+                }
+            }
+        }
+        hits
+    }
+}
+
+impl Rule for TypeofInLoop {
+    fn id(&self) -> &'static str { "alloc::typeof_in_loop" }
+    fn severity(&self) -> Severity { Severity::Allow }
+
+    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        visit::each_call(ast, |call, ctx| {
+            if ctx.in_loop && visit::is_bare_call(call, "typeof") {
+                hits.push(Hit {
+                    pos: visit::call_pos(call),
+                    msg: "typeof() in loop crosses the Lua-C++ bridge each call - cache outside if checking the same value: local t = typeof(obj)".into(),
+                });
+            }
+        });
+        hits
+    }
+}
+
+impl Rule for SetmetatableInLoop {
+    fn id(&self) -> &'static str { "alloc::setmetatable_in_loop" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        visit::each_call(ast, |call, ctx| {
+            if ctx.in_loop && visit::is_bare_call(call, "setmetatable") {
+                hits.push(Hit {
+                    pos: visit::call_pos(call),
+                    msg: "setmetatable() in loop creates a new metatable-linked object per iteration - consider a constructor pattern or object pooling".into(),
+                });
+            }
+        });
+        hits
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -613,20 +778,100 @@ mod tests {
         let hits = SelectInLoop.check(src, &ast);
         assert_eq!(hits.len(), 0);
     }
-}
 
-fn build_loop_depth_map(source: &str) -> Vec<u32> {
-    let mut depth: u32 = 0;
-    let mut depths = Vec::new();
-    for line in source.lines() {
-        let trimmed = line.trim();
-        if trimmed.starts_with("for ") || trimmed.starts_with("while ") || trimmed.starts_with("repeat") {
-            depth += 1;
-        }
-        depths.push(depth);
-        if trimmed == "end" || trimmed.starts_with("end ") || trimmed.starts_with("until ") || trimmed == "until" {
-            depth = depth.saturating_sub(1);
-        }
+    #[test]
+    fn table_insert_known_size_detected() {
+        let src = "local t = {}\nfor i = 1, 100 do\n  table.insert(t, i)\nend";
+        let ast = parse(src);
+        let hits = TableInsertKnownSize.check(src, &ast);
+        assert_eq!(hits.len(), 1);
     }
-    depths
+
+    #[test]
+    fn table_insert_generic_loop_ok() {
+        let src = "for _, v in items do\n  table.insert(t, v)\nend";
+        let ast = parse(src);
+        let hits = TableInsertKnownSize.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn buffer_over_string_pack_detected() {
+        let src = "for i = 1, 10 do\n  local s = string.pack(\"I4\", i)\nend";
+        let ast = parse(src);
+        let hits = BufferOverStringPack.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn buffer_over_string_pack_outside_loop_ok() {
+        let src = "local s = string.pack(\"I4\", 42)";
+        let ast = parse(src);
+        let hits = BufferOverStringPack.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn task_spawn_in_loop_detected() {
+        let src = "for i = 1, 10 do\n  task.spawn(doWork, i)\nend";
+        let ast = parse(src);
+        let hits = TaskSpawnInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn task_spawn_outside_loop_ok() {
+        let src = "task.spawn(doWork, 42)";
+        let ast = parse(src);
+        let hits = TaskSpawnInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn gsub_function_in_loop_detected() {
+        let src = "for i = 1, 10 do\n  s:gsub(\"%w+\", function(w) return w:upper() end)\nend";
+        let ast = parse(src);
+        let hits = GsubFunctionInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn gsub_string_replacement_in_loop_ok() {
+        let src = "for i = 1, 10 do\n  s:gsub(\"%w+\", \"X\")\nend";
+        let ast = parse(src);
+        let hits = GsubFunctionInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn typeof_in_loop_detected() {
+        let src = "for _, v in items do\n  if typeof(v) == \"Instance\" then end\nend";
+        let ast = parse(src);
+        let hits = TypeofInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn typeof_outside_loop_ok() {
+        let src = "local t = typeof(obj)";
+        let ast = parse(src);
+        let hits = TypeofInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn setmetatable_in_loop_detected() {
+        let src = "for i = 1, 10 do\n  local obj = setmetatable({}, MT)\nend";
+        let ast = parse(src);
+        let hits = SetmetatableInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn setmetatable_outside_loop_ok() {
+        let src = "local obj = setmetatable({}, MT)";
+        let ast = parse(src);
+        let hits = SetmetatableInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
 }

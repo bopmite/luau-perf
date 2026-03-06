@@ -1,4 +1,4 @@
-use crate::lint::Severity;
+use crate::lint::{Level, Severity};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::path::Path;
@@ -9,6 +9,8 @@ pub struct Config {
     pub rules: HashMap<String, Severity>,
     #[serde(default)]
     pub exclude: Vec<String>,
+    #[serde(default)]
+    pub level: Option<Level>,
 }
 
 impl Config {
@@ -39,11 +41,18 @@ pub fn load(target: &Path) -> Config {
                 let content = std::fs::read_to_string(p).unwrap_or_default();
                 match toml::from_str::<Config>(&content) {
                     Ok(cfg) => {
+                        let lvl_str = match cfg.level {
+                            Some(Level::Default) => ", level=default",
+                            Some(Level::Strict) => ", level=strict",
+                            Some(Level::Pedantic) => ", level=pedantic",
+                            None => "",
+                        };
                         eprintln!(
-                            "\x1b[90mconfig: {} ({} rules, {} excludes)\x1b[0m",
+                            "\x1b[90mconfig: {} ({} rules, {} excludes{})\x1b[0m",
                             p.display(),
                             cfg.rules.len(),
-                            cfg.exclude.len()
+                            cfg.exclude.len(),
+                            lvl_str,
                         );
                         return cfg;
                     }
@@ -66,14 +75,19 @@ pub fn load(target: &Path) -> Config {
 pub fn write_default() {
     let content = r#"# luauperf.toml
 
+# Level controls which rules are active:
+#   "default"  - Bugs, deprecated APIs, critical issues (recommended)
+#   "strict"   - Adds optimization suggestions worth fixing
+#   "pedantic" - Everything including micro-optimizations
+# level = "default"
+
 exclude = ["Packages/", "Generated/"]
 
 [rules]
-# "error", "warn", or "allow"
+# Override individual rule severity: "error", "warn", or "allow"
+# Explicit overrides here bypass level filtering.
 # "complexity::table_find_in_loop" = "error"
 # "cache::magnitude_over_squared" = "warn"
-# "memory::untracked_connection" = "error"
-# "roblox::deprecated_wait" = "error"
 "#;
 
     if Path::new("luauperf.toml").exists() {

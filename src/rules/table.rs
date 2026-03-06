@@ -12,6 +12,14 @@ pub struct ManualCopyLoop;
 pub struct DeferredFieldAssignment;
 pub struct IpairsOverNumericFor;
 pub struct PolymorphicConstructor;
+pub struct SortComparisonAllocation;
+pub struct ClearVsNew;
+pub struct TableMoveOverLoop;
+pub struct ConcatWithSeparatorLoop;
+pub struct PairsOverGeneralized;
+pub struct NilFieldInConstructor;
+pub struct RawsetInLoop;
+pub struct NextTNilOverPairs;
 
 impl Rule for ForeachDeprecated {
     fn id(&self) -> &'static str { "table::foreach_deprecated" }
@@ -359,6 +367,247 @@ impl Rule for PolymorphicConstructor {
     }
 }
 
+impl Rule for SortComparisonAllocation {
+    fn id(&self) -> &'static str { "table::sort_comparison_allocation" }
+    fn severity(&self) -> Severity { Severity::Allow }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        let loop_depth = build_loop_depth_map(source);
+        let line_starts = line_start_offsets(source);
+
+        for pos in visit::find_pattern_positions(source, "table.sort(") {
+            let after = &source[pos + "table.sort(".len()..];
+            if after.contains("function(") {
+                let paren_end = after.find("function(").unwrap_or(0);
+                let between = &after[..paren_end];
+                if between.contains(',') {
+                    let line = line_starts.partition_point(|&s| s <= pos).saturating_sub(1);
+                    if line < loop_depth.len() && loop_depth[line] > 0 {
+                        hits.push(Hit {
+                            pos,
+                            msg: "table.sort with inline function in loop - allocates comparator each iteration, hoist the function".into(),
+                        });
+                    }
+                }
+            }
+        }
+        hits
+    }
+}
+
+impl Rule for ClearVsNew {
+    fn id(&self) -> &'static str { "table::clear_vs_new" }
+    fn severity(&self) -> Severity { Severity::Allow }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        let loop_depth = build_loop_depth_map(source);
+        let line_starts = line_start_offsets(source);
+
+        for pos in visit::find_pattern_positions(source, "= {}") {
+            let line = line_starts.partition_point(|&s| s <= pos).saturating_sub(1);
+            if line < loop_depth.len() && loop_depth[line] > 0 {
+                let before = &source[source[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0)..pos];
+                let trimmed = before.trim();
+                if !trimmed.starts_with("local ") && !trimmed.is_empty() {
+                    hits.push(Hit {
+                        pos,
+                        msg: "reassigning to {} in loop - use table.clear() to reuse the table allocation".into(),
+                    });
+                }
+            }
+        }
+        hits
+    }
+}
+
+impl Rule for TableMoveOverLoop {
+    fn id(&self) -> &'static str { "table::move_over_loop" }
+    fn severity(&self) -> Severity { Severity::Allow }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        for pos in visit::find_pattern_positions(source, "for ") {
+            let after_end = visit::ceil_char(source, (pos + 200).min(source.len()));
+            let after = &source[pos..after_end];
+            let trimmed = after.trim();
+            if !trimmed.starts_with("for ") {
+                continue;
+            }
+            if let Some(eq_pos) = trimmed.find(" = ") {
+                let rest = &trimmed[eq_pos + 3..];
+                if rest.starts_with("1,") || rest.starts_with("1 ,") {
+                    if after.contains("] = ") && after.contains("[") {
+                        let assigns: Vec<&str> = after.lines()
+                            .filter(|l| l.contains("] = ") && l.contains("["))
+                            .collect();
+                        if assigns.len() == 1 {
+                            hits.push(Hit {
+                                pos,
+                                msg: "element-by-element array copy - use table.move(src, 1, #src, 1, dst) instead".into(),
+                            });
+                        }
+                    }
+                }
+            }
+        }
+        hits
+    }
+}
+
+impl Rule for ConcatWithSeparatorLoop {
+    fn id(&self) -> &'static str { "table::concat_with_separator_loop" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        let loop_depth = build_loop_depth_map(source);
+        let line_starts = line_start_offsets(source);
+
+        for pos in visit::find_pattern_positions(source, " = ") {
+            let line_idx = line_starts.partition_point(|&s| s <= pos).saturating_sub(1);
+            if line_idx >= loop_depth.len() || loop_depth[line_idx] == 0 {
+                continue;
+            }
+            let line_start = line_starts[line_idx];
+            let line_end = source[pos..].find('\n').map(|p| pos + p).unwrap_or(source.len());
+            let line = &source[line_start..line_end];
+            let trimmed = line.trim();
+            if trimmed.contains(" .. ") && trimmed.split(" .. ").count() >= 3 {
+                let lhs = trimmed.split(" = ").next().unwrap_or("");
+                let rhs = trimmed.split(" = ").nth(1).unwrap_or("");
+                if rhs.contains(lhs.trim()) && rhs.contains(" .. ") {
+                    hits.push(Hit {
+                        pos: line_start,
+                        msg: "string accumulation with .. in loop - use table.insert + table.concat for O(n) instead of O(n^2)".into(),
+                    });
+                }
+            }
+        }
+        hits
+    }
+}
+
+fn line_start_offsets(source: &str) -> Vec<usize> {
+    let mut starts = vec![0];
+    for (i, b) in source.bytes().enumerate() {
+        if b == b'\n' { starts.push(i + 1); }
+    }
+    starts
+}
+
+fn build_loop_depth_map(source: &str) -> Vec<u32> {
+    let mut depth: u32 = 0;
+    let mut depths = Vec::new();
+    for line in source.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("for ") || trimmed.starts_with("while ") || trimmed.starts_with("repeat") {
+            depth += 1;
+        }
+        depths.push(depth);
+        if trimmed == "end" || trimmed.starts_with("end ") || trimmed.starts_with("until ") || trimmed == "until" {
+            depth = depth.saturating_sub(1);
+        }
+    }
+    depths
+}
+
+impl Rule for PairsOverGeneralized {
+    fn id(&self) -> &'static str { "table::pairs_over_generalized" }
+    fn severity(&self) -> Severity { Severity::Allow }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        for pos in visit::find_pattern_positions(source, "in pairs(") {
+            hits.push(Hit {
+                pos,
+                msg: "pairs() is unnecessary - use generalized iteration: for k, v in t do (same bytecode, no function call)".into(),
+            });
+        }
+        for pos in visit::find_pattern_positions(source, "in ipairs(") {
+            hits.push(Hit {
+                pos,
+                msg: "ipairs() is unnecessary - use generalized iteration: for i, v in t do (same bytecode, no function call)".into(),
+            });
+        }
+        hits
+    }
+}
+
+impl Rule for NilFieldInConstructor {
+    fn id(&self) -> &'static str { "table::nil_field_in_constructor" }
+    fn severity(&self) -> Severity { Severity::Allow }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        for (i, line) in source.lines().enumerate() {
+            let trimmed = line.trim();
+            if trimmed.contains("= nil") && (trimmed.contains("= nil,") || trimmed.contains("= nil;") || trimmed.ends_with("= nil")) {
+                let before = &source[..source.lines().take(i).map(|l| l.len() + 1).sum::<usize>()];
+                let open_braces = before.matches('{').count();
+                let close_braces = before.matches('}').count();
+                if open_braces > close_braces {
+                    let byte_pos: usize = source.lines().take(i).map(|l| l.len() + 1).sum();
+                    hits.push(Hit {
+                        pos: byte_pos,
+                        msg: "nil field in table constructor defeats Luau's table template optimization - omit nil fields (they default to nil)".into(),
+                    });
+                }
+            }
+        }
+        hits
+    }
+}
+
+impl Rule for RawsetInLoop {
+    fn id(&self) -> &'static str { "table::rawset_in_loop" }
+    fn severity(&self) -> Severity { Severity::Allow }
+
+    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        visit::each_call(ast, |call, ctx| {
+            if ctx.in_loop && visit::is_bare_call(call, "rawset") {
+                hits.push(Hit {
+                    pos: visit::call_pos(call),
+                    msg: "rawset() in loop bypasses __newindex metamethod but is not a FASTCALL builtin - regular t[k] = v is faster when no metatable is set".into(),
+                });
+            }
+        });
+        hits
+    }
+}
+
+impl Rule for NextTNilOverPairs {
+    fn id(&self) -> &'static str { "table::next_t_nil_over_pairs" }
+    fn severity(&self) -> Severity { Severity::Allow }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        for pos in visit::find_pattern_positions(source, "next(") {
+            let after = &source[pos + 5..];
+            if let Some(close) = after.find(')') {
+                let args = &after[..close];
+                if args.contains(", nil") || args.ends_with(",nil") || args.trim() == args.split(',').next().unwrap_or("").trim() {
+                    if source[pos..].starts_with("next(") {
+                        let before = source[..pos].trim_end();
+                        if before.ends_with("==") || before.ends_with("~=") {
+                            continue;
+                        }
+                        if args.contains(',') && (args.contains("nil") || args.trim().split(',').nth(1).map(|s| s.trim()) == Some("nil")) {
+                            hits.push(Hit {
+                                pos,
+                                msg: "next(t, nil) == next(t) - omit the nil second argument for cleaner empty-table check".into(),
+                            });
+                        }
+                    }
+                }
+            }
+        }
+        hits
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -486,6 +735,110 @@ mod tests {
         let src = "table.freeze(config)";
         let ast = parse(src);
         let hits = FreezeInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn sort_comparison_in_loop_detected() {
+        let src = "for i = 1, 10 do\n  table.sort(t, function(a, b) return a < b end)\nend";
+        let ast = parse(src);
+        let hits = SortComparisonAllocation.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn sort_outside_loop_ok() {
+        let src = "table.sort(t, function(a, b) return a < b end)";
+        let ast = parse(src);
+        let hits = SortComparisonAllocation.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn clear_vs_new_detected() {
+        let src = "for i = 1, 10 do\n  results = {}\nend";
+        let ast = parse(src);
+        let hits = ClearVsNew.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn local_new_table_in_loop_ok() {
+        let src = "for i = 1, 10 do\n  local t = {}\nend";
+        let ast = parse(src);
+        let hits = ClearVsNew.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn concat_with_separator_loop_detected() {
+        let src = "for _, v in items do\n  result = result .. \", \" .. v\nend";
+        let ast = parse(src);
+        let hits = ConcatWithSeparatorLoop.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn concat_outside_loop_ok() {
+        let src = "local s = a .. \", \" .. b";
+        let ast = parse(src);
+        let hits = ConcatWithSeparatorLoop.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn pairs_over_generalized_detected() {
+        let src = "for k, v in pairs(t) do end";
+        let ast = parse(src);
+        let hits = PairsOverGeneralized.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn generalized_iteration_ok() {
+        let src = "for k, v in t do end";
+        let ast = parse(src);
+        let hits = PairsOverGeneralized.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn ipairs_detected() {
+        let src = "for i, v in ipairs(t) do end";
+        let ast = parse(src);
+        let hits = PairsOverGeneralized.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn nil_field_in_constructor_detected() {
+        let src = "local t = {\n  name = \"test\",\n  value = nil,\n}";
+        let ast = parse(src);
+        let hits = NilFieldInConstructor.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn no_nil_field_ok() {
+        let src = "local t = {\n  name = \"test\",\n  value = 42,\n}";
+        let ast = parse(src);
+        let hits = NilFieldInConstructor.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn rawset_in_loop_detected() {
+        let src = "for i = 1, 10 do\n  rawset(t, i, val)\nend";
+        let ast = parse(src);
+        let hits = RawsetInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn rawset_outside_loop_ok() {
+        let src = "rawset(t, \"key\", val)";
+        let ast = parse(src);
+        let hits = RawsetInLoop.check(src, &ast);
         assert_eq!(hits.len(), 0);
     }
 }

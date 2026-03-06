@@ -9,6 +9,14 @@ pub enum Severity {
     Error,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Level {
+    Default = 0,
+    Strict = 1,
+    Pedantic = 2,
+}
+
 pub struct Diagnostic {
     pub file: PathBuf,
     pub line: usize,

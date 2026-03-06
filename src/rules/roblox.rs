@@ -21,6 +21,28 @@ pub struct MissingOptimize;
 pub struct DeprecatedRegion3;
 pub struct BindableSameScript;
 pub struct ServerPropertyInHeartbeat;
+pub struct GameLoadedRace;
+pub struct HumanoidStatePolling;
+pub struct ServerSideTween;
+pub struct RequireInConnect;
+pub struct FindFirstChildChain;
+pub struct OnceOverConnect;
+pub struct HealthPolling;
+pub struct DescendantEventWorkspace;
+pub struct GetAttributeInHeartbeat;
+pub struct PivotToInLoop;
+pub struct ChangedEventUnfiltered;
+pub struct DeprecatedTick;
+pub struct DeprecatedFindPartOnRay;
+pub struct WhileWaitDo;
+pub struct GetPropertyChangedInLoop;
+pub struct RenderSteppedOnServer;
+pub struct TaskWaitNoArg;
+pub struct DeprecatedDelay;
+pub struct CloneSetParent;
+pub struct YieldInConnectCallback;
+pub struct DeprecatedUdim;
+pub struct TeleportServiceRace;
 
 impl Rule for DeprecatedWait {
     fn id(&self) -> &'static str { "roblox::deprecated_wait" }
@@ -481,6 +503,610 @@ impl Rule for ServerPropertyInHeartbeat {
     }
 }
 
+impl Rule for GameLoadedRace {
+    fn id(&self) -> &'static str { "roblox::game_loaded_race" }
+    fn severity(&self) -> Severity { Severity::Error }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let has_is_loaded = !visit::find_pattern_positions(source, ":IsLoaded()").is_empty()
+            || !visit::find_pattern_positions(source, "game.Loaded").is_empty();
+        if !has_is_loaded {
+            return vec![];
+        }
+        let has_loaded_wait = source.contains("Loaded:Wait()") || source.contains("Loaded:wait()");
+        if has_loaded_wait {
+            return vec![];
+        }
+        let is_loaded_positions = visit::find_pattern_positions(source, ":IsLoaded()");
+        if let Some(&pos) = is_loaded_positions.first() {
+            return vec![Hit {
+                pos,
+                msg: "game:IsLoaded() without game.Loaded:Wait() fallback - race condition if game hasn't loaded yet".into(),
+            }];
+        }
+        vec![]
+    }
+}
+
+impl Rule for HumanoidStatePolling {
+    fn id(&self) -> &'static str { "roblox::humanoid_state_polling" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        visit::each_call(ast, |call, ctx| {
+            if ctx.in_loop && visit::is_method_call(call, "GetState") {
+                let src = format!("{call}");
+                if src.contains("Humanoid") || src.contains("humanoid") {
+                    hits.push(Hit {
+                        pos: visit::call_pos(call),
+                        msg: "Humanoid:GetState() in loop - use StateChanged event instead of polling".into(),
+                    });
+                }
+            }
+        });
+        hits
+    }
+}
+
+impl Rule for ServerSideTween {
+    fn id(&self) -> &'static str { "roblox::server_side_tween" }
+    fn severity(&self) -> Severity { Severity::Allow }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        if !source.contains("TweenService") {
+            return vec![];
+        }
+        let is_server = source.contains("ServerScriptService")
+            || source.contains("ServerStorage")
+            || source.contains("game:GetService(\"Players\")") && source.contains("OnServerEvent");
+        if !is_server {
+            return vec![];
+        }
+        let mut hits = Vec::new();
+        for pos in visit::find_pattern_positions(source, ":Create(") {
+            let before_start = visit::floor_char(source, pos.saturating_sub(60));
+            let before = &source[before_start..pos];
+            if before.contains("TweenService") || before.contains("tweenService") || before.contains("Tween") {
+                hits.push(Hit {
+                    pos,
+                    msg: "TweenService:Create() on server - tweens replicate every property change, tween on client instead".into(),
+                });
+            }
+        }
+        hits
+    }
+}
+
+impl Rule for RequireInConnect {
+    fn id(&self) -> &'static str { "roblox::require_in_connect" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        let connect_positions = visit::find_pattern_positions(source, ":Connect(");
+        for &pos in &connect_positions {
+            let after_end = visit::ceil_char(source, (pos + 500).min(source.len()));
+            let callback = &source[pos..after_end];
+            if !callback.contains("function") {
+                continue;
+            }
+            let func_start = callback.find("function").unwrap_or(0);
+            let body = &callback[func_start..];
+            let body_lines: Vec<&str> = body.lines().take(15).collect();
+            for line in &body_lines[1..] {
+                if line.contains("require(") {
+                    let _line_start = source[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
+                    let abs_pos = pos + callback[..callback.find("require(").unwrap_or(0)].len();
+                    hits.push(Hit {
+                        pos: abs_pos.min(source.len().saturating_sub(1)),
+                        msg: "require() inside :Connect() callback - runs on every event fire, move to module level".into(),
+                    });
+                    break;
+                }
+            }
+        }
+        hits
+    }
+}
+
+impl Rule for FindFirstChildChain {
+    fn id(&self) -> &'static str { "roblox::find_first_child_chain" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        for pos in visit::find_pattern_positions(source, ":FindFirstChild(") {
+            let after_start = pos + ":FindFirstChild(".len();
+            let after_end = visit::ceil_char(source, (after_start + 200).min(source.len()));
+            let after = &source[after_start..after_end];
+            if let Some(close) = after.find(')') {
+                let rest = &after[close + 1..];
+                let trimmed = rest.trim_start();
+                if trimmed.starts_with(":FindFirstChild(") || trimmed.starts_with(".") {
+                    let chain_count = rest.matches(":FindFirstChild(").count()
+                        + rest.matches(":WaitForChild(").count();
+                    if chain_count >= 2 {
+                        hits.push(Hit {
+                            pos,
+                            msg: "deep FindFirstChild chain - each call does a tree search, cache intermediate results".into(),
+                        });
+                    }
+                }
+            }
+        }
+        hits
+    }
+}
+
+impl Rule for OnceOverConnect {
+    fn id(&self) -> &'static str { "roblox::once_over_connect" }
+    fn severity(&self) -> Severity { Severity::Allow }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        let connect_positions = visit::find_pattern_positions(source, ":Connect(");
+        for &pos in &connect_positions {
+            let after_end = visit::ceil_char(source, (pos + 500).min(source.len()));
+            let callback = &source[pos..after_end];
+            if callback.contains(":Disconnect()") {
+                let disconnect_pos = callback.find(":Disconnect()").unwrap_or(0);
+                let between = &callback[..disconnect_pos];
+                let connect_arg_end = between.find("function").unwrap_or(0);
+                if disconnect_pos > connect_arg_end && between.lines().count() < 8 {
+                    hits.push(Hit {
+                        pos,
+                        msg: ":Connect() with immediate :Disconnect() in handler - use :Once() instead (auto-disconnects)".into(),
+                    });
+                }
+            }
+        }
+        hits
+    }
+}
+
+impl Rule for HealthPolling {
+    fn id(&self) -> &'static str { "roblox::health_polling" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let loop_depth = build_loop_depth_map(source);
+        let line_starts = line_start_offsets(source);
+        let mut hits = Vec::new();
+        for pos in visit::find_pattern_positions(source, ".Health") {
+            let after = &source[pos + ".Health".len()..];
+            if after.starts_with("Changed") || after.starts_with("Max") {
+                continue;
+            }
+            let line = line_starts.partition_point(|&s| s <= pos).saturating_sub(1);
+            if line < loop_depth.len() && loop_depth[line] > 0 {
+                let context_start = visit::floor_char(source, pos.saturating_sub(200));
+                let context = &source[context_start..pos];
+                if context.contains("humanoid") || context.contains("Humanoid") {
+                    hits.push(Hit {
+                        pos,
+                        msg: "Humanoid.Health polled in loop - use HealthChanged event or GetPropertyChangedSignal(\"Health\")".into(),
+                    });
+                }
+            }
+        }
+        hits
+    }
+}
+
+impl Rule for ChangedEventUnfiltered {
+    fn id(&self) -> &'static str { "roblox::changed_event_unfiltered" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        for pos in visit::find_pattern_positions(source, ".Changed:Connect(") {
+            let before_start = visit::floor_char(source, pos.saturating_sub(100));
+            let before = &source[before_start..pos];
+            if before.contains("GetPropertyChangedSignal") || before.contains("AttributeChanged") {
+                continue;
+            }
+            let src_after = &source[pos..];
+            if src_after.starts_with(".Changed:Connect(") {
+                let after = &src_after[".Changed:Connect(".len()..];
+                let callback_end = after.find("end)").unwrap_or(after.len().min(500));
+                let callback = &after[..callback_end];
+                if !callback.contains("GetPropertyChangedSignal") {
+                    hits.push(Hit {
+                        pos,
+                        msg: ".Changed fires for ANY property change - use GetPropertyChangedSignal(\"Prop\") for specific properties".into(),
+                    });
+                }
+            }
+        }
+        hits
+    }
+}
+
+impl Rule for PivotToInLoop {
+    fn id(&self) -> &'static str { "roblox::pivot_to_in_loop" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        visit::each_call(ast, |call, ctx| {
+            if ctx.in_loop && visit::is_method_call(call, "PivotTo") {
+                hits.push(Hit {
+                    pos: visit::call_pos(call),
+                    msg: ":PivotTo() in loop - each call crosses Lua-C++ bridge + triggers replication, use workspace:BulkMoveTo() to batch".into(),
+                });
+            }
+        });
+        hits
+    }
+}
+
+impl Rule for DescendantEventWorkspace {
+    fn id(&self) -> &'static str { "roblox::descendant_event_workspace" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        let patterns = [
+            "workspace.DescendantAdded",
+            "Workspace.DescendantAdded",
+            "workspace.DescendantRemoving",
+            "Workspace.DescendantRemoving",
+        ];
+        for pattern in &patterns {
+            for pos in visit::find_pattern_positions(source, pattern) {
+                hits.push(Hit {
+                    pos,
+                    msg: "DescendantAdded/Removing on workspace fires for EVERY instance change in the entire game - use CollectionService tags or scope to a subtree".into(),
+                });
+            }
+        }
+        hits
+    }
+}
+
+impl Rule for GetAttributeInHeartbeat {
+    fn id(&self) -> &'static str { "roblox::get_attribute_in_heartbeat" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        let callback_starts = [
+            "Heartbeat:Connect(",
+            "RenderStepped:Connect(",
+            ".Stepped:Connect(",
+        ];
+        for start_pat in &callback_starts {
+            for start_pos in visit::find_pattern_positions(source, start_pat) {
+                let body_start = start_pos + start_pat.len();
+                let body_end = visit::ceil_char(source, (body_start + 2000).min(source.len()));
+                let body = &source[body_start..body_end];
+                if let Some(end_pos) = find_callback_end(body) {
+                    let callback = &body[..end_pos];
+                    for inner_pos in find_inner_positions(callback, ":GetAttribute(") {
+                        hits.push(Hit {
+                            pos: body_start + inner_pos,
+                            msg: ":GetAttribute() in RunService callback - crosses Lua-C++ bridge at 60Hz, cache value and update via AttributeChanged".into(),
+                        });
+                    }
+                }
+            }
+        }
+        hits
+    }
+}
+
+impl Rule for DeprecatedTick {
+    fn id(&self) -> &'static str { "roblox::deprecated_tick" }
+    fn severity(&self) -> Severity { Severity::Error }
+
+    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        visit::each_call(ast, |call, _ctx| {
+            if visit::is_bare_call(call, "tick") {
+                hits.push(Hit {
+                    pos: visit::call_pos(call),
+                    msg: "tick() is deprecated - use os.clock() for elapsed time or workspace:GetServerTimeNow() for wall-clock time".into(),
+                });
+            }
+        });
+        hits
+    }
+}
+
+impl Rule for DeprecatedFindPartOnRay {
+    fn id(&self) -> &'static str { "roblox::deprecated_find_part_on_ray" }
+    fn severity(&self) -> Severity { Severity::Error }
+
+    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        visit::each_call(ast, |call, _ctx| {
+            if visit::is_method_call(call, "FindPartOnRay") || visit::is_method_call(call, "FindPartOnRayWithWhitelist") || visit::is_method_call(call, "FindPartOnRayWithIgnoreList") {
+                hits.push(Hit {
+                    pos: visit::call_pos(call),
+                    msg: "FindPartOnRay is deprecated - use workspace:Raycast() with RaycastParams".into(),
+                });
+            }
+        });
+        hits
+    }
+}
+
+impl Rule for WhileWaitDo {
+    fn id(&self) -> &'static str { "roblox::while_wait_do" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        for pos in visit::find_pattern_positions(source, "while wait(") {
+            hits.push(Hit {
+                pos,
+                msg: "while wait() do is an anti-pattern - use while true do ... task.wait() end for explicit control and modern task scheduler".into(),
+            });
+        }
+        for pos in visit::find_pattern_positions(source, "while task.wait(") {
+            hits.push(Hit {
+                pos,
+                msg: "while task.wait() do combines yielding and looping in the condition - use while true do ... task.wait() end for clarity".into(),
+            });
+        }
+        hits
+    }
+}
+
+impl Rule for GetPropertyChangedInLoop {
+    fn id(&self) -> &'static str { "roblox::get_property_changed_in_loop" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        visit::each_call(ast, |call, ctx| {
+            if ctx.in_loop && visit::is_method_call(call, "GetPropertyChangedSignal") {
+                hits.push(Hit {
+                    pos: visit::call_pos(call),
+                    msg: ":GetPropertyChangedSignal() in loop creates a signal object per iteration - cache outside or use a single .Changed handler".into(),
+                });
+            }
+        });
+        hits
+    }
+}
+
+fn find_callback_end(s: &str) -> Option<usize> {
+    let mut depth = 0i32;
+    for (i, c) in s.char_indices() {
+        if c == '(' { depth += 1; }
+        if c == ')' {
+            if depth == 0 { return Some(i); }
+            depth -= 1;
+        }
+    }
+    None
+}
+
+fn find_inner_positions(s: &str, pattern: &str) -> Vec<usize> {
+    let mut positions = Vec::new();
+    let mut start = 0;
+    while let Some(pos) = s[start..].find(pattern) {
+        positions.push(start + pos);
+        start += pos + 1;
+    }
+    positions
+}
+
+fn line_start_offsets(source: &str) -> Vec<usize> {
+    let mut starts = vec![0];
+    for (i, b) in source.bytes().enumerate() {
+        if b == b'\n' { starts.push(i + 1); }
+    }
+    starts
+}
+
+fn build_loop_depth_map(source: &str) -> Vec<u32> {
+    let mut depth: u32 = 0;
+    let mut depths = Vec::new();
+    for line in source.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("for ") || trimmed.starts_with("while ") || trimmed.starts_with("repeat") {
+            depth += 1;
+        }
+        depths.push(depth);
+        if trimmed == "end" || trimmed.starts_with("end ") || trimmed.starts_with("until ") || trimmed == "until" {
+            depth = depth.saturating_sub(1);
+        }
+    }
+    depths
+}
+
+impl Rule for RenderSteppedOnServer {
+    fn id(&self) -> &'static str { "roblox::render_stepped_on_server" }
+    fn severity(&self) -> Severity { Severity::Error }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        for pos in visit::find_pattern_positions(source, "RenderStepped") {
+            let line_start = source[..pos].rfind('\n').map(|p| p + 1).unwrap_or(0);
+            let line = &source[line_start..source[pos..].find('\n').map(|p| pos + p).unwrap_or(source.len())];
+            if line.contains("Server") || line.contains("server") {
+                continue;
+            }
+            if source.contains("ServerScript") || source.contains("ServerStorage") {
+                hits.push(Hit {
+                    pos,
+                    msg: "RenderStepped does not fire on the server - use Heartbeat or Stepped instead".into(),
+                });
+            }
+        }
+        hits
+    }
+}
+
+impl Rule for TaskWaitNoArg {
+    fn id(&self) -> &'static str { "roblox::task_wait_no_arg" }
+    fn severity(&self) -> Severity { Severity::Allow }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        for pos in visit::find_pattern_positions(source, "task.wait()") {
+            hits.push(Hit {
+                pos,
+                msg: "task.wait() with no argument waits one frame - if intentional, add a comment, otherwise specify a duration: task.wait(0.1)".into(),
+            });
+        }
+        hits
+    }
+}
+
+impl Rule for DeprecatedDelay {
+    fn id(&self) -> &'static str { "roblox::deprecated_delay" }
+    fn severity(&self) -> Severity { Severity::Error }
+
+    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        visit::each_call(ast, |call, _ctx| {
+            if visit::is_bare_call(call, "delay") {
+                hits.push(Hit {
+                    pos: visit::call_pos(call),
+                    msg: "delay() is deprecated - use task.delay() for modern scheduling with better error handling".into(),
+                });
+            }
+        });
+        hits
+    }
+}
+
+impl Rule for CloneSetParent {
+    fn id(&self) -> &'static str { "roblox::clone_set_parent" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        let lines: Vec<&str> = source.lines().collect();
+        for (i, line) in lines.iter().enumerate() {
+            let trimmed = line.trim();
+            if !trimmed.contains(":Clone()") { continue; }
+            if let Some(eq_pos) = trimmed.find(" = ") {
+                let var = trimmed[..eq_pos].trim().trim_start_matches("local ");
+                if i + 1 < lines.len() {
+                    let next = lines[i + 1].trim();
+                    if next.starts_with(&format!("{var}.Parent")) {
+                        let mut props_before_parent = 0;
+                        for j in (i + 2)..lines.len().min(i + 10) {
+                            if lines[j].trim().starts_with(&format!("{var}.")) {
+                                props_before_parent += 1;
+                            } else {
+                                break;
+                            }
+                        }
+                        if props_before_parent > 0 {
+                            let byte_pos: usize = lines[..i + 1].iter().map(|l| l.len() + 1).sum();
+                            hits.push(Hit {
+                                pos: byte_pos,
+                                msg: "Clone():Parent set before other properties - set .Parent last to batch replication into a single packet".into(),
+                            });
+                        }
+                    }
+                }
+            }
+        }
+        hits
+    }
+}
+
+impl Rule for YieldInConnectCallback {
+    fn id(&self) -> &'static str { "roblox::yield_in_connect_callback" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        let lines: Vec<&str> = source.lines().collect();
+        for (i, line) in lines.iter().enumerate() {
+            let trimmed = line.trim();
+            if !trimmed.contains(":Connect(function") && !trimmed.contains(":Once(function") {
+                continue;
+            }
+            for j in (i + 1)..lines.len().min(i + 30) {
+                let inner = lines[j].trim();
+                if inner == "end)" || inner == "end) " { break; }
+                if inner.contains("task.wait(") || inner.contains(":WaitForChild(") || inner.contains("task.delay(") {
+                    let byte_pos: usize = lines[..j].iter().map(|l| l.len() + 1).sum();
+                    hits.push(Hit {
+                        pos: byte_pos,
+                        msg: "yielding (task.wait/WaitForChild) in :Connect callback - the callback is supposed to be non-yielding, use task.spawn for async work".into(),
+                    });
+                    break;
+                }
+            }
+        }
+        hits
+    }
+}
+
+impl Rule for DeprecatedUdim {
+    fn id(&self) -> &'static str { "roblox::deprecated_udim" }
+    fn severity(&self) -> Severity { Severity::Allow }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        for pos in visit::find_pattern_positions(source, "UDim2.new(0,") {
+            let after = &source[pos + "UDim2.new(0,".len()..];
+            if let Some(close) = after.find(')') {
+                let args = after[..close].trim();
+                let parts: Vec<&str> = args.split(',').map(|s| s.trim()).collect();
+                if parts.len() == 3 && parts[1] == "0" {
+                    hits.push(Hit {
+                        pos,
+                        msg: "UDim2.new(0, px, 0, py) with zero scale components - use UDim2.fromOffset(px, py) for cleaner code".into(),
+                    });
+                }
+            }
+        }
+        for pos in visit::find_pattern_positions(source, "UDim2.new(") {
+            if source[pos..].starts_with("UDim2.new(0,") { continue; }
+            let after = &source[pos + "UDim2.new(".len()..];
+            if let Some(close) = after.find(')') {
+                let args = after[..close].trim();
+                let parts: Vec<&str> = args.split(',').map(|s| s.trim()).collect();
+                if parts.len() == 4 && parts[1] == "0" && parts[3] == "0" {
+                    hits.push(Hit {
+                        pos,
+                        msg: "UDim2.new(sx, 0, sy, 0) with zero offset components - use UDim2.fromScale(sx, sy) for cleaner code".into(),
+                    });
+                }
+            }
+        }
+        hits
+    }
+}
+
+impl Rule for TeleportServiceRace {
+    fn id(&self) -> &'static str { "roblox::teleport_service_race" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        for pos in visit::find_pattern_positions(source, ":TeleportAsync(") {
+            if !source.contains("pcall") && !source.contains("xpcall") {
+                hits.push(Hit {
+                    pos,
+                    msg: ":TeleportAsync() can fail from rate limits or network errors - wrap in pcall and implement retry logic".into(),
+                });
+                break;
+            }
+        }
+        for pos in visit::find_pattern_positions(source, ":Teleport(") {
+            let before = source[..pos].trim_end();
+            if before.ends_with("TeleportService") || before.ends_with("teleportService") {
+                hits.push(Hit {
+                    pos,
+                    msg: "TeleportService:Teleport() is deprecated - use TeleportService:TeleportAsync() with pcall for better error handling".into(),
+                });
+            }
+        }
+        hits
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -561,5 +1187,293 @@ mod tests {
         let ast = parse(src);
         let hits = ServerPropertyInHeartbeat.check(src, &ast);
         assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn game_loaded_race_detected() {
+        let src = "if not game:IsLoaded() then\n  print(\"wait\")\nend";
+        let ast = parse(src);
+        let hits = GameLoadedRace.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn game_loaded_with_wait_ok() {
+        let src = "if not game:IsLoaded() then\n  game.Loaded:Wait()\nend";
+        let ast = parse(src);
+        let hits = GameLoadedRace.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn humanoid_state_polling_detected() {
+        let src = "while true do\n  local state = humanoid:GetState()\nend";
+        let ast = parse(src);
+        let hits = HumanoidStatePolling.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn humanoid_state_outside_loop_ok() {
+        let src = "local state = humanoid:GetState()";
+        let ast = parse(src);
+        let hits = HumanoidStatePolling.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn server_side_tween_detected() {
+        let src = "local ServerScriptService = game:GetService(\"ServerScriptService\")\nlocal TweenService = game:GetService(\"TweenService\")\nTweenService:Create(part, info, goal)";
+        let ast = parse(src);
+        let hits = ServerSideTween.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn client_tween_ok() {
+        let src = "local TweenService = game:GetService(\"TweenService\")\nTweenService:Create(part, info, goal)";
+        let ast = parse(src);
+        let hits = ServerSideTween.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn once_over_connect_detected() {
+        let src = "local conn\nconn = event:Connect(function()\n  conn:Disconnect()\n  doStuff()\nend)";
+        let ast = parse(src);
+        let hits = OnceOverConnect.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn normal_connect_ok() {
+        let src = "event:Connect(function()\n  doStuff()\nend)";
+        let ast = parse(src);
+        let hits = OnceOverConnect.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn changed_event_unfiltered_detected() {
+        let src = "part.Changed:Connect(function(prop)\n  print(prop)\nend)";
+        let ast = parse(src);
+        let hits = ChangedEventUnfiltered.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn get_property_changed_signal_ok() {
+        let src = "part:GetPropertyChangedSignal(\"Position\"):Connect(function() end)";
+        let ast = parse(src);
+        let hits = ChangedEventUnfiltered.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn health_polling_in_loop_detected() {
+        let src = "while true do\n  local h = humanoid.Health\n  task.wait()\nend";
+        let ast = parse(src);
+        let hits = HealthPolling.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn health_outside_loop_ok() {
+        let src = "local h = humanoid.Health";
+        let ast = parse(src);
+        let hits = HealthPolling.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn descendant_event_workspace_detected() {
+        let src = "workspace.DescendantAdded:Connect(function(d) end)";
+        let ast = parse(src);
+        let hits = DescendantEventWorkspace.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn descendant_event_subtree_ok() {
+        let src = "folder.DescendantAdded:Connect(function(d) end)";
+        let ast = parse(src);
+        let hits = DescendantEventWorkspace.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn pivot_to_in_loop_detected() {
+        let src = "for _, model in models do\n  model:PivotTo(cf)\nend";
+        let ast = parse(src);
+        let hits = PivotToInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn pivot_to_outside_loop_ok() {
+        let src = "model:PivotTo(cf)";
+        let ast = parse(src);
+        let hits = PivotToInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn get_attribute_in_heartbeat_detected() {
+        let src = "RunService.Heartbeat:Connect(function()\n  local v = part:GetAttribute(\"Speed\")\nend)";
+        let ast = parse(src);
+        let hits = GetAttributeInHeartbeat.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn get_attribute_outside_heartbeat_ok() {
+        let src = "local v = part:GetAttribute(\"Speed\")";
+        let ast = parse(src);
+        let hits = GetAttributeInHeartbeat.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn deprecated_tick_detected() {
+        let src = "local t = tick()";
+        let ast = parse(src);
+        let hits = DeprecatedTick.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn os_clock_ok() {
+        let src = "local t = os.clock()";
+        let ast = parse(src);
+        let hits = DeprecatedTick.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn deprecated_find_part_on_ray_detected() {
+        let src = "local hit = workspace:FindPartOnRay(ray)";
+        let ast = parse(src);
+        let hits = DeprecatedFindPartOnRay.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn raycast_ok() {
+        let src = "local result = workspace:Raycast(origin, direction, params)";
+        let ast = parse(src);
+        let hits = DeprecatedFindPartOnRay.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn while_wait_do_detected() {
+        let src = "while wait() do\n  print(\"loop\")\nend";
+        let ast = parse(src);
+        let hits = WhileWaitDo.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn while_task_wait_do_detected() {
+        let src = "while task.wait() do\n  print(\"loop\")\nend";
+        let ast = parse(src);
+        let hits = WhileWaitDo.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn while_true_task_wait_ok() {
+        let src = "while true do\n  task.wait()\nend";
+        let ast = parse(src);
+        let hits = WhileWaitDo.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn get_property_changed_in_loop_detected() {
+        let src = "for _, part in parts do\n  part:GetPropertyChangedSignal(\"Position\"):Connect(function() end)\nend";
+        let ast = parse(src);
+        let hits = GetPropertyChangedInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn get_property_changed_outside_loop_ok() {
+        let src = "part:GetPropertyChangedSignal(\"Position\"):Connect(function() end)";
+        let ast = parse(src);
+        let hits = GetPropertyChangedInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn task_wait_no_arg_detected() {
+        let src = "task.wait()";
+        let ast = parse(src);
+        let hits = TaskWaitNoArg.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn task_wait_with_arg_ok() {
+        let src = "task.wait(0.1)";
+        let ast = parse(src);
+        let hits = TaskWaitNoArg.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn deprecated_delay_detected() {
+        let src = "delay(5, function() print(\"hi\") end)";
+        let ast = parse(src);
+        let hits = DeprecatedDelay.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn task_delay_ok() {
+        let src = "task.delay(5, function() print(\"hi\") end)";
+        let ast = parse(src);
+        let hits = DeprecatedDelay.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn clone_set_parent_before_props_detected() {
+        let src = "local p = template:Clone()\np.Parent = workspace\np.Name = \"test\"\np.Size = Vector3.new(1,1,1)";
+        let ast = parse(src);
+        let hits = CloneSetParent.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn clone_parent_last_ok() {
+        let src = "local p = template:Clone()\np.Name = \"test\"\np.Parent = workspace";
+        let ast = parse(src);
+        let hits = CloneSetParent.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn yield_in_connect_detected() {
+        let src = "event:Connect(function()\n  task.wait(1)\n  print(\"done\")\nend)";
+        let ast = parse(src);
+        let hits = YieldInConnectCallback.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn no_yield_in_connect_ok() {
+        let src = "event:Connect(function()\n  print(\"fired\")\nend)";
+        let ast = parse(src);
+        let hits = YieldInConnectCallback.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn deprecated_teleport_detected() {
+        let src = "TeleportService:Teleport(placeId, player)";
+        let ast = parse(src);
+        let hits = TeleportServiceRace.check(src, &ast);
+        assert_eq!(hits.len(), 1);
     }
 }

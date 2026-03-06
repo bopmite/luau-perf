@@ -1,7 +1,7 @@
 use crate::config::Config;
 use crate::fix;
 use crate::ignore::Ignores;
-use crate::lint::{Diagnostic, LineIndex, Rule, Severity};
+use crate::lint::{Diagnostic, Level, LineIndex, Rule, Severity};
 use rayon::prelude::*;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -33,7 +33,7 @@ pub struct RunResult {
     pub parse_errors: usize,
 }
 
-pub fn run(path: &Path, config: &Config, fix_mode: bool, dry_run: bool) -> RunResult {
+pub fn run(path: &Path, config: &Config, fix_mode: bool, dry_run: bool, level: Level) -> RunResult {
     let files: Vec<PathBuf> = discover(path)
         .into_iter()
         .filter(|f| !config.is_excluded(f))
@@ -52,7 +52,7 @@ pub fn run(path: &Path, config: &Config, fix_mode: bool, dry_run: bool) -> RunRe
     let mut diags: Vec<Diagnostic> = pool.install(|| {
         files
             .par_iter()
-            .flat_map(|file| lint_file(file, &rules, config, fix_mode, &parse_errors))
+            .flat_map(|file| lint_file(file, &rules, config, fix_mode, &parse_errors, level))
             .collect()
     });
 
@@ -73,7 +73,7 @@ pub fn run(path: &Path, config: &Config, fix_mode: bool, dry_run: bool) -> RunRe
     }
 }
 
-fn lint_file(path: &Path, rules: &[Box<dyn Rule>], config: &Config, fix_mode: bool, parse_errors: &std::sync::atomic::AtomicUsize) -> Vec<Diagnostic> {
+fn lint_file(path: &Path, rules: &[Box<dyn Rule>], config: &Config, fix_mode: bool, parse_errors: &std::sync::atomic::AtomicUsize, level: Level) -> Vec<Diagnostic> {
     let source = match std::fs::read_to_string(path) {
         Ok(s) => s,
         Err(_) => return vec![],
@@ -93,8 +93,12 @@ fn lint_file(path: &Path, rules: &[Box<dyn Rule>], config: &Config, fix_mode: bo
     rules
         .iter()
         .flat_map(|rule| {
+            let has_config_override = config.severity_for(rule.id()).is_some();
             let sev = config.severity_for(rule.id()).unwrap_or(rule.severity());
             if sev == Severity::Allow {
+                return vec![];
+            }
+            if !has_config_override && crate::rules::rule_level(rule.id()) > level {
                 return vec![];
             }
 

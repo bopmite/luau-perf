@@ -14,6 +14,14 @@ pub struct DebugInHotPath;
 pub struct IndexFunctionMetatable;
 pub struct ConditionalFieldInConstructor;
 pub struct GlobalFunctionNotLocal;
+pub struct AssertInHotPath;
+pub struct RedundantCondition;
+pub struct LongFunctionBody;
+pub struct DuplicateStringLiteral;
+pub struct TypeOverTypeof;
+pub struct NestedTernary;
+pub struct UnusedVariable;
+pub struct MultipleReturns;
 
 impl Rule for ServiceLocatorAntiPattern {
     fn id(&self) -> &'static str { "style::duplicate_get_service" }
@@ -355,6 +363,295 @@ impl Rule for GlobalFunctionNotLocal {
     }
 }
 
+impl Rule for AssertInHotPath {
+    fn id(&self) -> &'static str { "style::assert_in_hot_path" }
+    fn severity(&self) -> Severity { Severity::Allow }
+
+    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        visit::each_call(ast, |call, ctx| {
+            if ctx.in_loop && visit::is_bare_call(call, "assert") {
+                hits.push(Hit {
+                    pos: visit::call_pos(call),
+                    msg: "assert() in loop - has overhead even when condition is true, guard with a debug flag or move outside".into(),
+                });
+            }
+        });
+        hits
+    }
+}
+
+impl Rule for RedundantCondition {
+    fn id(&self) -> &'static str { "style::redundant_condition" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        for pos in visit::find_pattern_positions(source, "if true then") {
+            hits.push(Hit {
+                pos,
+                msg: "if true then - condition is always true, remove the if statement".into(),
+            });
+        }
+        for pos in visit::find_pattern_positions(source, "if false then") {
+            hits.push(Hit {
+                pos,
+                msg: "if false then - condition is always false, dead code".into(),
+            });
+        }
+        for pos in visit::find_pattern_positions(source, "while false do") {
+            hits.push(Hit {
+                pos,
+                msg: "while false do - loop body is dead code".into(),
+            });
+        }
+        hits
+    }
+}
+
+impl Rule for LongFunctionBody {
+    fn id(&self) -> &'static str { "style::long_function_body" }
+    fn severity(&self) -> Severity { Severity::Allow }
+
+    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        check_functions(ast.nodes(), &mut hits);
+        hits
+    }
+}
+
+fn check_functions(block: &full_moon::ast::Block, hits: &mut Vec<Hit>) {
+    for stmt in block.stmts() {
+        match stmt {
+            full_moon::ast::Stmt::LocalFunction(f) => {
+                let count = count_stmts(f.body().block());
+                if count > 80 {
+                    let pos = f.local_token().start_position().bytes();
+                    let name = format!("{}", f.name());
+                    hits.push(Hit {
+                        pos,
+                        msg: format!("function '{name}' has {count} statements - consider splitting into smaller functions"),
+                    });
+                }
+                check_functions(f.body().block(), hits);
+            }
+            full_moon::ast::Stmt::FunctionDeclaration(f) => {
+                let count = count_stmts(f.body().block());
+                if count > 80 {
+                    let pos = f.function_token().start_position().bytes();
+                    let name = format!("{}", f.name());
+                    hits.push(Hit {
+                        pos,
+                        msg: format!("function '{name}' has {count} statements - consider splitting into smaller functions"),
+                    });
+                }
+                check_functions(f.body().block(), hits);
+            }
+            full_moon::ast::Stmt::Do(s) => check_functions(s.block(), hits),
+            full_moon::ast::Stmt::If(s) => {
+                check_functions(s.block(), hits);
+                if let Some(eis) = s.else_if() {
+                    for ei in eis { check_functions(ei.block(), hits); }
+                }
+                if let Some(eb) = s.else_block() { check_functions(eb, hits); }
+            }
+            full_moon::ast::Stmt::While(s) => check_functions(s.block(), hits),
+            full_moon::ast::Stmt::Repeat(s) => check_functions(s.block(), hits),
+            full_moon::ast::Stmt::NumericFor(s) => check_functions(s.block(), hits),
+            full_moon::ast::Stmt::GenericFor(s) => check_functions(s.block(), hits),
+            _ => {}
+        }
+    }
+}
+
+fn count_stmts(block: &full_moon::ast::Block) -> usize {
+    let mut count = 0;
+    for stmt in block.stmts() {
+        count += 1;
+        match stmt {
+            full_moon::ast::Stmt::If(s) => {
+                count += count_stmts(s.block());
+                if let Some(eis) = s.else_if() {
+                    for ei in eis { count += count_stmts(ei.block()); }
+                }
+                if let Some(eb) = s.else_block() { count += count_stmts(eb); }
+            }
+            full_moon::ast::Stmt::While(s) => count += count_stmts(s.block()),
+            full_moon::ast::Stmt::Repeat(s) => count += count_stmts(s.block()),
+            full_moon::ast::Stmt::NumericFor(s) => count += count_stmts(s.block()),
+            full_moon::ast::Stmt::GenericFor(s) => count += count_stmts(s.block()),
+            full_moon::ast::Stmt::Do(s) => count += count_stmts(s.block()),
+            _ => {}
+        }
+    }
+    count
+}
+
+impl Rule for DuplicateStringLiteral {
+    fn id(&self) -> &'static str { "style::duplicate_string_literal" }
+    fn severity(&self) -> Severity { Severity::Allow }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut counts: HashMap<String, (usize, usize)> = HashMap::new();
+        let mut i = 0;
+        let bytes = source.as_bytes();
+        while i < bytes.len() {
+            if bytes[i] == b'"' || bytes[i] == b'\'' {
+                let quote = bytes[i];
+                let start = i;
+                i += 1;
+                while i < bytes.len() && bytes[i] != quote {
+                    if bytes[i] == b'\\' { i += 1; }
+                    i += 1;
+                }
+                if i < bytes.len() {
+                    let s = &source[start + 1..i];
+                    if s.len() >= 4 {
+                        let entry = counts.entry(s.to_string()).or_insert((0, start));
+                        entry.0 += 1;
+                    }
+                }
+            }
+            i += 1;
+        }
+        counts.into_iter()
+            .filter(|(_, (count, _))| *count >= 5)
+            .map(|(s, (count, pos))| Hit {
+                pos,
+                msg: format!("string \"{s}\" appears {count} times - extract to a local constant"),
+            })
+            .collect()
+    }
+}
+
+impl Rule for TypeOverTypeof {
+    fn id(&self) -> &'static str { "style::type_over_typeof" }
+    fn severity(&self) -> Severity { Severity::Allow }
+
+    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        visit::each_call(ast, |call, _ctx| {
+            if visit::is_bare_call(call, "type") {
+                hits.push(Hit {
+                    pos: visit::call_pos(call),
+                    msg: "type() doesn't handle Roblox types - typeof() returns correct types for Vector3, CFrame, Instance, etc.".into(),
+                });
+            }
+        });
+        hits
+    }
+}
+
+impl Rule for NestedTernary {
+    fn id(&self) -> &'static str { "style::nested_ternary" }
+    fn severity(&self) -> Severity { Severity::Allow }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        for (line_num, line) in source.lines().enumerate() {
+            let if_count = line.matches(" if ").count() + line.matches("(if ").count();
+            if if_count >= 3 {
+                let pos = source.lines().take(line_num).map(|l| l.len() + 1).sum::<usize>();
+                hits.push(Hit {
+                    pos,
+                    msg: "deeply nested ternary (if/then/else) expression - extract to a helper function for readability".into(),
+                });
+            }
+        }
+        hits
+    }
+}
+
+impl Rule for UnusedVariable {
+    fn id(&self) -> &'static str { "style::unused_variable_in_loop" }
+    fn severity(&self) -> Severity { Severity::Allow }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        let lines: Vec<&str> = source.lines().collect();
+        let loop_depth = build_loop_depth_map(source);
+        for (i, line) in lines.iter().enumerate() {
+            let trimmed = line.trim();
+            if i >= loop_depth.len() || loop_depth[i] == 0 { continue; }
+            if !trimmed.starts_with("local ") { continue; }
+            let after_local = trimmed.strip_prefix("local ").unwrap();
+            if after_local.starts_with("function") { continue; }
+            if let Some(eq_pos) = after_local.find(" = ") {
+                let var_name = after_local[..eq_pos].trim();
+                if var_name.contains(',') || var_name.starts_with('_') { continue; }
+                let rhs = &after_local[eq_pos + 3..];
+                if rhs.contains("Instance.new") || rhs.contains(".new(") || rhs.contains(":Clone()") {
+                    let mut used = false;
+                    for j in (i + 1)..lines.len().min(i + 20) {
+                        let next = lines[j].trim();
+                        if next == "end" || next.starts_with("end ") || next.starts_with("until") { break; }
+                        if next.contains(var_name) && !next.starts_with("local ") {
+                            used = true;
+                            break;
+                        }
+                    }
+                    if !used {
+                        let byte_pos: usize = lines[..i].iter().map(|l| l.len() + 1).sum();
+                        hits.push(Hit {
+                            pos: byte_pos,
+                            msg: format!("'{var_name}' allocated in loop but never used afterward - remove or use the variable"),
+                        });
+                    }
+                }
+            }
+        }
+        hits
+    }
+}
+
+impl Rule for MultipleReturns {
+    fn id(&self) -> &'static str { "style::multiple_returns_hot_path" }
+    fn severity(&self) -> Severity { Severity::Allow }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        let mut in_heartbeat = false;
+        for (i, line) in source.lines().enumerate() {
+            let trimmed = line.trim();
+            if trimmed.contains("Heartbeat") || trimmed.contains("RenderStepped") || trimmed.contains("Stepped") {
+                if trimmed.contains(":Connect") || trimmed.contains(":Once") {
+                    in_heartbeat = true;
+                }
+            }
+            if in_heartbeat && trimmed == "end)" {
+                in_heartbeat = false;
+            }
+            if in_heartbeat && trimmed.starts_with("return ") && trimmed.contains(", ") {
+                let return_count = trimmed.split(", ").count();
+                if return_count >= 4 {
+                    let byte_pos: usize = source.lines().take(i).map(|l| l.len() + 1).sum();
+                    hits.push(Hit {
+                        pos: byte_pos,
+                        msg: format!("returning {return_count} values from hot path - multiple returns require stack management overhead each frame"),
+                    });
+                }
+            }
+        }
+        hits
+    }
+}
+
+fn build_loop_depth_map(source: &str) -> Vec<u32> {
+    let mut depth: u32 = 0;
+    let mut depths = Vec::new();
+    for line in source.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("for ") || trimmed.starts_with("while ") || trimmed.starts_with("repeat") {
+            depth += 1;
+        }
+        depths.push(depth);
+        if trimmed == "end" || trimmed.starts_with("end ") || trimmed.starts_with("until ") || trimmed == "until" {
+            depth = depth.saturating_sub(1);
+        }
+    }
+    depths
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -483,6 +780,62 @@ mod tests {
         let src = "function obj:Method()\n  return 1\nend";
         let ast = parse(src);
         let hits = GlobalFunctionNotLocal.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn assert_in_loop_detected() {
+        let src = "for i = 1, 10 do\n  assert(i > 0)\nend";
+        let ast = parse(src);
+        let hits = AssertInHotPath.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn assert_outside_loop_ok() {
+        let src = "assert(x > 0)";
+        let ast = parse(src);
+        let hits = AssertInHotPath.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn redundant_if_true_detected() {
+        let src = "if true then\n  print(1)\nend";
+        let ast = parse(src);
+        let hits = RedundantCondition.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn redundant_if_false_detected() {
+        let src = "if false then\n  print(1)\nend";
+        let ast = parse(src);
+        let hits = RedundantCondition.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn normal_condition_ok() {
+        let src = "if x > 0 then\n  print(1)\nend";
+        let ast = parse(src);
+        let hits = RedundantCondition.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn duplicate_string_literal_detected() {
+        let src = "local a = \"hello\"\nlocal b = \"hello\"\nlocal c = \"hello\"\nlocal d = \"hello\"\nlocal e = \"hello\"";
+        let ast = parse(src);
+        let hits = DuplicateStringLiteral.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn few_strings_ok() {
+        let src = "local a = \"hello\"\nlocal b = \"hello\"";
+        let ast = parse(src);
+        let hits = DuplicateStringLiteral.check(src, &ast);
         assert_eq!(hits.len(), 0);
     }
 }

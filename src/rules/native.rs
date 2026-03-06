@@ -14,6 +14,14 @@ pub struct UntypedParams;
 pub struct HeavyApiScript;
 pub struct LargeTableLiteral;
 pub struct MixedComputationApi;
+pub struct GlobalWrite;
+pub struct ShadowedBuiltin;
+pub struct TableZeroIndex;
+pub struct MethodCallDefeatsFastcall;
+pub struct SharedGlobalMutation;
+pub struct ImportChainTooDeep;
+pub struct PcallInNative;
+pub struct DynamicTableKeyInNative;
 
 impl Rule for GetfenvSetfenv {
     fn id(&self) -> &'static str { "native::getfenv_setfenv" }
@@ -334,6 +342,264 @@ impl Rule for MixedComputationApi {
     }
 }
 
+impl Rule for GlobalWrite {
+    fn id(&self) -> &'static str { "native::global_write" }
+    fn severity(&self) -> Severity { Severity::Error }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        for pos in visit::find_pattern_positions(source, "_G.") {
+            let after = &source[pos + 3..];
+            if after.contains(" = ") || after.starts_with(|c: char| c.is_alphanumeric()) {
+                let line_end = after.find('\n').unwrap_or(after.len());
+                let line = &after[..line_end];
+                if line.contains(" = ") {
+                    hits.push(Hit {
+                        pos,
+                        msg: "_G write disables safeenv - all GETIMPORT, FASTCALL, and native optimizations are disabled for this script".into(),
+                    });
+                }
+            }
+        }
+        for pos in visit::find_pattern_positions(source, "_G[") {
+            hits.push(Hit {
+                pos,
+                msg: "_G access disables safeenv - all GETIMPORT, FASTCALL, and native optimizations are disabled for this script".into(),
+            });
+        }
+        hits
+    }
+}
+
+impl Rule for ShadowedBuiltin {
+    fn id(&self) -> &'static str { "native::shadowed_builtin" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let builtins = [
+            "math", "string", "table", "bit32", "buffer", "coroutine", "debug",
+            "os", "utf8", "vector", "task",
+            "pairs", "ipairs", "next", "select", "type", "typeof",
+            "tonumber", "tostring", "error", "assert", "pcall", "xpcall",
+            "print", "warn", "require", "setmetatable", "getmetatable",
+            "rawget", "rawset", "rawequal", "rawlen", "unpack",
+        ];
+        let mut hits = Vec::new();
+        for builtin in &builtins {
+            let pattern = format!("local {builtin} = ");
+            for pos in visit::find_pattern_positions(source, &pattern) {
+                let after = &source[pos + pattern.len()..];
+                let value_end = after.find('\n').unwrap_or(after.len());
+                let value = after[..value_end].trim();
+                if value == *builtin {
+                    continue;
+                }
+                hits.push(Hit {
+                    pos,
+                    msg: format!("shadowing builtin '{builtin}' - breaks FASTCALL/GETIMPORT optimizations for '{builtin}' in this scope"),
+                });
+            }
+        }
+        hits
+    }
+}
+
+impl Rule for TableZeroIndex {
+    fn id(&self) -> &'static str { "native::table_zero_index" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        for pos in visit::find_pattern_positions(source, "[0]") {
+            let before = &source[..pos];
+            let before_char = before.trim_end().chars().last().unwrap_or(' ');
+            if before_char.is_alphanumeric() || before_char == '_' || before_char == ')' || before_char == ']' {
+                hits.push(Hit {
+                    pos,
+                    msg: "t[0] - Luau arrays are 1-based, index 0 is in the hash part (slower) and skipped by ipairs/# operator".into(),
+                });
+            }
+        }
+        hits
+    }
+}
+
+impl Rule for MethodCallDefeatsFastcall {
+    fn id(&self) -> &'static str { "native::method_call_defeats_fastcall" }
+    fn severity(&self) -> Severity { Severity::Allow }
+
+    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let fastcall_methods = ["byte", "char", "sub", "len"];
+        let mut hits = Vec::new();
+        visit::each_call(ast, |call, ctx| {
+            if !ctx.in_loop { return; }
+            for method in &fastcall_methods {
+                if visit::is_method_call(call, method) {
+                    let pos = visit::call_pos(call);
+                    hits.push(Hit {
+                        pos,
+                        msg: format!(":{}() in loop defeats FASTCALL - use string.{}() dot syntax for the fast builtin path", method, method),
+                    });
+                }
+            }
+        });
+        hits
+    }
+}
+
+impl Rule for SharedGlobalMutation {
+    fn id(&self) -> &'static str { "native::shared_global_mutation" }
+    fn severity(&self) -> Severity { Severity::Error }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        for pos in visit::find_pattern_positions(source, "shared.") {
+            let after = &source[pos + 7..];
+            if after.contains('=') {
+                let line_end = after.find('\n').unwrap_or(after.len());
+                let line = &after[..line_end];
+                if line.contains(" = ") || line.starts_with(|c: char| c.is_alphanumeric() || c == '_') {
+                    let before_eq = line.find(" = ");
+                    let before_eq2 = line.find("=");
+                    let eq_pos = before_eq.or(before_eq2);
+                    if let Some(ep) = eq_pos {
+                        if !line[..ep].contains("=") || before_eq.is_some() {
+                            hits.push(Hit {
+                                pos,
+                                msg: "writing to shared.* disables GETIMPORT, FASTCALL, and DUPCLOSURE optimizations for the entire script - use a module instead".into(),
+                            });
+                        }
+                    }
+                }
+            }
+        }
+        for pos in visit::find_pattern_positions(source, "shared[") {
+            let after = &source[pos..];
+            let line_end = after.find('\n').unwrap_or(after.len());
+            let line = &after[..line_end];
+            if line.contains("] =") {
+                hits.push(Hit {
+                    pos,
+                    msg: "writing to shared[] disables GETIMPORT, FASTCALL, and DUPCLOSURE optimizations for the entire script - use a module instead".into(),
+                });
+            }
+        }
+        hits
+    }
+}
+
+impl Rule for ImportChainTooDeep {
+    fn id(&self) -> &'static str { "native::import_chain_too_deep" }
+    fn severity(&self) -> Severity { Severity::Allow }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        let loop_depth = build_loop_depth_map(source);
+        let line_starts = line_start_offsets(source);
+        let lines: Vec<&str> = source.lines().collect();
+        for (i, line) in lines.iter().enumerate() {
+            let trimmed = line.trim();
+            if i < loop_depth.len() && loop_depth[i] > 0 {
+                let dot_count = trimmed.matches('.').count();
+                if dot_count >= 4 {
+                    let pos = if i < line_starts.len() { line_starts[i] } else { 0 };
+                    hits.push(Hit {
+                        pos,
+                        msg: "deep property chain (4+ dots) in loop - GETIMPORT only caches 3 levels, cache intermediate results in locals".into(),
+                    });
+                }
+            }
+        }
+        hits
+    }
+}
+
+fn line_start_offsets(source: &str) -> Vec<usize> {
+    let mut starts = vec![0];
+    for (i, b) in source.bytes().enumerate() {
+        if b == b'\n' { starts.push(i + 1); }
+    }
+    starts
+}
+
+fn build_loop_depth_map(source: &str) -> Vec<u32> {
+    let mut depth: u32 = 0;
+    let mut depths = Vec::new();
+    for line in source.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("for ") || trimmed.starts_with("while ") || trimmed.starts_with("repeat") {
+            depth += 1;
+        }
+        depths.push(depth);
+        if trimmed == "end" || trimmed.starts_with("end ") || trimmed.starts_with("until ") || trimmed == "until" {
+            depth = depth.saturating_sub(1);
+        }
+    }
+    depths
+}
+
+impl Rule for PcallInNative {
+    fn id(&self) -> &'static str { "native::pcall_in_native" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        if !source.starts_with("--!native") {
+            return vec![];
+        }
+        let mut hits = Vec::new();
+        visit::each_call(ast, |call, ctx| {
+            if ctx.in_loop && (visit::is_bare_call(call, "pcall") || visit::is_bare_call(call, "xpcall")) {
+                hits.push(Hit {
+                    pos: visit::call_pos(call),
+                    msg: "pcall/xpcall in loop in --!native script forces interpreter fallback for the protected call - move error handling outside the loop".into(),
+                });
+            }
+        });
+        hits
+    }
+}
+
+impl Rule for DynamicTableKeyInNative {
+    fn id(&self) -> &'static str { "native::dynamic_table_key_in_native" }
+    fn severity(&self) -> Severity { Severity::Allow }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        if !source.starts_with("--!native") {
+            return vec![];
+        }
+        let mut hits = Vec::new();
+        let loop_depth = build_loop_depth_map(source);
+        let line_starts = line_start_offsets(source);
+        for pos in visit::find_pattern_positions(source, "[") {
+            if pos == 0 { continue; }
+            let before = source[..pos].as_bytes();
+            let prev = before[before.len() - 1];
+            if prev == b'=' || prev == b',' || prev == b'{' || prev == b'(' {
+                continue;
+            }
+            let line = line_starts.partition_point(|&s| s <= pos).saturating_sub(1);
+            if line >= loop_depth.len() || loop_depth[line] == 0 {
+                continue;
+            }
+            let after = &source[pos + 1..];
+            if let Some(close) = after.find(']') {
+                let key = after[..close].trim();
+                if !key.starts_with('"') && !key.starts_with('\'') && key.parse::<f64>().is_err() {
+                    let line_start = line_starts[line];
+                    let line_text = &source[line_start..source[line_start..].find('\n').map(|p| line_start + p).unwrap_or(source.len())];
+                    if line_text.contains("t[") || line_text.contains("][") {
+                        hits.push(Hit {
+                            pos,
+                            msg: "dynamic table key t[var] in loop in --!native defeats inline caching - GETTABLEKS (constant key) is much faster".into(),
+                        });
+                    }
+                }
+            }
+        }
+        hits
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -421,6 +687,118 @@ mod tests {
         let src = "local function update()\n  local x = math.sqrt(a) + b * c - d / e\n  game:GetService(\"A\")\n  obj:FindFirstChild(\"B\")\n  obj:Clone()\nend";
         let ast = parse(src);
         let hits = MixedComputationApi.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn global_write_detected() {
+        let src = "_G.myValue = 42";
+        let ast = parse(src);
+        let hits = GlobalWrite.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn global_read_ok() {
+        let src = "local x = _G.myValue";
+        let ast = parse(src);
+        let hits = GlobalWrite.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn shadowed_builtin_detected() {
+        let src = "local math = require(mathLib)";
+        let ast = parse(src);
+        let hits = ShadowedBuiltin.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn local_math_equals_math_ok() {
+        let src = "local math = math";
+        let ast = parse(src);
+        let hits = ShadowedBuiltin.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn table_zero_index_detected() {
+        let src = "local x = t[0]";
+        let ast = parse(src);
+        let hits = TableZeroIndex.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn table_one_index_ok() {
+        let src = "local x = t[1]";
+        let ast = parse(src);
+        let hits = TableZeroIndex.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn method_call_defeats_fastcall_detected() {
+        let src = "for i = 1, 10 do\n  local b = s:byte(i)\nend";
+        let ast = parse(src);
+        let hits = MethodCallDefeatsFastcall.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn dot_call_fastcall_ok() {
+        let src = "for i = 1, 10 do\n  local b = string.byte(s, i)\nend";
+        let ast = parse(src);
+        let hits = MethodCallDefeatsFastcall.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn shared_global_mutation_detected() {
+        let src = "shared.GameState = \"running\"";
+        let ast = parse(src);
+        let hits = SharedGlobalMutation.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn shared_read_ok() {
+        let src = "local state = shared.GameState";
+        let ast = parse(src);
+        let hits = SharedGlobalMutation.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn import_chain_in_loop_detected() {
+        let src = "for _, p in parts do\n  local x = game.Workspace.Model.Part.Position.X\nend";
+        let ast = parse(src);
+        let hits = ImportChainTooDeep.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn short_chain_ok() {
+        let src = "for _, p in parts do\n  local x = game.Workspace.Model\nend";
+        let ast = parse(src);
+        let hits = ImportChainTooDeep.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn pcall_in_native_loop_detected() {
+        let src = "--!native\nfor i = 1, 10 do\n  pcall(doWork)\nend";
+        let ast = parse(src);
+        let hits = PcallInNative.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn pcall_in_non_native_ok() {
+        let src = "for i = 1, 10 do\n  pcall(doWork)\nend";
+        let ast = parse(src);
+        let hits = PcallInNative.check(src, &ast);
         assert_eq!(hits.len(), 0);
     }
 }

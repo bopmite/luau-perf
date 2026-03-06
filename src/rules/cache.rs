@@ -17,6 +17,13 @@ pub struct GetAttributeInLoop;
 pub struct Color3NewInLoop;
 pub struct UDim2NewInLoop;
 pub struct RepeatedMethodCall;
+pub struct CurrentCameraUncached;
+pub struct LocalPlayerUncached;
+pub struct WorkspaceLookupInLoop;
+pub struct RepeatedColor3;
+pub struct EnumLookupInLoop;
+pub struct BrickColorNewInLoop;
+pub struct RegionNewInLoop;
 
 impl Rule for MagnitudeOverSquared {
     fn id(&self) -> &'static str { "cache::magnitude_over_squared" }
@@ -365,6 +372,214 @@ impl Rule for RepeatedMethodCall {
     }
 }
 
+impl Rule for CurrentCameraUncached {
+    fn id(&self) -> &'static str { "cache::current_camera_uncached" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let positions = visit::find_pattern_positions(source, "workspace.CurrentCamera");
+        if positions.len() < 2 {
+            return vec![];
+        }
+        positions[1..]
+            .iter()
+            .map(|&pos| Hit {
+                pos,
+                msg: "workspace.CurrentCamera accessed multiple times - cache in a local".into(),
+            })
+            .collect()
+    }
+}
+
+impl Rule for LocalPlayerUncached {
+    fn id(&self) -> &'static str { "cache::local_player_uncached" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let positions = visit::find_pattern_positions(source, ".LocalPlayer");
+        let positions: Vec<_> = positions.into_iter().filter(|&p| {
+            let after = &source[p + ".LocalPlayer".len()..];
+            !after.starts_with("Uncached") && !after.starts_with("_")
+        }).collect();
+        if positions.len() < 2 {
+            return vec![];
+        }
+        positions[1..]
+            .iter()
+            .map(|&pos| Hit {
+                pos,
+                msg: "Players.LocalPlayer accessed multiple times - cache in a module-level local".into(),
+            })
+            .collect()
+    }
+}
+
+impl Rule for WorkspaceLookupInLoop {
+    fn id(&self) -> &'static str { "cache::workspace_lookup_in_loop" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        visit::each_call(ast, |call, ctx| {
+            if !ctx.in_loop {
+                return;
+            }
+            let tok = match visit::prefix_token(call) {
+                Some(t) => t,
+                None => return,
+            };
+            if visit::tok_text(tok) == "workspace" {
+                if visit::is_method_call(call, "FindFirstChild")
+                    || visit::is_method_call(call, "WaitForChild")
+                    || visit::is_method_call(call, "FindFirstChildOfClass")
+                    || visit::is_method_call(call, "FindFirstChildWhichIsA")
+                {
+                    hits.push(Hit {
+                        pos: visit::call_pos(call),
+                        msg: "workspace lookup in loop - cache the result outside the loop".into(),
+                    });
+                }
+            }
+        });
+        hits
+    }
+}
+
+impl Rule for RepeatedColor3 {
+    fn id(&self) -> &'static str { "cache::repeated_color3" }
+    fn severity(&self) -> Severity { Severity::Allow }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        let mut counts: std::collections::HashMap<String, (usize, usize)> = std::collections::HashMap::new();
+        let mut start = 0;
+        while let Some(idx) = source[start..].find("Color3.fromRGB(") {
+            let abs = start + idx;
+            let after = &source[abs + "Color3.fromRGB(".len()..];
+            if let Some(close) = after.find(')') {
+                let args = after[..close].to_string();
+                let entry = counts.entry(format!("Color3.fromRGB({})", args)).or_insert((0, abs));
+                entry.0 += 1;
+            }
+            start = abs + 1;
+        }
+        start = 0;
+        while let Some(idx) = source[start..].find("Color3.new(") {
+            let abs = start + idx;
+            let after = &source[abs + "Color3.new(".len()..];
+            if let Some(close) = after.find(')') {
+                let args = after[..close].to_string();
+                let entry = counts.entry(format!("Color3.new({})", args)).or_insert((0, abs));
+                entry.0 += 1;
+            }
+            start = abs + 1;
+        }
+        for (call, (count, pos)) in &counts {
+            if *count >= 4 {
+                hits.push(Hit {
+                    pos: *pos,
+                    msg: format!("{} repeated {} times - extract to a module-level constant", call, count),
+                });
+            }
+        }
+        hits
+    }
+}
+
+impl Rule for EnumLookupInLoop {
+    fn id(&self) -> &'static str { "cache::enum_lookup_in_loop" }
+    fn severity(&self) -> Severity { Severity::Allow }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        let loop_depth = build_loop_depth_map(source);
+        let line_starts = line_start_offsets(source);
+        let mut start = 0;
+        while let Some(idx) = source[start..].find("Enum.") {
+            let abs = start + idx;
+            let rest = &source[abs + 5..];
+            if rest.starts_with(|c: char| c.is_ascii_uppercase()) {
+                if let Some(dot2) = rest.find('.') {
+                    let after_dot2 = &rest[dot2 + 1..];
+                    if after_dot2.starts_with(|c: char| c.is_ascii_uppercase()) {
+                        let line = line_starts.partition_point(|&s| s <= abs).saturating_sub(1);
+                        if line < loop_depth.len() && loop_depth[line] > 0 {
+                            let end = abs + 5 + dot2 + 1 + after_dot2.find(|c: char| !c.is_alphanumeric() && c != '_').unwrap_or(after_dot2.len());
+                            let enum_val = &source[abs..end];
+                            hits.push(Hit {
+                                pos: abs,
+                                msg: format!("{} in loop - cache enum value outside the loop", enum_val),
+                            });
+                        }
+                    }
+                }
+            }
+            start = abs + 1;
+        }
+        hits
+    }
+}
+
+fn line_start_offsets(source: &str) -> Vec<usize> {
+    let mut starts = vec![0];
+    for (i, b) in source.bytes().enumerate() {
+        if b == b'\n' { starts.push(i + 1); }
+    }
+    starts
+}
+
+fn build_loop_depth_map(source: &str) -> Vec<u32> {
+    let mut depth: u32 = 0;
+    let mut depths = Vec::new();
+    for line in source.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("for ") || trimmed.starts_with("while ") || trimmed.starts_with("repeat") {
+            depth += 1;
+        }
+        depths.push(depth);
+        if trimmed == "end" || trimmed.starts_with("end ") || trimmed.starts_with("until ") || trimmed == "until" {
+            depth = depth.saturating_sub(1);
+        }
+    }
+    depths
+}
+
+impl Rule for BrickColorNewInLoop {
+    fn id(&self) -> &'static str { "cache::brick_color_new_in_loop" }
+    fn severity(&self) -> Severity { Severity::Allow }
+
+    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        visit::each_call(ast, |call, ctx| {
+            if ctx.in_loop && visit::is_dot_call(call, "BrickColor", "new") {
+                hits.push(Hit {
+                    pos: visit::call_pos(call),
+                    msg: "BrickColor.new() in loop allocates each iteration - cache outside if arguments are loop-invariant".into(),
+                });
+            }
+        });
+        hits
+    }
+}
+
+impl Rule for RegionNewInLoop {
+    fn id(&self) -> &'static str { "cache::region_new_in_loop" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        visit::each_call(ast, |call, ctx| {
+            if ctx.in_loop && visit::is_dot_call(call, "Region3", "new") {
+                hits.push(Hit {
+                    pos: visit::call_pos(call),
+                    msg: "Region3.new() in loop allocates a Region3 each iteration - cache outside if bounds are loop-invariant".into(),
+                });
+            }
+        });
+        hits
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -395,6 +610,118 @@ mod tests {
         let src = "local a = obj1:GetChildren()\nlocal b = obj2:GetChildren()";
         let ast = parse(src);
         let hits = RepeatedMethodCall.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn current_camera_uncached_detected() {
+        let src = "local c1 = workspace.CurrentCamera\nlocal c2 = workspace.CurrentCamera";
+        let ast = parse(src);
+        let hits = CurrentCameraUncached.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn current_camera_single_ok() {
+        let src = "local cam = workspace.CurrentCamera";
+        let ast = parse(src);
+        let hits = CurrentCameraUncached.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn local_player_uncached_detected() {
+        let src = "local p = Players.LocalPlayer\nlocal n = Players.LocalPlayer.Name";
+        let ast = parse(src);
+        let hits = LocalPlayerUncached.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn local_player_single_ok() {
+        let src = "local player = Players.LocalPlayer";
+        let ast = parse(src);
+        let hits = LocalPlayerUncached.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn workspace_lookup_in_loop_detected() {
+        let src = "for i = 1, 10 do\n  workspace:FindFirstChild(\"Part\")\nend";
+        let ast = parse(src);
+        let hits = WorkspaceLookupInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn workspace_lookup_outside_loop_ok() {
+        let src = "local p = workspace:FindFirstChild(\"Part\")";
+        let ast = parse(src);
+        let hits = WorkspaceLookupInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn repeated_color3_detected() {
+        let src = "local a = Color3.fromRGB(255, 0, 0)\nlocal b = Color3.fromRGB(255, 0, 0)\nlocal c = Color3.fromRGB(255, 0, 0)\nlocal d = Color3.fromRGB(255, 0, 0)";
+        let ast = parse(src);
+        let hits = RepeatedColor3.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn unique_color3_ok() {
+        let src = "local a = Color3.fromRGB(255, 0, 0)\nlocal b = Color3.fromRGB(0, 255, 0)";
+        let ast = parse(src);
+        let hits = RepeatedColor3.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn enum_lookup_in_loop_detected() {
+        let src = "for _, part in parts do\n  part.Material = Enum.Material.SmoothPlastic\nend";
+        let ast = parse(src);
+        let hits = EnumLookupInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn enum_lookup_outside_loop_ok() {
+        let src = "part.Material = Enum.Material.SmoothPlastic";
+        let ast = parse(src);
+        let hits = EnumLookupInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn brick_color_in_loop_detected() {
+        let src = "for i = 1, 10 do\n  local bc = BrickColor.new(\"Really red\")\nend";
+        let ast = parse(src);
+        let hits = BrickColorNewInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn brick_color_outside_loop_ok() {
+        let src = "local bc = BrickColor.new(\"Really red\")";
+        let ast = parse(src);
+        let hits = BrickColorNewInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn region_new_in_loop_detected() {
+        let src = "for i = 1, 10 do\n  local r = Region3.new(min, max)\nend";
+        let ast = parse(src);
+        let hits = RegionNewInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn region_new_outside_loop_ok() {
+        let src = "local r = Region3.new(min, max)";
+        let ast = parse(src);
+        let hits = RegionNewInLoop.check(src, &ast);
         assert_eq!(hits.len(), 0);
     }
 }

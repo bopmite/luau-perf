@@ -9,6 +9,10 @@ pub struct PropertyBeforeParent;
 pub struct RepeatedFindFirstChild;
 pub struct ChangedOnMovingPart;
 pub struct BulkPropertySet;
+pub struct CollectionServiceInLoop;
+pub struct NameIndexingInLoop;
+pub struct DestroyInLoop;
+pub struct GetChildrenInLoop;
 
 impl Rule for TwoArgInstanceNew {
     fn id(&self) -> &'static str { "instance::two_arg_instance_new" }
@@ -259,6 +263,61 @@ impl Rule for BulkPropertySet {
     }
 }
 
+impl Rule for CollectionServiceInLoop {
+    fn id(&self) -> &'static str { "instance::collection_service_in_loop" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        visit::each_call(ast, |call, ctx| {
+            if !ctx.in_loop {
+                return;
+            }
+            let pos = visit::call_pos(call);
+            if visit::is_method_call(call, "AddTag") || visit::is_method_call(call, "RemoveTag") {
+                hits.push(Hit {
+                    pos,
+                    msg: "AddTag/RemoveTag in loop - triggers CollectionService event per call, batch outside loop".into(),
+                });
+            } else if visit::is_method_call(call, "HasTag") {
+                hits.push(Hit {
+                    pos,
+                    msg: "HasTag() in loop - consider caching tag state outside loop".into(),
+                });
+            }
+        });
+        hits
+    }
+}
+
+impl Rule for NameIndexingInLoop {
+    fn id(&self) -> &'static str { "instance::name_indexing_in_loop" }
+    fn severity(&self) -> Severity { Severity::Allow }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let loop_depth = build_loop_depth_map(source);
+        let line_starts = line_start_offsets(source);
+        let mut hits = Vec::new();
+
+        for pos in visit::find_pattern_positions(source, "workspace.") {
+            let after = &source[pos + "workspace.".len()..];
+            let name_end = after.find(|c: char| !c.is_alphanumeric() && c != '_').unwrap_or(after.len());
+            let name = &after[..name_end];
+            if name.is_empty() || !name.starts_with(|c: char| c.is_uppercase()) {
+                continue;
+            }
+            let line = line_starts.partition_point(|&s| s <= pos).saturating_sub(1);
+            if line < loop_depth.len() && loop_depth[line] > 0 {
+                hits.push(Hit {
+                    pos,
+                    msg: format!("workspace.{name} accessed in loop - property lookup each iteration, cache in a local"),
+                });
+            }
+        }
+        hits
+    }
+}
+
 fn parse_property_assignment(line: &str) -> Option<(&str, &str)> {
     let eq_pos = line.find(" = ")?;
     let lhs = line[..eq_pos].trim();
@@ -301,6 +360,42 @@ fn build_loop_depth_map(source: &str) -> Vec<u32> {
         }
     }
     depths
+}
+
+impl Rule for DestroyInLoop {
+    fn id(&self) -> &'static str { "instance::destroy_in_loop" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        visit::each_call(ast, |call, ctx| {
+            if ctx.in_loop && visit::is_method_call(call, "Destroy") {
+                hits.push(Hit {
+                    pos: visit::call_pos(call),
+                    msg: ":Destroy() in loop triggers ancestry-changed events per call - consider :ClearAllChildren() on the parent or batch with Debris".into(),
+                });
+            }
+        });
+        hits
+    }
+}
+
+impl Rule for GetChildrenInLoop {
+    fn id(&self) -> &'static str { "instance::get_children_in_loop" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        visit::each_call(ast, |call, ctx| {
+            if ctx.in_loop && (visit::is_method_call(call, "GetChildren") || visit::is_method_call(call, "GetDescendants")) {
+                hits.push(Hit {
+                    pos: visit::call_pos(call),
+                    msg: ":GetChildren/:GetDescendants in loop allocates a new table each call - cache outside the loop".into(),
+                });
+            }
+        });
+        hits
+    }
 }
 
 #[cfg(test)]
@@ -367,6 +462,70 @@ mod tests {
         let src = "part.Size = v\npart.Position = v\npart.Color = c";
         let ast = parse(src);
         let hits = BulkPropertySet.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn collection_service_in_loop_detected() {
+        let src = "for _, part in parts do\n  part:AddTag(\"Tagged\")\nend";
+        let ast = parse(src);
+        let hits = CollectionServiceInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn collection_service_outside_loop_ok() {
+        let src = "part:AddTag(\"Tagged\")";
+        let ast = parse(src);
+        let hits = CollectionServiceInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn name_indexing_in_loop_detected() {
+        let src = "for i = 1, 10 do\n  local p = workspace.SpawnLocation\nend";
+        let ast = parse(src);
+        let hits = NameIndexingInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn name_indexing_outside_loop_ok() {
+        let src = "local p = workspace.SpawnLocation";
+        let ast = parse(src);
+        let hits = NameIndexingInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn destroy_in_loop_detected() {
+        let src = "for _, child in children do\n  child:Destroy()\nend";
+        let ast = parse(src);
+        let hits = DestroyInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn destroy_outside_loop_ok() {
+        let src = "part:Destroy()";
+        let ast = parse(src);
+        let hits = DestroyInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn get_children_in_loop_detected() {
+        let src = "for i = 1, 10 do\n  local c = folder:GetChildren()\nend";
+        let ast = parse(src);
+        let hits = GetChildrenInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn get_children_outside_loop_ok() {
+        let src = "local c = folder:GetChildren()";
+        let ast = parse(src);
+        let hits = GetChildrenInLoop.check(src, &ast);
         assert_eq!(hits.len(), 0);
     }
 }

@@ -29,6 +29,16 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(complexity::FindFirstChildRecursive),
         Box::new(complexity::RequireInFunction),
         Box::new(complexity::DeepMetatableChain),
+        Box::new(complexity::PairsInPairs),
+        Box::new(complexity::GmatchInLoop),
+        Box::new(complexity::DataStoreNoPcall),
+        Box::new(complexity::AccumulatingRebuild),
+        Box::new(complexity::OneIterationLoop),
+        Box::new(complexity::ElseifChainOverTable),
+        Box::new(complexity::FilterThenFirst),
+        Box::new(complexity::NestedTableFind),
+        Box::new(complexity::StringMatchInLoop),
+        Box::new(complexity::PromiseChainInLoop),
         // cache
         Box::new(cache::MagnitudeOverSquared),
         Box::new(cache::UncachedGetService),
@@ -46,6 +56,13 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(cache::Color3NewInLoop),
         Box::new(cache::UDim2NewInLoop),
         Box::new(cache::RepeatedMethodCall),
+        Box::new(cache::CurrentCameraUncached),
+        Box::new(cache::LocalPlayerUncached),
+        Box::new(cache::WorkspaceLookupInLoop),
+        Box::new(cache::RepeatedColor3),
+        Box::new(cache::EnumLookupInLoop),
+        Box::new(cache::BrickColorNewInLoop),
+        Box::new(cache::RegionNewInLoop),
         // memory
         Box::new(memory::UntrackedConnection),
         Box::new(memory::UntrackedTaskSpawn),
@@ -58,6 +75,13 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(memory::CircularConnectionRef),
         Box::new(memory::WeakTableNoShrink),
         Box::new(memory::RunServiceNoDisconnect),
+        Box::new(memory::TaskDelayLongDuration),
+        Box::new(memory::TweenCompletedConnect),
+        Box::new(memory::SetAttributeInHeartbeat),
+        Box::new(memory::SoundNotDestroyed),
+        Box::new(memory::UnboundedTableGrowth),
+        Box::new(memory::DebrisNegativeDuration),
+        Box::new(memory::CollectionTagNoCleanup),
         // roblox
         Box::new(roblox::DeprecatedWait),
         Box::new(roblox::DeprecatedSpawn),
@@ -79,6 +103,28 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(roblox::DeprecatedRegion3),
         Box::new(roblox::BindableSameScript),
         Box::new(roblox::ServerPropertyInHeartbeat),
+        Box::new(roblox::GameLoadedRace),
+        Box::new(roblox::HumanoidStatePolling),
+        Box::new(roblox::ServerSideTween),
+        Box::new(roblox::RequireInConnect),
+        Box::new(roblox::FindFirstChildChain),
+        Box::new(roblox::OnceOverConnect),
+        Box::new(roblox::HealthPolling),
+        Box::new(roblox::ChangedEventUnfiltered),
+        Box::new(roblox::DescendantEventWorkspace),
+        Box::new(roblox::GetAttributeInHeartbeat),
+        Box::new(roblox::PivotToInLoop),
+        Box::new(roblox::DeprecatedTick),
+        Box::new(roblox::DeprecatedFindPartOnRay),
+        Box::new(roblox::WhileWaitDo),
+        Box::new(roblox::GetPropertyChangedInLoop),
+        Box::new(roblox::RenderSteppedOnServer),
+        Box::new(roblox::TaskWaitNoArg),
+        Box::new(roblox::DeprecatedDelay),
+        Box::new(roblox::CloneSetParent),
+        Box::new(roblox::YieldInConnectCallback),
+        Box::new(roblox::DeprecatedUdim),
+        Box::new(roblox::TeleportServiceRace),
         // alloc
         Box::new(alloc::StringConcatInLoop),
         Box::new(alloc::StringFormatInLoop),
@@ -94,10 +140,24 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(alloc::RepeatedStringByte),
         Box::new(alloc::StringInterpInLoop),
         Box::new(alloc::SelectInLoop),
+        Box::new(alloc::TableInsertKnownSize),
+        Box::new(alloc::BufferOverStringPack),
+        Box::new(alloc::TaskSpawnInLoop),
+        Box::new(alloc::GsubFunctionInLoop),
+        Box::new(alloc::TypeofInLoop),
+        Box::new(alloc::SetmetatableInLoop),
         // network
         Box::new(network::FireInLoop),
         Box::new(network::InvokeServerInLoop),
         Box::new(network::LargeRemoteData),
+        Box::new(network::FireClientPerPlayer),
+        Box::new(network::RemoteEventStringData),
+        Box::new(network::DataStoreInLoop),
+        Box::new(network::DictKeysInRemoteData),
+        Box::new(network::UnreliableRemotePreferred),
+        Box::new(network::InvokeClientDangerous),
+        Box::new(network::HttpServiceInLoop),
+        Box::new(network::MarketplaceInfoInLoop),
         // math
         Box::new(math::RandomDeprecated),
         Box::new(math::RandomNewInLoop),
@@ -105,6 +165,15 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(math::SqrtOverSquared),
         Box::new(math::FloorDivision),
         Box::new(math::FmodOverModulo),
+        Box::new(math::PowTwo),
+        Box::new(math::VectorNormalizeManual),
+        Box::new(math::UnnecessaryTonumber),
+        Box::new(math::LerpManual),
+        Box::new(math::AbsForSignCheck),
+        Box::new(math::Vector3ZeroConstant),
+        Box::new(math::CFrameIdentityConstant),
+        Box::new(math::HugeComparison),
+        Box::new(math::ExpOverPow),
         // string
         Box::new(string::LenOverHash),
         Box::new(string::RepInLoop),
@@ -112,6 +181,15 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(string::LowerUpperInLoop),
         Box::new(string::ByteComparison),
         Box::new(string::SubForSingleChar),
+        Box::new(string::TostringOnString),
+        Box::new(string::FindMissingPlainFlag),
+        Box::new(string::LowerForComparison),
+        Box::new(string::MatchForBoolean),
+        Box::new(string::ConcatChain),
+        Box::new(string::SubForPrefixCheck),
+        Box::new(string::PatternBacktracking),
+        Box::new(string::ReverseInLoop),
+        Box::new(string::FormatKnownTypes),
         // table
         Box::new(table::ForeachDeprecated),
         Box::new(table::GetnDeprecated),
@@ -124,6 +202,14 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(table::DeferredFieldAssignment),
         Box::new(table::IpairsOverNumericFor),
         Box::new(table::PolymorphicConstructor),
+        Box::new(table::SortComparisonAllocation),
+        Box::new(table::ClearVsNew),
+        Box::new(table::TableMoveOverLoop),
+        Box::new(table::ConcatWithSeparatorLoop),
+        Box::new(table::PairsOverGeneralized),
+        Box::new(table::NilFieldInConstructor),
+        Box::new(table::RawsetInLoop),
+        Box::new(table::NextTNilOverPairs),
         // native
         Box::new(native::GetfenvSetfenv),
         Box::new(native::DynamicRequire),
@@ -136,15 +222,39 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(native::HeavyApiScript),
         Box::new(native::LargeTableLiteral),
         Box::new(native::MixedComputationApi),
+        Box::new(native::GlobalWrite),
+        Box::new(native::ShadowedBuiltin),
+        Box::new(native::TableZeroIndex),
+        Box::new(native::MethodCallDefeatsFastcall),
+        Box::new(native::SharedGlobalMutation),
+        Box::new(native::ImportChainTooDeep),
+        Box::new(native::PcallInNative),
+        Box::new(native::DynamicTableKeyInNative),
         // physics
         Box::new(physics::SpatialQueryInLoop),
         Box::new(physics::MoveToInLoop),
+        Box::new(physics::TouchedWithoutDebounce),
+        Box::new(physics::SetNetworkOwnerInLoop),
+        Box::new(physics::PreciseCollisionFidelity),
+        Box::new(physics::CollisionGroupStringInLoop),
+        Box::new(physics::AnchoredWithVelocity),
+        Box::new(physics::RaycastParamsInLoop),
+        Box::new(physics::CFrameAssignInLoop),
+        Box::new(physics::CanTouchQueryNotDisabled),
+        Box::new(physics::WeldConstraintInLoop),
+        Box::new(physics::MasslessNotSet),
+        Box::new(physics::AssemblyVelocityInLoop),
         // render
         Box::new(render::GuiCreationInLoop),
         Box::new(render::BeamTrailInLoop),
         Box::new(render::ParticleEmitterInLoop),
         Box::new(render::BillboardGuiInLoop),
         Box::new(render::TransparencyChangeInLoop),
+        Box::new(render::RichTextInLoop),
+        Box::new(render::NeonGlassMaterialInLoop),
+        Box::new(render::SurfaceGuiInLoop),
+        Box::new(render::ImageLabelInLoop),
+        Box::new(render::ScrollingFrameInLoop),
         // instance
         Box::new(instance::TwoArgInstanceNew),
         Box::new(instance::PropertyChangeSignalWrong),
@@ -154,6 +264,10 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(instance::RepeatedFindFirstChild),
         Box::new(instance::ChangedOnMovingPart),
         Box::new(instance::BulkPropertySet),
+        Box::new(instance::CollectionServiceInLoop),
+        Box::new(instance::NameIndexingInLoop),
+        Box::new(instance::DestroyInLoop),
+        Box::new(instance::GetChildrenInLoop),
         // style
         Box::new(style::ServiceLocatorAntiPattern),
         Box::new(style::EmptyFunctionBody),
@@ -166,6 +280,14 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(style::IndexFunctionMetatable),
         Box::new(style::ConditionalFieldInConstructor),
         Box::new(style::GlobalFunctionNotLocal),
+        Box::new(style::AssertInHotPath),
+        Box::new(style::RedundantCondition),
+        Box::new(style::LongFunctionBody),
+        Box::new(style::DuplicateStringLiteral),
+        Box::new(style::TypeOverTypeof),
+        Box::new(style::NestedTernary),
+        Box::new(style::UnusedVariable),
+        Box::new(style::MultipleReturns),
     ]
 }
 
@@ -200,7 +322,12 @@ pub fn print_all() {
             Severity::Warn => "\x1b[33m warn\x1b[0m",
             Severity::Allow => " allow",
         };
-        println!("   {:<42} {sev}", name);
+        let lvl = match rule_level(id) {
+            crate::lint::Level::Default => "\x1b[32mdefault\x1b[0m ",
+            crate::lint::Level::Strict => "\x1b[36m strict\x1b[0m ",
+            crate::lint::Level::Pedantic => "\x1b[90mpedantic\x1b[0m",
+        };
+        println!("   {:<42} {sev}  {lvl}", name);
     }
 
     println!();
@@ -222,7 +349,13 @@ pub fn explain(rule_id: &str) {
                 Severity::Allow => "allow",
             };
             println!("\n \x1b[1m{}\x1b[0m", r.id());
+            let lvl = match rule_level(r.id()) {
+                crate::lint::Level::Default => "default",
+                crate::lint::Level::Strict => "strict",
+                crate::lint::Level::Pedantic => "pedantic",
+            };
             println!(" severity: {sev}");
+            println!(" level:    {lvl}");
             println!(" fixable:  {}", if is_fixable(r.id()) { "yes (--fix)" } else { "no" });
             println!();
             println!(" {}", explain_text(r.id()));
@@ -232,6 +365,226 @@ pub fn explain(rule_id: &str) {
             eprintln!("\x1b[31merror\x1b[0m: unknown rule '{rule_id}'");
             eprintln!("Run --list-rules to see all available rules.");
         }
+    }
+}
+
+pub fn rule_level(id: &str) -> crate::lint::Level {
+    use crate::lint::Level;
+    match id {
+        // === DEFAULT: Bugs, deprecated APIs, patterns that are always wrong ===
+
+        // memory bugs
+        "memory::untracked_connection"
+        | "memory::connect_in_loop"
+        | "memory::missing_player_removing"
+        | "memory::while_true_no_yield"
+        | "memory::runservice_no_disconnect"
+        | "memory::connect_in_connect"
+        | "memory::character_added_no_cleanup"
+
+        // deprecated APIs
+        | "roblox::deprecated_wait"
+        | "roblox::deprecated_spawn"
+        | "roblox::deprecated_body_movers"
+        | "roblox::model_set_primary_part_cframe"
+        | "roblox::deprecated_physics_service"
+        | "roblox::deprecated_region3"
+        | "math::random_deprecated"
+        | "table::foreach_deprecated"
+        | "table::getn_deprecated"
+        | "table::maxn_deprecated"
+
+        // correctness / race conditions
+        | "roblox::game_loaded_race"
+        | "roblox::wait_for_child_no_timeout"
+        | "table::remove_in_ipairs"
+        | "complexity::datastore_no_pcall"
+
+        // critical perf (always wrong)
+        | "instance::two_arg_instance_new"
+        | "network::fire_in_loop"
+        | "network::invoke_server_in_loop"
+        | "network::datastore_in_loop"
+        | "complexity::table_find_in_loop"
+
+        // deopt killers (entire script breaks)
+        | "native::getfenv_setfenv"
+        | "native::loadstring_deopt"
+        | "native::global_write"
+        | "native::shared_global_mutation"
+
+        // more deprecated APIs
+        | "roblox::deprecated_tick"
+        | "roblox::deprecated_find_part_on_ray"
+
+        // dangerous patterns
+        | "network::invoke_client_dangerous"
+
+        // more deprecated
+        | "roblox::deprecated_delay"
+
+        // correctness
+        | "roblox::render_stepped_on_server"
+        | "memory::debris_negative_duration"
+        => Level::Default,
+
+        // === STRICT: Optimization suggestions worth fixing ===
+
+        // allocation in loops
+        "alloc::string_concat_in_loop"
+        | "alloc::string_format_in_loop"
+        | "alloc::closure_in_loop"
+        | "alloc::coroutine_wrap_in_loop"
+        | "alloc::excessive_string_split"
+        | "alloc::string_interp_in_loop"
+        | "alloc::unpack_in_loop"
+        | "alloc::tostring_in_loop"
+        | "alloc::repeated_gsub"
+        | "alloc::table_create_for_dict"
+        | "alloc::task_spawn_in_loop"
+        | "alloc::gsub_function_in_loop"
+        | "alloc::setmetatable_in_loop"
+        | "string::reverse_in_loop"
+
+        // caching suggestions
+        | "cache::uncached_get_service"
+        | "cache::instance_new_in_loop"
+        | "cache::tween_create_in_loop"
+        | "cache::get_attribute_in_loop"
+        | "cache::workspace_lookup_in_loop"
+        | "cache::region_new_in_loop"
+        | "cache::raycast_params_in_function"
+        | "cache::overlap_params_in_function"
+        | "cache::tween_info_in_function"
+        | "cache::magnitude_over_squared"
+        | "cache::current_camera_uncached"
+        | "cache::local_player_uncached"
+
+        // complexity
+        | "complexity::filter_then_first"
+        | "complexity::nested_table_find"
+        | "complexity::string_match_in_loop"
+        | "complexity::promise_chain_in_loop"
+        | "complexity::accumulating_rebuild"
+        | "complexity::one_iteration_loop"
+        | "complexity::get_descendants_in_loop"
+        | "complexity::table_remove_shift"
+        | "complexity::table_sort_in_loop"
+        | "complexity::get_tagged_in_loop"
+        | "complexity::get_players_in_loop"
+        | "complexity::clone_in_loop"
+        | "complexity::wait_for_child_in_loop"
+        | "complexity::find_first_child_recursive"
+        | "complexity::pairs_in_pairs"
+
+        // memory (important but not always bugs)
+        | "memory::untracked_task_spawn"
+        | "memory::heartbeat_allocation"
+        | "memory::circular_connection_ref"
+        | "memory::tween_completed_connect"
+        | "memory::set_attribute_in_heartbeat"
+        | "memory::sound_not_destroyed"
+        | "memory::unbounded_table_growth"
+        | "memory::collection_tag_no_cleanup"
+
+        // network
+        // network (important)
+        | "network::http_service_in_loop"
+        | "network::marketplace_info_in_loop"
+        | "network::fire_client_per_player"
+
+        // instance
+        | "instance::property_change_signal_wrong"
+        | "instance::clear_all_children_loop"
+        | "instance::set_parent_in_loop"
+        | "instance::property_before_parent"
+        | "instance::repeated_find_first_child"
+        | "instance::changed_on_moving_part"
+        | "instance::collection_service_in_loop"
+        | "instance::destroy_in_loop"
+        | "instance::get_children_in_loop"
+
+        // physics
+        | "physics::spatial_query_in_loop"
+        | "physics::move_to_in_loop"
+        | "physics::touched_without_debounce"
+        | "physics::set_network_owner_in_loop"
+        | "physics::raycast_params_in_loop"
+        | "physics::cframe_assign_in_loop"
+        | "physics::weld_constraint_in_loop"
+        | "physics::assembly_velocity_in_loop"
+
+        // render
+        | "render::gui_creation_in_loop"
+        | "render::beam_trail_in_loop"
+        | "render::particle_emitter_in_loop"
+        | "render::billboard_gui_in_loop"
+        | "render::surface_gui_in_loop"
+        | "render::image_label_in_loop"
+        | "render::scrolling_frame_in_loop"
+
+        // roblox
+        | "roblox::debris_add_item"
+        | "roblox::set_attribute_in_loop"
+        | "roblox::string_value_over_attribute"
+        | "roblox::touched_event_unfiltered"
+        | "roblox::destroy_children_manual"
+        | "roblox::server_property_in_heartbeat"
+        | "roblox::humanoid_state_polling"
+        | "roblox::require_in_connect"
+        | "roblox::find_first_child_chain"
+        | "roblox::health_polling"
+        | "roblox::changed_event_unfiltered"
+        | "roblox::descendant_event_workspace"
+        | "roblox::get_attribute_in_heartbeat"
+        | "roblox::pivot_to_in_loop"
+        | "roblox::while_wait_do"
+        | "roblox::get_property_changed_in_loop"
+        | "roblox::clone_set_parent"
+        | "roblox::yield_in_connect_callback"
+        | "roblox::teleport_service_race"
+
+        // native
+        | "native::dynamic_require"
+        | "native::shadowed_builtin"
+        | "native::table_zero_index"
+        | "native::pcall_in_native"
+
+        // style with real perf impact
+        | "style::duplicate_get_service"
+        | "style::dot_method_call"
+        | "style::print_in_hot_path"
+        | "style::debug_in_hot_path"
+        | "style::index_function_metatable"
+        | "style::redundant_condition"
+
+        // string
+        | "string::len_over_hash"
+        | "string::rep_in_loop"
+        | "string::gsub_for_find"
+        | "string::lower_upper_in_loop"
+        | "string::tostring_on_string"
+        | "string::pattern_backtracking"
+
+        // table
+        | "table::freeze_in_loop"
+        | "table::insert_with_position"
+        | "table::pack_over_literal"
+        | "table::manual_copy_loop"
+        | "table::concat_with_separator_loop"
+
+        // math
+        | "math::random_new_in_loop"
+        | "math::clamp_manual"
+        | "math::sqrt_over_squared"
+        | "math::floor_division"
+        | "math::fmod_over_modulo"
+        | "math::vector_normalize_manual"
+        | "math::unnecessary_tonumber"
+        => Level::Strict,
+
+        // === PEDANTIC: Everything else (micro-opts, style, situational) ===
+        _ => Level::Pedantic,
     }
 }
 
@@ -263,6 +616,48 @@ fn explain_text(id: &str) -> &'static str {
         "alloc::repeated_string_byte" => "Multiple string.byte(s, i) calls on the same string in a loop each do bounds checking and extraction. Use a single string.byte(s, 1, -1) call to get all bytes at once.",
         "alloc::string_interp_in_loop" => "String interpolation (`...{expr}...`) allocates a new string each iteration, just like concatenation (..). Use table.concat or buffer for loop string building.",
         "alloc::select_in_loop" => "select(i, ...) walks the vararg list from the start each call, making it O(n). In a loop over varargs, this is O(n^2) total. Cache results: local args = {...}; for i, v in ipairs(args).",
+        "alloc::table_insert_known_size" => "table.insert() in a numeric for with known bounds causes incremental table resizing. Use table.create(n) to pre-allocate the array part, then assign by index: t[i] = value.",
+        "alloc::buffer_over_string_pack" => "string.pack/unpack in a loop allocates a new string per call. The buffer library (buffer.writeu32/readu32) provides zero-allocation binary I/O using FASTCALL builtins.",
+        "alloc::task_spawn_in_loop" => "task.spawn/defer in a loop creates a new coroutine per iteration (~247x overhead vs direct call). If the function doesn't need to yield, call it directly instead.",
+        "alloc::gsub_function_in_loop" => "gsub with a function replacement in a loop invokes the function per match and allocates a closure. Cache the replacement function outside or use buffer-based string building.",
+
+        // batch 6 additions
+        "table::nil_field_in_constructor" => "Setting a field to nil in a table constructor defeats Luau's table template optimization. The compiler pre-allocates exact shapes, but nil fields waste hash slots. Omit them - nil is the default.",
+        "table::rawset_in_loop" => "rawset() bypasses __newindex but is not a FASTCALL builtin. If no metatable is set, regular t[k] = v is faster because it uses SETTABLEKS/SETTABLE opcodes directly.",
+        "table::next_t_nil_over_pairs" => "next(t, nil) is equivalent to next(t). The nil second argument is unnecessary and adds visual noise.",
+        "complexity::filter_then_first" => "Iterating over GetDescendants/GetChildren just to find the first match is O(n). FindFirstChild or FindFirstChildOfClass is O(1) lookup with early return.",
+        "complexity::nested_table_find" => "table.find() in a nested loop creates O(n*m*k) complexity. Convert the inner collection to a hashset: local set = {}; for _,v in t do set[v] = true end.",
+        "memory::debris_negative_duration" => "Debris:AddItem with zero or negative duration destroys the instance on the same frame - likely a bug. Use a positive duration for timed cleanup.",
+        "memory::collection_tag_no_cleanup" => "GetInstanceAddedSignal without GetInstanceRemovedSignal means tagged instances that are destroyed or reparented leave behind stale connections and data.",
+        "roblox::render_stepped_on_server" => "RenderStepped only fires on the client (it's tied to the rendering pipeline). On the server, use Heartbeat or Stepped instead.",
+        "roblox::task_wait_no_arg" => "task.wait() with no argument waits exactly one frame (~16ms at 60fps). If you need a specific delay, pass a duration. If one frame is intentional, consider adding a comment.",
+        "roblox::deprecated_delay" => "delay() is a legacy global with inconsistent timing behavior. task.delay() uses the modern task scheduler with better error handling and deterministic timing.",
+        "roblox::clone_set_parent" => "Setting .Parent immediately after :Clone() before setting other properties triggers a replication packet per subsequent property change. Set all properties first, then .Parent last.",
+        "native::pcall_in_native" => "pcall/xpcall in --!native scripts forces interpreter fallback for the protected call. The native compiler can't generate code across pcall boundaries. Restructure to minimize pcall usage in hot loops.",
+        "native::dynamic_table_key_in_native" => "Dynamic table access t[variable] in --!native uses GETTABLE which can't be inline-cached. GETTABLEKS (constant string key, t.field) uses inline caching for fast property access.",
+        "string::reverse_in_loop" => "string.reverse() allocates a new reversed string each call. In a loop, cache the result outside if the input string doesn't change between iterations.",
+        "string::format_known_types" => "string.format(\"%s\", x) is just tostring(x) with extra format-string parsing overhead. Use tostring() directly for simple type conversion.",
+        "physics::massless_not_set" => "The Massless property only has effect on parts that are welded to an assembly with a non-massless root part. On unanchored, unwelded parts, Massless does nothing.",
+        "physics::assembly_velocity_in_loop" => "Setting AssemblyLinearVelocity/AssemblyAngularVelocity in a loop crosses the Lua-C++ bridge per call and fights the physics solver. Use constraint-based movers (LinearVelocity, AngularVelocity) instead.",
+        "style::unused_variable_in_loop" => "Allocating an instance (Instance.new, :Clone) in a loop body but never using the variable wastes creation and GC cost per iteration.",
+        "style::multiple_returns_hot_path" => "Returning many values from a hot-path function requires stack management overhead per frame. Consider returning a table or reducing return count.",
+        "cache::brick_color_new_in_loop" => "BrickColor.new() in a loop allocates a BrickColor userdata each iteration. Cache outside if the color doesn't change between iterations.",
+        "cache::region_new_in_loop" => "Region3.new() in a loop allocates a Region3 userdata each iteration. Cache outside if the bounds are loop-invariant.",
+        "network::http_service_in_loop" => "HTTP requests (GetAsync/PostAsync/RequestAsync) in a loop send N network requests. Each one yields the thread. Batch requests or process asynchronously.",
+        "network::marketplace_info_in_loop" => "GetProductInfo() in a loop makes an HTTP request per iteration. Cache results in a table keyed by product ID.",
+        "render::image_label_in_loop" => "Creating ImageLabel/ImageButton in a loop loads an image asset per instance. Pre-create a template and use :Clone() for better performance.",
+        "render::scrolling_frame_in_loop" => "ScrollingFrame creation in a loop triggers expensive layout computation per instance. Pre-create a template and :Clone().",
+        "instance::destroy_in_loop" => ":Destroy() in a loop fires ancestry-changed events, Destroying events, and processes connections per call. For clearing children, use :ClearAllChildren() instead.",
+        "instance::get_children_in_loop" => ":GetChildren/:GetDescendants allocates a new table of all children each call. In a loop, cache outside: local children = obj:GetChildren().",
+        "math::huge_comparison" => "math.huge in a loop requires a GETIMPORT lookup each access. Cache in a local: local INF = math.huge before the loop.",
+        "math::exp_over_pow" => "math.exp() in a loop with constant exponent recomputes the same value each iteration. Cache outside: local e = math.exp(k).",
+        "alloc::typeof_in_loop" => "typeof() in a loop crosses the Lua-C++ bridge each call to determine the type. Cache outside if checking the same value repeatedly.",
+        "alloc::setmetatable_in_loop" => "setmetatable() in a loop creates a new metatable-linked table per iteration. Consider object pooling or a constructor pattern to reuse metatables.",
+        "roblox::yield_in_connect_callback" => "Yielding (task.wait, WaitForChild) inside :Connect callbacks blocks the signal handler. Use task.spawn to run async work from within a connection callback.",
+        "roblox::deprecated_udim" => "UDim2.new(0, px, 0, py) can be UDim2.fromOffset(px, py). UDim2.new(sx, 0, sy, 0) can be UDim2.fromScale(sx, sy). Cleaner and more readable.",
+        "roblox::teleport_service_race" => "TeleportAsync can fail from rate limits, network errors, or invalid place IDs. Without pcall, the error kills the script. Always wrap in pcall with retry logic.",
+        "complexity::string_match_in_loop" => "string.match() compiles the pattern each call. In a loop, the same pattern is compiled N times. Use gmatch for iteration or cache results outside the loop.",
+        "complexity::promise_chain_in_loop" => "Promise chaining (:andThen, :catch) in a loop creates N promise objects per iteration. Collect items and use Promise.all() for batch processing.",
 
         // cache
         "cache::magnitude_over_squared" => ".Magnitude computes sqrt internally. When comparing distances (if a.Magnitude < b), compare squared values instead: a.Magnitude * a.Magnitude < b * b, avoiding the sqrt cost.",
@@ -294,6 +689,9 @@ fn explain_text(id: &str) -> &'static str {
         "complexity::find_first_child_recursive" => "FindFirstChild(name, true) does a recursive O(n) search through all descendants. Cache the result or use CollectionService tags for indexed lookup.",
         "complexity::require_in_function" => "require() inside a function body runs on every call. While Luau caches module results, the lookup still has overhead. Move require to module level for clarity and GETIMPORT.",
         "complexity::deep_metatable_chain" => "Each __index lookup walks the metatable chain linearly. With >3 levels, this defeats Luau's inline caching. Flatten the hierarchy or use explicit method tables.",
+        "complexity::pairs_in_pairs" => "Nested pairs/ipairs loops create O(n*m) iteration. Consider using a lookup table for the inner loop to reduce to O(n+m).",
+        "complexity::gmatch_in_loop" => "string.gmatch() creates a new iterator and compiles the pattern each call. In a loop, this repeats per iteration. Move outside if the pattern is constant.",
+        "complexity::datastore_no_pcall" => "DataStore operations can fail from throttling, network issues, or Roblox outages. Without pcall, the error propagates and kills the script. Always wrap DataStore calls in pcall for resilience.",
 
         // instance
         "instance::two_arg_instance_new" => "Instance.new(class, parent) sets Parent immediately, triggering replication before properties are set. Each subsequent property change sends another packet. Set .Parent last: local p = Instance.new('Part'); p.Size = ...; p.Parent = workspace.",
@@ -338,11 +736,16 @@ fn explain_text(id: &str) -> &'static str {
         "native::heavy_api_script" => "--!native benefits computation (math, loops, table ops), not Roblox API bridge calls. Scripts that mostly call APIs see no native codegen benefit - the time is spent in C++, not Lua.",
         "native::large_table_literal" => "Large table literals in --!native scripts waste native compilation memory on table-creation code. The native compiler generates code for each entry. Move large data tables to non-native modules.",
         "native::mixed_computation_api" => "Functions mixing computation and API calls in --!native compile everything to native, but only the computation benefits. Split into a native computation function and a non-native API function.",
+        "native::global_write" => "Writing to _G (e.g. _G.foo = bar) disables the safeenv flag for the entire script. This turns off GETIMPORT (cached globals), FASTCALL (builtin fast-paths), and native codegen.",
+        "native::shadowed_builtin" => "Shadowing a builtin like 'local math = require(...)' prevents FASTCALL and GETIMPORT optimizations for that builtin in the current scope. The VM can't prove the local is the real builtin.",
+        "native::table_zero_index" => "Luau arrays are 1-based. Index 0 goes into the hash part of the table (slower than array part) and is skipped by ipairs() and the # operator.",
 
         // network
         "network::fire_in_loop" => "Firing a RemoteEvent in a loop sends N network packets. Each one has header overhead and may be throttled. Batch data into a single table and fire once.",
         "network::invoke_server_in_loop" => "InvokeServer() yields until the server responds. In a loop, this serializes N round-trips. Batch into a single invoke with all data.",
         "network::large_remote_data" => "Large/deeply nested tables in Remote calls are serialized and sent over the network. Flatten nested structures and remove redundant data to reduce payload size.",
+        "network::fire_client_per_player" => ":FireClient() in a loop over Players:GetPlayers() sends N individual network packets. Use :FireAllClients() to send a single message to all players.",
+        "network::remote_event_string_data" => "tostring()/string.format() in Remote fire arguments converts data to strings before sending. Send raw values and format on the receiving end to reduce serialization overhead.",
 
         // physics
         "physics::spatial_query_in_loop" => "Physics queries (Raycast, GetPartBoundsInBox, GetPartsInPart, etc.) are expensive C++ operations. In a loop, consider spatial indexing or batching queries.",
@@ -410,6 +813,84 @@ fn explain_text(id: &str) -> &'static str {
         "table::deferred_field_assignment" => "local t = {} followed by t.x = ... misses Luau's table template optimization. Using {x = ..., y = ...} lets the compiler pre-allocate the exact shape.",
         "table::ipairs_over_numeric_for" => "for i = 1, #t do ... t[i] ... uses index-based access. for i, v in ipairs(t) uses FORGPREP_INEXT - a specialized fast-path that's ~2x faster for packed arrays.",
         "table::polymorphic_constructor" => "Table constructors with different key sets in the same scope create differently-shaped objects. Luau's inline cache (IC) can only cache one shape per access site - misses cause ~27% overhead.",
+
+        // batch 1 additions
+        "math::pow_two" => "math.pow(x, 2) is a function call. x * x is a single MUL instruction - faster and avoids call overhead. The VM has special-cased x^2 in POWK, but x * x is still clearer.",
+        "math::vector_normalize_manual" => "v / v.Magnitude manually normalizes a vector. v.Unit is a built-in property that computes the unit vector natively - no Lua-side division needed.",
+        "math::unnecessary_tonumber" => "tonumber() on a numeric literal is a no-op. The value is already a number - remove the unnecessary function call.",
+        "math::lerp_manual" => "a + (b - a) * t is a manual linear interpolation. Use Vector3:Lerp(target, alpha), CFrame:Lerp(target, alpha), or a dedicated lerp utility for clarity and potential optimization.",
+        "math::abs_for_sign_check" => "math.abs(x) > 0 is equivalent to x ~= 0. Comparing directly avoids the function call. math.abs(x) == 0 is equivalent to x == 0.",
+        "physics::touched_without_debounce" => ".Touched fires at ~240Hz per contact pair. Without a debounce/cooldown check at the top of the handler, the callback runs hundreds of times per second.",
+        "physics::set_network_owner_in_loop" => "SetNetworkOwner() changes physics ownership, which involves network negotiation. In a loop, this triggers N ownership changes. Set once outside the loop.",
+        "physics::precise_collision_fidelity" => "PreciseConvexDecomposition is the most expensive collision fidelity mode. It decomposes meshes into many convex hulls. Use Box, Hull, or Default for most parts.",
+        "physics::collision_group_string_in_loop" => "Setting .CollisionGroup to a string in a loop does a string comparison for the collision group name each time. Cache the assignment outside the loop.",
+        "physics::anchored_with_velocity" => "Anchored parts ignore all physics forces and velocities. Setting Velocity/Force properties on an Anchored part is wasted work.",
+        "cache::current_camera_uncached" => "workspace.CurrentCamera crosses the Lua-C++ bridge each access. Cache in a local: local camera = workspace.CurrentCamera.",
+        "cache::local_player_uncached" => "Players.LocalPlayer crosses the Lua-C++ bridge each access. Cache in a module-level local: local localPlayer = Players.LocalPlayer.",
+        "cache::workspace_lookup_in_loop" => "workspace:FindFirstChild/WaitForChild in a loop searches the workspace tree each iteration. Cache the result outside: local obj = workspace:FindFirstChild('Name').",
+        "memory::task_delay_long_duration" => "task.delay() with very long durations (>5 minutes) keeps the callback and its captures alive in memory for the duration. Consider alternative approaches for long-lived timers.",
+        "memory::tween_completed_connect" => ".Completed:Connect() creates a permanent connection. Use .Completed:Once() instead - it automatically disconnects after the first fire, preventing memory leaks.",
+        "memory::set_attribute_in_heartbeat" => "SetAttribute() in a RunService callback triggers attribute replication at 60Hz. That's 60 replication packets per second per attribute per instance. Use plain Lua tables for per-frame mutable data instead.",
+        "style::assert_in_hot_path" => "assert() has overhead even when the condition is true - it evaluates all arguments and checks the result. In hot loops, this adds up. Remove assertions or guard with a debug flag.",
+        "style::redundant_condition" => "if true then / if false then are unconditional branches. Remove the condition (if true) or the dead code (if false).",
+        "style::long_function_body" => "Functions with many statements are hard to maintain and optimize. The native code compiler has per-function limits. Split large functions into smaller, focused helpers.",
+        "style::duplicate_string_literal" => "The same string literal appearing many times wastes memory and makes refactoring harder. Extract to a module-level constant.",
+        "string::tostring_on_string" => "tostring() on a value that is already a string is a no-op function call. Remove it.",
+        "string::find_missing_plain_flag" => "string.find(s, literal) without the plain flag compiles the pattern even for literal strings. Add nil, true as 3rd/4th args to skip pattern compilation.",
+        "string::lower_for_comparison" => "Calling string.lower() twice for case-insensitive comparison allocates two new strings. Consider a helper function or use string.byte() for single-character checks.",
+        "table::sort_comparison_allocation" => "table.sort(t, function(a, b) ... end) with an inline comparator in a loop allocates a new closure per iteration. Extract the comparison function outside.",
+        "table::clear_vs_new" => "Reassigning a variable to {} in a loop allocates a new table each iteration. table.clear(t) reuses the existing table's memory, avoiding allocation and GC pressure.",
+        "table::move_over_loop" => "Copying array elements one at a time in a loop is O(n) Lua operations. table.move(src, 1, #src, 1, dst) is a single C call that does the same copy faster.",
+        "table::concat_with_separator_loop" => "result = result .. sep .. item in a loop creates O(n^2) intermediate strings. Use table.insert into an array, then table.concat(t, sep) for O(n) string building.",
+        "roblox::game_loaded_race" => "game:IsLoaded() without game.Loaded:Wait() has a race condition: if the game hasn't loaded yet when this code runs, the check returns false and you miss the load event entirely.",
+        "roblox::humanoid_state_polling" => "Humanoid:GetState() in a loop polls the state every iteration. Use Humanoid.StateChanged:Connect() instead - it fires only when the state actually changes.",
+        "roblox::server_side_tween" => "TweenService:Create() on the server creates tweens that replicate every property change to all clients. Run visual tweens on the client instead.",
+        "roblox::require_in_connect" => "require() inside a :Connect() callback runs on every event fire. Module require has lookup overhead even with caching. Hoist to module level.",
+        "roblox::find_first_child_chain" => "Chaining :FindFirstChild() calls (a:FindFirstChild('B'):FindFirstChild('C'):FindFirstChild('D')) does a tree search at each step. Cache intermediate results in locals.",
+        "roblox::once_over_connect" => ":Connect() followed by :Disconnect() in the handler is the manual version of :Once(). Use :Once() instead - it auto-disconnects after the first fire, cleaner and no leaked connection reference.",
+        "render::rich_text_in_loop" => "Rich text tags (<font>, <b>, etc.) inside string building in a loop create complex formatted strings per iteration. Pre-build if content is static.",
+        "string::match_for_boolean" => "string.match() in a boolean context (if/while) allocates capture tables even when you only care about truthiness. string.find() returns indices without allocation - use it when you don't need captures.",
+        "string::concat_chain" => "Long concatenation chains (a .. b .. c .. d .. e .. f) create N-1 intermediate strings. Use string.format(), string interpolation, or table.concat() for cleaner code and fewer allocations.",
+        "instance::collection_service_in_loop" => "AddTag/RemoveTag in a loop triggers CollectionService events per call, causing listeners to fire N times. HasTag in a loop crosses the Lua-C++ bridge each iteration. Batch tag operations or cache tag state.",
+        "instance::name_indexing_in_loop" => "workspace.Name in a loop does a name-based instance lookup each iteration, crossing the Lua-C++ bridge. Cache the reference outside: local obj = workspace.Name.",
+        "roblox::health_polling" => "Humanoid.Health in a loop polls the property each iteration. Use Humanoid.HealthChanged event or GetPropertyChangedSignal('Health') instead - fires only when health actually changes.",
+        "roblox::changed_event_unfiltered" => ".Changed fires for ANY property change on the instance, including internal engine updates. Use GetPropertyChangedSignal('PropertyName') to listen for specific properties only.",
+        "physics::raycast_params_in_loop" => "RaycastParams.new() allocates a new userdata each call. In a loop, this creates N params objects. Create once outside the loop and reuse by updating FilterDescendantsInstances as needed.",
+        "physics::cframe_assign_in_loop" => ".CFrame assignment in a loop crosses the Lua-C++ bridge, triggers physics recalculation, and sends a replication packet per iteration. Use workspace:BulkMoveTo() to batch all moves into one engine call.",
+        "math::vector3_zero_constant" => "Vector3.new(0,0,0) allocates a new Vector3. Vector3.zero is a pre-allocated constant - no allocation, no constructor call. Same for Vector3.one.",
+        "math::cframe_identity_constant" => "CFrame.new() with no arguments allocates a new identity CFrame. CFrame.identity is a pre-allocated constant - no allocation.",
+        "network::datastore_in_loop" => "DataStore operations yield and are rate-limited (60 + numPlayers*10/min). In a loop, you risk hitting throttle limits and each iteration yields the thread. Batch operations or use a queue.",
+        "roblox::descendant_event_workspace" => "DescendantAdded/Removing on workspace fires for EVERY instance added or removed anywhere in the entire game. Use CollectionService tags for indexed lookup or scope the listener to a smaller subtree.",
+        "roblox::get_attribute_in_heartbeat" => ":GetAttribute() in a RunService callback crosses the Lua-C++ bridge at 60Hz. Cache the value in a Lua variable and update via AttributeChanged events.",
+        "roblox::pivot_to_in_loop" => ":PivotTo() in a loop crosses the Lua-C++ bridge per call and triggers replication. workspace:BulkMoveTo() batches all moves into a single engine call.",
+        "table::pairs_over_generalized" => "pairs()/ipairs() are function calls that return an iterator. Luau's generalized iteration (for k, v in t do) emits the same FORGPREP bytecode without the function call overhead.",
+        "style::type_over_typeof" => "type() returns Lua types only ('string', 'number', 'table', etc.). typeof() also handles Roblox types ('Vector3', 'CFrame', 'Instance', etc.). Use typeof() for correct Roblox type checking.",
+        "style::nested_ternary" => "Deeply nested if/then/else expressions are hard to read and maintain. Extract to a helper function or use a lookup table.",
+
+        // batch 5 additions
+        "roblox::deprecated_tick" => "tick() is deprecated and returns Unix timestamp with limited precision. Use os.clock() for elapsed time measurement or workspace:GetServerTimeNow() for synchronized wall-clock time.",
+        "roblox::deprecated_find_part_on_ray" => "FindPartOnRay/FindPartOnRayWithWhitelist/FindPartOnRayWithIgnoreList are deprecated. workspace:Raycast() with RaycastParams provides better control and performance.",
+        "roblox::while_wait_do" => "while wait() do combines yielding and loop condition in a way that obscures control flow. Use while true do ... task.wait() end for explicit timing control with the modern task scheduler.",
+        "roblox::get_property_changed_in_loop" => ":GetPropertyChangedSignal() creates a new signal object each call. In a loop, this creates N signal objects that are never garbage collected. Cache the signal outside the loop or use a single .Changed handler.",
+        "complexity::accumulating_rebuild" => "{unpack(result), item} in a loop copies the entire growing table each iteration, creating O(n^2) total work. Use table.insert(result, item) for O(1) amortized append.",
+        "complexity::one_iteration_loop" => "A loop that unconditionally returns or breaks on the first iteration executes at most once. Remove the loop wrapper or restructure the logic.",
+        "complexity::elseif_chain_over_table" => "Long elseif chains with equality comparisons are O(n) linear scans. A lookup table provides O(1) dispatch: local handlers = {[1] = fn1, [2] = fn2}; handlers[x]()",
+        "render::neon_glass_material_in_loop" => "Neon and Glass materials trigger special rendering passes (glow bloom / refraction). Setting these in a loop creates many expensive-to-render parts. Cache the material value outside.",
+        "render::surface_gui_in_loop" => "SurfaceGui creation allocates a 3D-to-2D rendering context. In a loop, pre-create a template and use :Clone() for better performance.",
+        "physics::can_touch_query_not_disabled" => "CanCollide = false only disables physical collision response. The engine still evaluates CanTouch (Touched events at ~240Hz) and CanQuery (raycast/spatial query hits). Disable both for decorative/non-interactive parts.",
+        "physics::weld_constraint_in_loop" => "Each WeldConstraint adds a constraint to the physics solver. Creating many in a loop increases solver iteration time. Pre-create constraints or use WeldConstraint pooling.",
+        "memory::sound_not_destroyed" => "Sound instances persist in memory after playback ends. Without cleanup (Ended:Once -> Destroy, or Debris:AddItem), accumulated Sounds cause memory growth and audio system overhead.",
+        "memory::unbounded_table_growth" => "table.insert in a per-frame or per-event callback without cleanup creates unbounded memory growth. Add a size limit with table.remove or use a ring buffer pattern.",
+        "network::dict_keys_in_remote_data" => "String dictionary keys in RemoteEvent data add bytes per key per packet. For high-frequency updates (Heartbeat), use array-indexed tables {value1, value2} instead of {Key1 = value1}.",
+        "network::unreliable_remote_preferred" => "Reliable RemoteEvents in per-frame callbacks guarantee delivery and ordering, consuming bandwidth for data that's immediately superseded. UnreliableRemoteEvent drops stale packets automatically.",
+        "network::invoke_client_dangerous" => ":InvokeClient() yields the server thread until the client responds. A malicious or disconnecting client can stall the server indefinitely. Use FireClient + client-to-server response pattern instead.",
+        "cache::repeated_color3" => "The same Color3.fromRGB/new call repeated 4+ times wastes constructor calls. Extract to a module-level constant: local RED = Color3.fromRGB(255, 0, 0).",
+        "cache::enum_lookup_in_loop" => "Enum.Category.Value crosses the Lua-C++ bridge each access. In a loop, cache outside: local material = Enum.Material.SmoothPlastic.",
+        "native::method_call_defeats_fastcall" => "Method syntax (:byte, :sub, :len, :char) generates NAMECALL instead of FASTCALL. In loops, use string.byte(s, i) instead of s:byte(i) for the fast builtin path.",
+        "native::shared_global_mutation" => "Writing to shared.* (like _G.*) disables GETIMPORT, FASTCALL, and DUPCLOSURE optimizations for the ENTIRE script. Use a required module for cross-script state instead.",
+        "native::import_chain_too_deep" => "GETIMPORT caches at most 3 levels of property access (global.a.b). Deeper chains fall back to individual GETTABLEKS instructions. Cache intermediate results in locals.",
+        "string::sub_for_prefix_check" => "string.sub(s, 1, n) == prefix allocates a new substring for comparison. string.find(s, prefix, 1, true) == 1 returns a number, avoiding the allocation entirely.",
+        "string::pattern_backtracking" => "Patterns with multiple greedy quantifiers (.*/.+) can cause exponential backtracking on non-matching inputs. Simplify patterns or use string.find with plain flag for literal searches.",
 
         _ => "No detailed explanation available for this rule. Run --list-rules to see all rules.",
     }

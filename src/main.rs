@@ -45,8 +45,11 @@ fn main() {
     }
 
     let cfg = config::load(&path);
+    let level = parse_level_flag(&args).unwrap_or_else(|| {
+        cfg.level.unwrap_or(lint::Level::Default)
+    });
     let t = Instant::now();
-    let result = scanner::run(&path, &cfg, fix_mode, dry_run);
+    let result = scanner::run(&path, &cfg, fix_mode, dry_run, level);
     let elapsed = t.elapsed();
 
     let scanner::RunResult { n_files, diags, files_fixed, fixes_applied, parse_errors } = result;
@@ -110,9 +113,27 @@ fn parse_usize_flag(args: &[String], flag: &str) -> Option<usize> {
         .and_then(|w| w[1].parse().ok())
 }
 
+fn parse_level_flag(args: &[String]) -> Option<lint::Level> {
+    args.windows(2)
+        .find(|w| w[0] == "--level")
+        .map(|w| match w[1].as_str() {
+            "default" | "1" => lint::Level::Default,
+            "strict" | "2" => lint::Level::Strict,
+            "pedantic" | "3" | "all" => lint::Level::Pedantic,
+            other => {
+                eprintln!(
+                    "\x1b[31merror\x1b[0m: unknown level '{}' (expected: default, strict, pedantic)",
+                    other
+                );
+                process::exit(1);
+            }
+        })
+}
+
 fn usage() {
     eprintln!("luauperf - static performance analyzer for Luau\n");
     eprintln!("usage: luauperf <path> [options]\n");
+    eprintln!("  --level <level>    set lint aggressiveness (default, strict, pedantic)");
     eprintln!("  --fix              auto-fix safely fixable issues");
     eprintln!("  --fix --dry-run    show what --fix would change without writing");
     eprintln!("  --format json      JSON output");

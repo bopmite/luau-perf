@@ -13,6 +13,13 @@ pub struct HeartbeatAllocation;
 pub struct CircularConnectionRef;
 pub struct WeakTableNoShrink;
 pub struct RunServiceNoDisconnect;
+pub struct TaskDelayLongDuration;
+pub struct TweenCompletedConnect;
+pub struct SetAttributeInHeartbeat;
+pub struct SoundNotDestroyed;
+pub struct UnboundedTableGrowth;
+pub struct DebrisNegativeDuration;
+pub struct CollectionTagNoCleanup;
 
 impl Rule for UntrackedConnection {
     fn id(&self) -> &'static str { "memory::untracked_connection" }
@@ -382,6 +389,186 @@ impl Rule for RunServiceNoDisconnect {
     }
 }
 
+impl Rule for TaskDelayLongDuration {
+    fn id(&self) -> &'static str { "memory::task_delay_long_duration" }
+    fn severity(&self) -> Severity { Severity::Allow }
+
+    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        visit::each_call(ast, |call, _ctx| {
+            if !visit::is_dot_call(call, "task", "delay") {
+                return;
+            }
+            if let Some(arg) = visit::nth_arg(call, 0) {
+                let txt = format!("{arg}").trim().to_string();
+                if let Ok(val) = txt.parse::<f64>() {
+                    if val > 300.0 {
+                        hits.push(Hit {
+                            pos: visit::call_pos(call),
+                            msg: format!("task.delay({txt}s) - very long delay (>5 minutes), consider a different approach"),
+                        });
+                    }
+                }
+            }
+        });
+        hits
+    }
+}
+
+impl Rule for TweenCompletedConnect {
+    fn id(&self) -> &'static str { "memory::tween_completed_connect" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        for pos in visit::find_pattern_positions(source, ".Completed:Connect(") {
+            hits.push(Hit {
+                pos,
+                msg: ".Completed:Connect() - use .Completed:Once() instead (auto-disconnects after firing)".into(),
+            });
+        }
+        hits
+    }
+}
+
+impl Rule for SetAttributeInHeartbeat {
+    fn id(&self) -> &'static str { "memory::set_attribute_in_heartbeat" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        let callback_starts = [
+            "Heartbeat:Connect(",
+            "RenderStepped:Connect(",
+            ".Stepped:Connect(",
+        ];
+        for start_pat in &callback_starts {
+            for start_pos in visit::find_pattern_positions(source, start_pat) {
+                let body_start = start_pos + start_pat.len();
+                let body_end = (body_start + 2000).min(source.len());
+                let body = &source[body_start..body_end];
+                let search_end = body.find("\nend)").unwrap_or(body.len().min(1500));
+                let callback = &body[..search_end];
+                let mut search = 0;
+                while let Some(pos) = callback[search..].find(":SetAttribute(") {
+                    hits.push(Hit {
+                        pos: body_start + search + pos,
+                        msg: ":SetAttribute() in RunService callback - triggers replication at 60Hz, use plain Lua tables for per-frame data".into(),
+                    });
+                    search += pos + 1;
+                }
+            }
+        }
+        hits
+    }
+}
+
+impl Rule for SoundNotDestroyed {
+    fn id(&self) -> &'static str { "memory::sound_not_destroyed" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        for pos in visit::find_pattern_positions(source, ":Play()") {
+            let before_start = pos.saturating_sub(300);
+            let before = &source[before_start..pos];
+            let is_sound = before.contains("Sound") || before.contains("sound");
+            if !is_sound { continue; }
+            let after_end = (pos + 300).min(source.len());
+            let after = &source[pos..after_end];
+            let has_cleanup = after.contains(".Ended:") || after.contains(":Destroy()") || after.contains("Debris");
+            let has_cleanup_before = before.contains(".Ended:") || before.contains("Debris");
+            if !has_cleanup && !has_cleanup_before {
+                hits.push(Hit {
+                    pos,
+                    msg: "Sound:Play() without cleanup - Sound instances persist after playing, use .Ended:Once() to destroy or Debris:AddItem()".into(),
+                });
+            }
+        }
+        hits
+    }
+}
+
+impl Rule for UnboundedTableGrowth {
+    fn id(&self) -> &'static str { "memory::unbounded_table_growth" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        let callback_starts = [
+            "Heartbeat:Connect(",
+            "RenderStepped:Connect(",
+            ".Stepped:Connect(",
+            "PlayerAdded:Connect(",
+        ];
+        for start_pat in &callback_starts {
+            for start_pos in visit::find_pattern_positions(source, start_pat) {
+                let body_start = start_pos + start_pat.len();
+                let body_end = (body_start + 2000).min(source.len());
+                let body = &source[body_start..body_end];
+                let search_end = body.find("\nend)").unwrap_or(body.len().min(1500));
+                let callback = &body[..search_end];
+                if callback.contains("table.insert(") || callback.contains("[#") {
+                    let has_remove = callback.contains("table.remove(") || callback.contains("table.clear(");
+                    if !has_remove {
+                        hits.push(Hit {
+                            pos: start_pos,
+                            msg: "table growth in callback without cleanup - table.insert in a per-event/per-frame callback without corresponding removal causes unbounded memory growth".into(),
+                        });
+                    }
+                }
+            }
+        }
+        hits
+    }
+}
+
+impl Rule for DebrisNegativeDuration {
+    fn id(&self) -> &'static str { "memory::debris_negative_duration" }
+    fn severity(&self) -> Severity { Severity::Error }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        for pos in visit::find_pattern_positions(source, "Debris:AddItem(") {
+            let after = &source[pos + "Debris:AddItem(".len()..];
+            if let Some(comma) = after.find(',') {
+                let rest = after[comma + 1..].trim();
+                if let Some(close) = rest.find(')') {
+                    let duration = rest[..close].trim();
+                    if let Ok(n) = duration.parse::<f64>() {
+                        if n <= 0.0 {
+                            hits.push(Hit {
+                                pos,
+                                msg: "Debris:AddItem with zero or negative duration destroys the instance immediately - likely a bug, use a positive duration".into(),
+                            });
+                        }
+                    }
+                }
+            }
+        }
+        hits
+    }
+}
+
+impl Rule for CollectionTagNoCleanup {
+    fn id(&self) -> &'static str { "memory::collection_tag_no_cleanup" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        for pos in visit::find_pattern_positions(source, ":GetInstanceAddedSignal(") {
+            if !source.contains(":GetInstanceRemovedSignal(") && !source.contains("RemoveTag") {
+                hits.push(Hit {
+                    pos,
+                    msg: "GetInstanceAddedSignal without GetInstanceRemovedSignal - tagged instances that leave may leak connections/data without cleanup".into(),
+                });
+                break;
+            }
+        }
+        hits
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -468,6 +655,118 @@ mod tests {
         let src = "RunService.Heartbeat:Connect(function(dt)\n  update(dt)\nend)\nconn:Disconnect()";
         let ast = parse(src);
         let hits = RunServiceNoDisconnect.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn task_delay_long_duration_detected() {
+        let src = "task.delay(600, function() end)";
+        let ast = parse(src);
+        let hits = TaskDelayLongDuration.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn task_delay_short_ok() {
+        let src = "task.delay(5, function() end)";
+        let ast = parse(src);
+        let hits = TaskDelayLongDuration.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn tween_completed_connect_detected() {
+        let src = "tween.Completed:Connect(function() part:Destroy() end)";
+        let ast = parse(src);
+        let hits = TweenCompletedConnect.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn tween_completed_once_ok() {
+        let src = "tween.Completed:Once(function() part:Destroy() end)";
+        let ast = parse(src);
+        let hits = TweenCompletedConnect.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn set_attribute_in_heartbeat_detected() {
+        let src = "RunService.Heartbeat:Connect(function()\n  part:SetAttribute(\"Speed\", 10)\nend)";
+        let ast = parse(src);
+        let hits = SetAttributeInHeartbeat.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn set_attribute_outside_heartbeat_ok() {
+        let src = "part:SetAttribute(\"Speed\", 10)";
+        let ast = parse(src);
+        let hits = SetAttributeInHeartbeat.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn sound_not_destroyed_detected() {
+        let src = "local sound = Instance.new(\"Sound\")\nsound.SoundId = \"rbxassetid://123\"\nsound.Parent = workspace\nsound:Play()";
+        let ast = parse(src);
+        let hits = SoundNotDestroyed.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn sound_with_ended_ok() {
+        let src = "local sound = Instance.new(\"Sound\")\nsound.Ended:Once(function() sound:Destroy() end)\nsound:Play()";
+        let ast = parse(src);
+        let hits = SoundNotDestroyed.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn unbounded_table_growth_detected() {
+        let src = "RunService.Heartbeat:Connect(function()\n  table.insert(history, data)\nend)";
+        let ast = parse(src);
+        let hits = UnboundedTableGrowth.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn bounded_table_growth_ok() {
+        let src = "RunService.Heartbeat:Connect(function()\n  table.insert(history, data)\n  if #history > 100 then table.remove(history, 1) end\nend)";
+        let ast = parse(src);
+        let hits = UnboundedTableGrowth.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn debris_negative_duration_detected() {
+        let src = "Debris:AddItem(part, 0)";
+        let ast = parse(src);
+        let hits = DebrisNegativeDuration.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn debris_positive_duration_ok() {
+        let src = "Debris:AddItem(part, 5)";
+        let ast = parse(src);
+        let hits = DebrisNegativeDuration.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn collection_tag_no_cleanup_detected() {
+        let src = "CollectionService:GetInstanceAddedSignal(\"Enemy\"):Connect(function(inst)\n  print(inst)\nend)";
+        let ast = parse(src);
+        let hits = CollectionTagNoCleanup.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn collection_tag_with_cleanup_ok() {
+        let src = "CollectionService:GetInstanceAddedSignal(\"Enemy\"):Connect(function(inst) end)\nCollectionService:GetInstanceRemovedSignal(\"Enemy\"):Connect(function(inst) end)";
+        let ast = parse(src);
+        let hits = CollectionTagNoCleanup.check(src, &ast);
         assert_eq!(hits.len(), 0);
     }
 }
