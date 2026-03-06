@@ -11,10 +11,10 @@ Not a type checker. Not a formatter. Just perf.
 ## Install
 
 ```bash
-cargo install --path .
+cargo install luauperf
 ```
 
-Or grab a binary from releases.
+Requires [Rust](https://rustup.rs). Or build from source (see below).
 
 ## Getting started
 
