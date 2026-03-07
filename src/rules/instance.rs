@@ -82,7 +82,7 @@ impl Rule for SetParentInLoop {
             return vec![];
         }
 
-        let loop_depth = build_loop_depth_map(source);
+        let loop_depth = build_hot_loop_depth_map(source);
         let line_starts = line_start_offsets(source);
         let lines: Vec<&str> = source.lines().collect();
 
@@ -151,7 +151,7 @@ impl Rule for PropertyBeforeParent {
                 if trimmed.is_empty() || trimmed.starts_with("--") {
                     continue;
                 }
-                if trimmed == "end" || trimmed.starts_with("end") || trimmed.starts_with("local ") || trimmed.starts_with("return") {
+                if trimmed == "end" || trimmed.starts_with("end") || trimmed.starts_with("local ") || trimmed.starts_with("return") || trimmed.starts_with("elseif ") || trimmed == "else" {
                     break;
                 }
                 if trimmed.contains('.') && trimmed.contains(" = ") && !trimmed.contains(".Parent") {
@@ -371,6 +371,24 @@ fn build_loop_depth_map(source: &str) -> Vec<u32> {
     for line in source.lines() {
         let trimmed = line.trim();
         if trimmed.starts_with("for ") || trimmed.starts_with("while ") || trimmed.starts_with("repeat") {
+            depth += 1;
+        }
+        depths.push(depth);
+        if trimmed == "end" || trimmed.starts_with("end ") || trimmed.starts_with("until ") || trimmed == "until" {
+            depth = depth.saturating_sub(1);
+        }
+    }
+    depths
+}
+
+fn build_hot_loop_depth_map(source: &str) -> Vec<u32> {
+    let mut depth: u32 = 0;
+    let mut depths = Vec::new();
+    for line in source.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("while ") || trimmed.starts_with("repeat") {
+            depth += 1;
+        } else if trimmed.starts_with("for ") && !trimmed.contains(" in ") {
             depth += 1;
         }
         depths.push(depth);

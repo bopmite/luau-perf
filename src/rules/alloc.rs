@@ -32,7 +32,7 @@ impl Rule for ClosureInLoop {
             return vec![];
         }
 
-        let loop_depth = build_loop_depth_map(source);
+        let loop_depth = build_hot_loop_depth_map(source);
         let line_starts = line_start_offsets(source);
 
         func_positions
@@ -47,8 +47,6 @@ impl Rule for ClosureInLoop {
                 if before_match.is_empty() {
                     return false;
                 }
-                // Don't flag closures passed as callback arguments - common pattern
-                // e.g. :Connect(function(), task.spawn(function(), etc.
                 let before_char = source[..pos].trim_end();
                 if before_char.ends_with('(') || before_char.ends_with(',') {
                     return false;
@@ -212,7 +210,7 @@ impl Rule for TableCreatePreferred {
     fn severity(&self) -> Severity { Severity::Allow }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
-        let loop_depth = build_loop_depth_map(source);
+        let loop_depth = build_hot_loop_depth_map(source);
         let line_starts = line_start_offsets(source);
         let mut hits = Vec::new();
 
@@ -236,7 +234,7 @@ impl Rule for ExcessiveStringSplit {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_loop && (visit::is_dot_call(call, "string", "split") || visit::is_method_call(call, "split")) {
+            if ctx.in_hot_loop && (visit::is_dot_call(call, "string", "split") || visit::is_method_call(call, "split")) {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
                     msg: "string.split() in loop - allocates new table per call, split once outside loop".into(),
@@ -254,7 +252,7 @@ impl Rule for CoroutineWrapInLoop {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_loop && visit::is_dot_call(call, "coroutine", "wrap") {
+            if ctx.in_hot_loop && visit::is_dot_call(call, "coroutine", "wrap") {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
                     msg: "coroutine.wrap() in loop - ~200x slower than a closure, allocates coroutine per iteration".into(),
@@ -564,7 +562,7 @@ impl Rule for TaskSpawnInLoop {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if !ctx.in_loop { return; }
+            if !ctx.in_hot_loop { return; }
             if visit::is_dot_call(call, "task", "spawn") || visit::is_dot_call(call, "task", "defer") {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
@@ -582,7 +580,7 @@ impl Rule for GsubFunctionInLoop {
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
-        let loop_depth = build_loop_depth_map(source);
+        let loop_depth = build_hot_loop_depth_map(source);
         let line_starts = line_start_offsets(source);
         let patterns = [":gsub(", "string.gsub("];
         for pat in &patterns {

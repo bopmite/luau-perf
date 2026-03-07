@@ -19,7 +19,7 @@ impl Rule for GuiCreationInLoop {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if !ctx.in_loop || !visit::is_dot_call(call, "Instance", "new") {
+            if !ctx.in_hot_loop || !visit::is_dot_call(call, "Instance", "new") {
                 return;
             }
             let src = format!("{call}");
@@ -50,7 +50,7 @@ impl Rule for BeamTrailInLoop {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if !ctx.in_loop || !visit::is_dot_call(call, "Instance", "new") {
+            if !ctx.in_hot_loop || !visit::is_dot_call(call, "Instance", "new") {
                 return;
             }
             let src = format!("{call}");
@@ -72,7 +72,7 @@ impl Rule for ParticleEmitterInLoop {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if !ctx.in_loop || !visit::is_dot_call(call, "Instance", "new") {
+            if !ctx.in_hot_loop || !visit::is_dot_call(call, "Instance", "new") {
                 return;
             }
             let src = format!("{call}");
@@ -94,7 +94,7 @@ impl Rule for BillboardGuiInLoop {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if !ctx.in_loop || !visit::is_dot_call(call, "Instance", "new") {
+            if !ctx.in_hot_loop || !visit::is_dot_call(call, "Instance", "new") {
                 return;
             }
             let src = format!("{call}");
@@ -121,7 +121,7 @@ impl Rule for TransparencyChangeInLoop {
             ".ImageTransparency =",
         ];
 
-        let loop_depth = build_loop_depth_map(source);
+        let loop_depth = build_hot_loop_depth_map(source);
         let line_starts = line_start_offsets(source);
 
         let mut hits = Vec::new();
@@ -145,7 +145,7 @@ impl Rule for RichTextInLoop {
     fn severity(&self) -> Severity { Severity::Allow }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
-        let loop_depth = build_loop_depth_map(source);
+        let loop_depth = build_hot_loop_depth_map(source);
         let line_starts = line_start_offsets(source);
         let rich_patterns = ["<font", "<b>", "<i>", "<u>", "<stroke", "<sc>", "</font>", "</b>"];
         for pattern in &rich_patterns {
@@ -172,7 +172,7 @@ impl Rule for NeonGlassMaterialInLoop {
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
-        let loop_depth = build_loop_depth_map(source);
+        let loop_depth = build_hot_loop_depth_map(source);
         let line_starts = line_start_offsets(source);
         let patterns = ["Enum.Material.Neon", "Enum.Material.Glass"];
         for pat in &patterns {
@@ -196,7 +196,7 @@ impl Rule for SurfaceGuiInLoop {
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
-        let loop_depth = build_loop_depth_map(source);
+        let loop_depth = build_hot_loop_depth_map(source);
         let line_starts = line_start_offsets(source);
         for pos in visit::find_pattern_positions(source, "\"SurfaceGui\"") {
             let line = line_starts.partition_point(|&s| s <= pos).saturating_sub(1);
@@ -217,7 +217,7 @@ impl Rule for ImageLabelInLoop {
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
-        let loop_depth = build_loop_depth_map(source);
+        let loop_depth = build_hot_loop_depth_map(source);
         let line_starts = line_start_offsets(source);
         for pat in ["\"ImageLabel\"", "\"ImageButton\""] {
             for pos in visit::find_pattern_positions(source, pat) {
@@ -244,7 +244,7 @@ impl Rule for ScrollingFrameInLoop {
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
-        let loop_depth = build_loop_depth_map(source);
+        let loop_depth = build_hot_loop_depth_map(source);
         let line_starts = line_start_offsets(source);
         for pos in visit::find_pattern_positions(source, "\"ScrollingFrame\"") {
             let line = line_starts.partition_point(|&s| s <= pos).saturating_sub(1);
@@ -326,7 +326,7 @@ mod tests {
 
     #[test]
     fn neon_material_in_loop_detected() {
-        let src = "for _, part in parts do\n  part.Material = Enum.Material.Neon\nend";
+        let src = "while true do\n  part.Material = Enum.Material.Neon\nend";
         let ast = parse(src);
         let hits = NeonGlassMaterialInLoop.check(src, &ast);
         assert_eq!(hits.len(), 1);
@@ -383,12 +383,14 @@ fn line_start_offsets(source: &str) -> Vec<usize> {
     starts
 }
 
-fn build_loop_depth_map(source: &str) -> Vec<u32> {
+fn build_hot_loop_depth_map(source: &str) -> Vec<u32> {
     let mut depth: u32 = 0;
     let mut depths = Vec::new();
     for line in source.lines() {
         let trimmed = line.trim();
-        if trimmed.starts_with("for ") || trimmed.starts_with("while ") || trimmed.starts_with("repeat") {
+        if trimmed.starts_with("while ") || trimmed.starts_with("repeat") {
+            depth += 1;
+        } else if trimmed.starts_with("for ") && !trimmed.contains(" in ") {
             depth += 1;
         }
         depths.push(depth);

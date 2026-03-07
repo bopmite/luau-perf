@@ -244,7 +244,7 @@ impl Rule for TweenCreateInLoop {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_loop && visit::is_method_call(call, "Create") {
+            if ctx.in_hot_loop && visit::is_method_call(call, "Create") {
                 let src = format!("{call}");
                 if src.contains("TweenService") || src.contains("tweenService") || src.contains("Tween") {
                     hits.push(Hit {
@@ -265,7 +265,7 @@ impl Rule for GetAttributeInLoop {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_loop && visit::is_method_call(call, "GetAttribute") {
+            if ctx.in_hot_loop && visit::is_method_call(call, "GetAttribute") {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
                     msg: ":GetAttribute() in loop - ~247ns bridge cost per call, cache outside loop".into(),
@@ -492,7 +492,7 @@ impl Rule for EnumLookupInLoop {
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
-        let loop_depth = build_loop_depth_map(source);
+        let loop_depth = build_hot_loop_depth_map(source);
         let line_starts = line_start_offsets(source);
         let mut start = 0;
         while let Some(idx) = source[start..].find("Enum.") {
@@ -528,12 +528,14 @@ fn line_start_offsets(source: &str) -> Vec<usize> {
     starts
 }
 
-fn build_loop_depth_map(source: &str) -> Vec<u32> {
+fn build_hot_loop_depth_map(source: &str) -> Vec<u32> {
     let mut depth: u32 = 0;
     let mut depths = Vec::new();
     for line in source.lines() {
         let trimmed = line.trim();
-        if trimmed.starts_with("for ") || trimmed.starts_with("while ") || trimmed.starts_with("repeat") {
+        if trimmed.starts_with("while ") || trimmed.starts_with("repeat") {
+            depth += 1;
+        } else if trimmed.starts_with("for ") && !trimmed.contains(" in ") {
             depth += 1;
         }
         depths.push(depth);
@@ -569,7 +571,7 @@ impl Rule for RegionNewInLoop {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_loop && visit::is_dot_call(call, "Region3", "new") {
+            if ctx.in_hot_loop && visit::is_dot_call(call, "Region3", "new") {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
                     msg: "Region3.new() in loop allocates a Region3 each iteration - cache outside if bounds are loop-invariant".into(),
@@ -679,7 +681,7 @@ mod tests {
 
     #[test]
     fn enum_lookup_in_loop_detected() {
-        let src = "for _, part in parts do\n  part.Material = Enum.Material.SmoothPlastic\nend";
+        let src = "while true do\n  part.Material = Enum.Material.SmoothPlastic\nend";
         let ast = parse(src);
         let hits = EnumLookupInLoop.check(src, &ast);
         assert_eq!(hits.len(), 1);

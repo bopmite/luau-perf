@@ -47,24 +47,56 @@ impl Rule for UntrackedTaskSpawn {
     fn id(&self) -> &'static str { "memory::untracked_task_spawn" }
     fn severity(&self) -> Severity { Severity::Warn }
 
-    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
-        visit::each_stmt(ast.nodes(), false, &mut |stmt, _in_loop| {
-            let call = match stmt {
-                Stmt::FunctionCall(c) => c,
-                _ => return,
-            };
-            let is_untracked = visit::is_dot_call(call, "task", "spawn")
-                || visit::is_dot_call(call, "task", "delay");
-            if is_untracked {
+        for pos in visit::find_pattern_positions(source, "task.spawn(function") {
+            if is_stored_result(source, pos) {
+                continue;
+            }
+            if spawned_function_has_loop(source, pos) {
                 hits.push(Hit {
-                    pos: visit::call_pos(call),
-                    msg: "task.spawn/delay not stored - track thread for cancellation on cleanup".into(),
+                    pos,
+                    msg: "task.spawn with long-running loop not stored - track thread for cancellation on cleanup".into(),
                 });
             }
-        });
+        }
         hits
     }
+}
+
+fn is_stored_result(source: &str, pos: usize) -> bool {
+    let before = &source[..pos];
+    let line_start = before.rfind('\n').map(|i| i + 1).unwrap_or(0);
+    let line_prefix = &source[line_start..pos].trim_start();
+    line_prefix.contains('=')
+}
+
+fn spawned_function_has_loop(source: &str, pos: usize) -> bool {
+    let after = &source[pos..];
+    let func_start = match after.find("function") {
+        Some(i) => i,
+        None => return false,
+    };
+    let body = &after[func_start..];
+    let mut depth: i32 = 0;
+    for line in body.lines() {
+        let t = line.trim();
+        if t.contains("function") {
+            depth += t.matches("function").count() as i32;
+        }
+        if t == "end" || t == "end)" || t == "end))" || t.starts_with("end)") || t.starts_with("end,") {
+            depth -= 1;
+            if depth <= 0 {
+                return false;
+            }
+        }
+        if depth == 1 {
+            if t.starts_with("while ") || t == "repeat" || t.starts_with("repeat") {
+                return true;
+            }
+        }
+    }
+    false
 }
 
 impl Rule for ConnectInLoop {
@@ -751,6 +783,38 @@ mod tests {
         let src = "Debris:AddItem(part, 5)";
         let ast = parse(src);
         let hits = DebrisNegativeDuration.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn untracked_task_spawn_with_loop_detected() {
+        let src = "task.spawn(function()\n  while true do\n    task.wait(1)\n  end\nend)";
+        let ast = parse(src);
+        let hits = UntrackedTaskSpawn.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn untracked_task_spawn_oneshot_ok() {
+        let src = "task.spawn(function()\n  doSomething()\nend)";
+        let ast = parse(src);
+        let hits = UntrackedTaskSpawn.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn untracked_task_delay_ok() {
+        let src = "task.delay(5, function()\n  cleanup()\nend)";
+        let ast = parse(src);
+        let hits = UntrackedTaskSpawn.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn tracked_task_spawn_with_loop_ok() {
+        let src = "local thread = task.spawn(function()\n  while running do\n    task.wait(1)\n  end\nend)";
+        let ast = parse(src);
+        let hits = UntrackedTaskSpawn.check(src, &ast);
         assert_eq!(hits.len(), 0);
     }
 

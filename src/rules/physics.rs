@@ -196,7 +196,7 @@ impl Rule for CFrameAssignInLoop {
         if positions.is_empty() {
             return vec![];
         }
-        let loop_depth = build_loop_depth_map(source);
+        let loop_depth = build_hot_loop_depth_map(source);
         let line_starts = line_start_offsets(source);
         let mut hits = Vec::new();
         for pos in positions {
@@ -240,7 +240,7 @@ impl Rule for WeldConstraintInLoop {
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
-        let loop_depth = build_loop_depth_map(source);
+        let loop_depth = build_hot_loop_depth_map(source);
         let line_starts = line_start_offsets(source);
         for pos in visit::find_pattern_positions(source, "\"WeldConstraint\"") {
             let line = line_starts.partition_point(|&s| s <= pos).saturating_sub(1);
@@ -261,6 +261,24 @@ fn line_start_offsets(source: &str) -> Vec<usize> {
         if b == b'\n' { starts.push(i + 1); }
     }
     starts
+}
+
+fn build_hot_loop_depth_map(source: &str) -> Vec<u32> {
+    let mut depth: u32 = 0;
+    let mut depths = Vec::new();
+    for line in source.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("while ") || trimmed.starts_with("repeat") {
+            depth += 1;
+        } else if trimmed.starts_with("for ") && !trimmed.contains(" in ") {
+            depth += 1;
+        }
+        depths.push(depth);
+        if trimmed == "end" || trimmed.starts_with("end ") || trimmed.starts_with("until ") || trimmed == "until" {
+            depth = depth.saturating_sub(1);
+        }
+    }
+    depths
 }
 
 fn build_loop_depth_map(source: &str) -> Vec<u32> {
@@ -458,7 +476,7 @@ mod tests {
 
     #[test]
     fn cframe_assign_in_loop_detected() {
-        let src = "for _, part in parts do\n  part.CFrame = cf\nend";
+        let src = "while true do\n  part.CFrame = cf\nend";
         let ast = parse(src);
         let hits = CFrameAssignInLoop.check(src, &ast);
         assert_eq!(hits.len(), 1);
@@ -490,7 +508,7 @@ mod tests {
 
     #[test]
     fn weld_constraint_in_loop_detected() {
-        let src = "for _, part in parts do\n  local w = Instance.new(\"WeldConstraint\")\nend";
+        let src = "while true do\n  local w = Instance.new(\"WeldConstraint\")\nend";
         let ast = parse(src);
         let hits = WeldConstraintInLoop.check(src, &ast);
         assert_eq!(hits.len(), 1);

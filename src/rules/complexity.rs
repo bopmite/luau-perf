@@ -157,7 +157,7 @@ impl Rule for CloneInLoop {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_loop && visit::is_method_call(call, "Clone") {
+            if ctx.in_hot_loop && visit::is_method_call(call, "Clone") {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
                     msg: ":Clone() in loop - clones entire instance tree per iteration".into(),
@@ -449,6 +449,24 @@ fn build_loop_depth_map(source: &str) -> Vec<u32> {
     depths
 }
 
+fn build_hot_loop_depth_map(source: &str) -> Vec<u32> {
+    let mut depth: u32 = 0;
+    let mut depths = Vec::new();
+    for line in source.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("while ") || trimmed.starts_with("repeat") {
+            depth += 1;
+        } else if trimmed.starts_with("for ") && !trimmed.contains(" in ") {
+            depth += 1;
+        }
+        depths.push(depth);
+        if trimmed == "end" || trimmed.starts_with("end ") || trimmed.starts_with("until ") || trimmed == "until" {
+            depth = depth.saturating_sub(1);
+        }
+    }
+    depths
+}
+
 impl Rule for FilterThenFirst {
     fn id(&self) -> &'static str { "complexity::filter_then_first" }
     fn severity(&self) -> Severity { Severity::Warn }
@@ -519,7 +537,7 @@ impl Rule for StringMatchInLoop {
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
-        let loop_depth = build_loop_depth_map(source);
+        let loop_depth = build_hot_loop_depth_map(source);
         let line_starts = line_start_offsets(source);
         let patterns = [":match(", "string.match("];
         for pat in &patterns {
@@ -783,7 +801,7 @@ mod tests {
 
     #[test]
     fn string_match_in_loop_detected() {
-        let src = "for _, line in lines do\n  local num = line:match(\"(%d+)\")\nend";
+        let src = "while true do\n  local num = line:match(\"(%d+)\")\nend";
         let ast = parse(src);
         let hits = StringMatchInLoop.check(src, &ast);
         assert_eq!(hits.len(), 1);

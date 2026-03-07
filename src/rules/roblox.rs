@@ -372,6 +372,9 @@ impl Rule for DestroyChildrenManual {
             let context_start = visit::floor_char(source, pos.saturating_sub(200));
             let context = &source[context_start..pos];
             if context.contains("GetChildren") || context.contains("GetDescendants") {
+                if context.contains(":IsA(") || context.contains(".ClassName") || context.contains("if ") {
+                    continue;
+                }
                 hits.push(Hit {
                     pos,
                     msg: ":Destroy() in loop over children - use parent:ClearAllChildren()".into(),
