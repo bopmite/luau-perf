@@ -217,6 +217,7 @@ impl Rule for RepeatedFindFirstChild {
                         t == "return" || t.starts_with("return ") || t == "return;"
                             || t == "else" || t.starts_with("elseif ")
                             || t.starts_with("function ") || t.starts_with("local function ")
+                            || t.starts_with("for ") || t.starts_with("while ") || t == "repeat"
                     });
                     if !has_scope_break {
                         hits.push(Hit {
