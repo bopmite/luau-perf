@@ -150,6 +150,12 @@ impl Rule for PropertyBeforeParent {
                 continue;
             }
 
+            let line_start = source[..parent_pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
+            let parent_line = source[line_start..parent_pos].trim();
+            let var_name = parent_line.strip_suffix(".Parent").unwrap_or(parent_line);
+            if var_name.is_empty() { continue; }
+            let var_prefix = format!("{}.", var_name);
+
             let after_parent = parent_pos + ".Parent =".len();
             let after_end = visit::ceil_char(source, (after_parent + 300).min(source.len()));
             let after = &source[after_parent..after_end];
@@ -160,11 +166,11 @@ impl Rule for PropertyBeforeParent {
                 if trimmed.is_empty() || trimmed.starts_with("--") {
                     continue;
                 }
-                if trimmed == "end" || trimmed.starts_with("end") || trimmed.starts_with("local ") || trimmed.starts_with("return") || trimmed.starts_with("elseif ") || trimmed == "else" {
+                if trimmed == "end" || trimmed.starts_with("end") || trimmed.starts_with("local ") || trimmed.starts_with("return") || trimmed.starts_with("elseif ") || trimmed == "else" || trimmed.contains("function(") || trimmed.contains("function (") {
                     break;
                 }
-                if trimmed.contains('.') && trimmed.contains(" = ") && !trimmed.contains(".Parent") {
-                    let dot_part = trimmed.split('.').nth(1).unwrap_or("");
+                if trimmed.starts_with(&var_prefix) && trimmed.contains(" = ") && !trimmed.contains(".Parent") {
+                    let dot_part = trimmed[var_prefix.len()..].split(|c: char| !c.is_alphanumeric()).next().unwrap_or("");
                     if dot_part.starts_with(|c: char| c.is_uppercase()) {
                         props_after += 1;
                     }
