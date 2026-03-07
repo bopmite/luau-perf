@@ -154,7 +154,7 @@ impl Rule for PropertyBeforeParent {
             let after_end = visit::ceil_char(source, (after_parent + 300).min(source.len()));
             let after = &source[after_parent..after_end];
 
-            let mut found_prop_after = false;
+            let mut props_after = 0u32;
             for line in after.lines().skip(1) {
                 let trimmed = line.trim();
                 if trimmed.is_empty() || trimmed.starts_with("--") {
@@ -166,13 +166,12 @@ impl Rule for PropertyBeforeParent {
                 if trimmed.contains('.') && trimmed.contains(" = ") && !trimmed.contains(".Parent") {
                     let dot_part = trimmed.split('.').nth(1).unwrap_or("");
                     if dot_part.starts_with(|c: char| c.is_uppercase()) {
-                        found_prop_after = true;
-                        break;
+                        props_after += 1;
                     }
                 }
             }
 
-            if found_prop_after {
+            if props_after >= 2 {
                 hits.push(Hit {
                     pos: parent_pos,
                     msg: ".Parent set before other properties - set properties FIRST, parent LAST to batch replication".into(),
@@ -459,7 +458,7 @@ mod tests {
 
     #[test]
     fn property_before_parent_detected() {
-        let src = "local p = Instance.new(\"Part\")\np.Parent = workspace\np.Size = Vector3.new(1,1,1)";
+        let src = "local p = Instance.new(\"Part\")\np.Parent = workspace\np.Size = Vector3.new(1,1,1)\np.Anchored = true";
         let ast = parse(src);
         let hits = PropertyBeforeParent.check(src, &ast);
         assert_eq!(hits.len(), 1);

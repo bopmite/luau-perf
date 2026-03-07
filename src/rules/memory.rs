@@ -500,12 +500,18 @@ impl Rule for SoundNotDestroyed {
     fn severity(&self) -> Severity { Severity::Warn }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let has_cleanup_fn = source.contains("function cleanup(") || source.contains("function Cleanup(")
+            || source.contains("function destroy(") || source.contains("function Destroy(");
         let mut hits = Vec::new();
         for pos in visit::find_pattern_positions(source, ":Play()") {
-            let before_start = pos.saturating_sub(300);
+            let before_start = pos.saturating_sub(400);
             let before = &source[before_start..pos];
             let is_sound = before.contains("Sound") || before.contains("sound");
             if !is_sound { continue; }
+            let is_existing = before.contains("FindFirstChild") || before.contains("FindFirstChildWhichIsA")
+                || before.contains("FindFirstDescendant");
+            if is_existing { continue; }
+            if has_cleanup_fn { continue; }
             let after_end = (pos + 300).min(source.len());
             let after = &source[pos..after_end];
             let has_cleanup = after.contains(".Ended:") || after.contains(":Destroy()") || after.contains("Debris");

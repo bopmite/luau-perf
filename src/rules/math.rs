@@ -268,22 +268,21 @@ impl Rule for AbsForSignCheck {
 
 impl Rule for Vector3ZeroConstant {
     fn id(&self) -> &'static str { "math::vector3_zero_constant" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn severity(&self) -> Severity { Severity::Warn }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
-        let constants = [
-            ("Vector3.new(0, 0, 0)", "Vector3.zero"),
-            ("Vector3.new(0,0,0)", "Vector3.zero"),
-            ("Vector3.new(1, 1, 1)", "Vector3.one"),
-            ("Vector3.new(1,1,1)", "Vector3.one"),
-        ];
-        for (pattern, replacement) in &constants {
-            for pos in visit::find_pattern_positions(source, pattern) {
-                hits.push(Hit {
-                    pos,
-                    msg: format!("{pattern} - use {replacement} (pre-allocated constant, no allocation)"),
-                });
+        for pos in visit::find_pattern_positions(source, "Vector3.new(") {
+            let after = &source[pos + "Vector3.new(".len()..];
+            let close = match after.find(')') {
+                Some(i) => i,
+                None => continue,
+            };
+            let args = after[..close].replace(' ', "");
+            if args == "0,0,0" {
+                hits.push(Hit { pos, msg: "Vector3.new(0, 0, 0) - use Vector3.zero (pre-allocated, no allocation)".into() });
+            } else if args == "1,1,1" {
+                hits.push(Hit { pos, msg: "Vector3.new(1, 1, 1) - use Vector3.one (pre-allocated, no allocation)".into() });
             }
         }
         hits
@@ -292,7 +291,7 @@ impl Rule for Vector3ZeroConstant {
 
 impl Rule for CFrameIdentityConstant {
     fn id(&self) -> &'static str { "math::cframe_identity_constant" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn severity(&self) -> Severity { Severity::Warn }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
