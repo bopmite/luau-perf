@@ -176,11 +176,11 @@ impl Rule for VectorNormalizeManual {
         let mut hits = Vec::new();
         for pos in visit::find_pattern_positions(source, "/ ") {
             let after_start = pos + 2;
-            let after_end = visit::ceil_char(source, (after_start + 60).min(source.len()));
-            let after = &source[after_start..after_end];
+            let line_end = source[after_start..].find('\n').map(|i| after_start + i).unwrap_or(source.len());
+            let after = &source[after_start..line_end];
             if after.contains(".Magnitude") {
-                let before_start = visit::floor_char(source, pos.saturating_sub(60));
-                let before = &source[before_start..pos];
+                let line_start = source[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
+                let before = &source[line_start..pos];
                 if before.ends_with(' ') || before.ends_with('(') {
                     hits.push(Hit {
                         pos,
