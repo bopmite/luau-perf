@@ -214,11 +214,12 @@ impl Rule for PrintInHotPath {
                     pos: visit::call_pos(call),
                     msg: "print/warn in loop - I/O is expensive, remove or guard with a flag for production".into(),
                 });
-            } else if has_runservice {
+            } else if has_runservice && ctx.in_func {
                 let pos = visit::call_pos(call);
-                let before_start = visit::floor_char(source, pos.saturating_sub(500));
+                let before_start = visit::floor_char(source, pos.saturating_sub(300));
                 let before = &source[before_start..pos];
-                if before.contains("Heartbeat") || before.contains("RenderStepped") || before.contains("Stepped") {
+                let has_rs = before.contains("Heartbeat:Connect(") || before.contains("RenderStepped:Connect(") || before.contains("Stepped:Connect(");
+                if has_rs {
                     hits.push(Hit {
                         pos,
                         msg: "print/warn in RunService callback - fires every frame, remove for production".into(),
