@@ -307,7 +307,7 @@ impl Rule for SetAttributeInLoop {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_loop && visit::is_method_call(call, "SetAttribute") {
+            if ctx.in_hot_loop && visit::is_method_call(call, "SetAttribute") {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
                     msg: "SetAttribute() in loop - triggers replication per call, consider batching".into(),
@@ -347,13 +347,28 @@ impl Rule for TouchedEventUnfiltered {
     fn severity(&self) -> Severity { Severity::Warn }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
-        visit::find_pattern_positions(source, ".Touched:Connect")
-            .into_iter()
-            .map(|pos| Hit {
-                pos,
-                msg: ".Touched fires at physics rate (~240Hz) - ensure debounce/filtering in handler".into(),
-            })
-            .collect()
+        let mut hits = Vec::new();
+        for pos in visit::find_pattern_positions(source, ".Touched:Connect(") {
+            let after_start = pos + ".Touched:Connect(".len();
+            let after_end = (after_start + 400).min(source.len());
+            let callback = &source[after_start..after_end];
+            let body: String = callback.lines().take(10).collect::<Vec<_>>().join("\n");
+            let has_guard = body.contains("GetPlayerFromCharacter")
+                || body.contains("debounce")
+                || body.contains("cooldown")
+                || body.contains("if not ")
+                || body.contains("tick()")
+                || body.contains("os.clock()")
+                || body.contains(":IsA(")
+                || body.contains("FindFirstAncestor");
+            if !has_guard {
+                hits.push(Hit {
+                    pos,
+                    msg: ".Touched fires at physics rate (~240Hz) - ensure debounce/filtering in handler".into(),
+                });
+            }
+        }
+        hits
     }
 }
 
@@ -673,7 +688,7 @@ impl Rule for HealthPolling {
     fn severity(&self) -> Severity { Severity::Warn }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
-        let loop_depth = build_loop_depth_map(source);
+        let loop_depth = build_hot_loop_depth_map(source);
         let line_starts = line_start_offsets(source);
         let mut hits = Vec::new();
         for pos in visit::find_pattern_positions(source, ".Health") {
@@ -733,7 +748,7 @@ impl Rule for PivotToInLoop {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_loop && visit::is_method_call(call, "PivotTo") {
+            if ctx.in_hot_loop && visit::is_method_call(call, "PivotTo") {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
                     msg: ":PivotTo() in loop - each call crosses Lua-C++ bridge + triggers replication, use workspace:BulkMoveTo() to batch".into(),
@@ -864,7 +879,7 @@ impl Rule for GetPropertyChangedInLoop {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_loop && visit::is_method_call(call, "GetPropertyChangedSignal") {
+            if ctx.in_hot_loop && visit::is_method_call(call, "GetPropertyChangedSignal") {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
                     msg: ":GetPropertyChangedSignal() in loop creates a signal object per iteration - cache outside or use a single .Changed handler".into(),
@@ -905,12 +920,14 @@ fn line_start_offsets(source: &str) -> Vec<usize> {
     starts
 }
 
-fn build_loop_depth_map(source: &str) -> Vec<u32> {
+fn build_hot_loop_depth_map(source: &str) -> Vec<u32> {
     let mut depth: u32 = 0;
     let mut depths = Vec::new();
     for line in source.lines() {
         let trimmed = line.trim();
-        if trimmed.starts_with("for ") || trimmed.starts_with("while ") || trimmed.starts_with("repeat") {
+        if trimmed.starts_with("while ") || trimmed.starts_with("repeat") {
+            depth += 1;
+        } else if trimmed.starts_with("for ") && !trimmed.contains(" in ") {
             depth += 1;
         }
         depths.push(depth);
@@ -1314,7 +1331,7 @@ mod tests {
 
     #[test]
     fn pivot_to_in_loop_detected() {
-        let src = "for _, model in models do\n  model:PivotTo(cf)\nend";
+        let src = "while true do\n  model:PivotTo(cf)\nend";
         let ast = parse(src);
         let hits = PivotToInLoop.check(src, &ast);
         assert_eq!(hits.len(), 1);
@@ -1402,7 +1419,7 @@ mod tests {
 
     #[test]
     fn get_property_changed_in_loop_detected() {
-        let src = "for _, part in parts do\n  part:GetPropertyChangedSignal(\"Position\"):Connect(function() end)\nend";
+        let src = "while true do\n  part:GetPropertyChangedSignal(\"Position\"):Connect(function() end)\nend";
         let ast = parse(src);
         let hits = GetPropertyChangedInLoop.check(src, &ast);
         assert_eq!(hits.len(), 1);

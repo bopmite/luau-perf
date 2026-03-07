@@ -184,29 +184,32 @@ impl Rule for RepeatedFindFirstChild {
             return vec![];
         }
 
-        let mut calls: Vec<(usize, String)> = Vec::new();
+        let mut calls: Vec<(usize, String, String)> = Vec::new();
         for &pos in &positions {
             let after = &source[pos + ":FindFirstChild(".len()..];
             if let Some(close) = after.find(')') {
                 let arg = after[..close].trim().to_string();
                 if !arg.is_empty() {
-                    calls.push((pos, arg));
+                    let before = &source[..pos];
+                    let obj = extract_call_object(before);
+                    calls.push((pos, arg, obj));
                 }
             }
         }
 
         let mut hits = Vec::new();
-        let mut seen: std::collections::HashMap<&str, usize> = std::collections::HashMap::new();
-        for (pos, arg) in &calls {
-            if let Some(&first_pos) = seen.get(arg.as_str()) {
+        let mut seen: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+        for (pos, arg, obj) in &calls {
+            let key = format!("{obj}:{arg}");
+            if let Some(&first_pos) = seen.get(&key) {
                 if pos - first_pos < 1000 {
                     hits.push(Hit {
                         pos: *pos,
-                        msg: format!("duplicate FindFirstChild({arg}) - cache the result in a local variable"),
+                        msg: format!("duplicate FindFirstChild({arg}) on same object - cache the result in a local variable"),
                     });
                 }
             } else {
-                seen.insert(arg, *pos);
+                seen.insert(key, *pos);
             }
         }
         hits
@@ -353,6 +356,14 @@ fn parse_property_assignment(line: &str) -> Option<(&str, &str)> {
         return None;
     }
     Some((var, prop))
+}
+
+fn extract_call_object(before: &str) -> String {
+    let trimmed = before.trim_end();
+    let start = trimmed.rfind(|c: char| !c.is_alphanumeric() && c != '_' && c != '.' && c != ':')
+        .map(|i| i + 1)
+        .unwrap_or(0);
+    trimmed[start..].to_string()
 }
 
 fn line_start_offsets(source: &str) -> Vec<usize> {
