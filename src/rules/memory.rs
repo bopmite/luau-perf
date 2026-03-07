@@ -477,9 +477,17 @@ impl Rule for SetAttributeInHeartbeat {
         for start_pat in &callback_starts {
             for start_pos in visit::find_pattern_positions(source, start_pat) {
                 let body_start = start_pos + start_pat.len();
+                let after_paren = source[body_start..].trim_start();
+                if !after_paren.starts_with("function") {
+                    continue;
+                }
                 let body_end = (body_start + 2000).min(source.len());
                 let body = &source[body_start..body_end];
-                let search_end = body.find("\nend)").unwrap_or(body.len().min(1500));
+                let search_end = ["\nend)", "\n\tend)", "\n\t\tend)", "\n    end)", "\n        end)"]
+                    .iter()
+                    .filter_map(|m| body.find(m))
+                    .min()
+                    .unwrap_or(body.len().min(1500));
                 let callback = &body[..search_end];
                 let mut search = 0;
                 while let Some(pos) = callback[search..].find(":SetAttribute(") {
@@ -548,13 +556,28 @@ impl Rule for UnboundedTableGrowth {
         ];
         for start_pat in &callback_starts {
             for start_pos in visit::find_pattern_positions(source, start_pat) {
+                let line_start = source[..start_pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
+                let line_prefix = &source[line_start..start_pos];
+                if line_prefix.contains("table.insert(") {
+                    continue;
+                }
                 let body_start = start_pos + start_pat.len();
+                let after_paren = source[body_start..].trim_start();
+                if !after_paren.starts_with("function") {
+                    continue;
+                }
                 let body_end = (body_start + 2000).min(source.len());
                 let body = &source[body_start..body_end];
-                let search_end = body.find("\nend)").unwrap_or(body.len().min(1500));
+                let search_end = ["\nend)", "\n\tend)", "\n\t\tend)", "\n    end)", "\n        end)"]
+                    .iter()
+                    .filter_map(|m| body.find(m))
+                    .min()
+                    .unwrap_or(body.len().min(1500));
                 let callback = &body[..search_end];
                 if callback.contains("table.insert(") || callback.contains("[#") {
-                    let has_remove = callback.contains("table.remove(") || callback.contains("table.clear(");
+                    let has_remove = callback.contains("table.remove(")
+                        || callback.contains("table.clear(")
+                        || callback.contains(":Disconnect()");
                     if !has_remove {
                         hits.push(Hit {
                             pos: start_pos,
