@@ -52,12 +52,7 @@ impl Rule for GetDescendantsInLoop {
                 return;
             }
             let pos = visit::call_pos(call);
-            if visit::is_method_call(call, "FindFirstChild") {
-                hits.push(Hit {
-                    pos,
-                    msg: "FindFirstChild() in loop - cache result outside the loop".into(),
-                });
-            } else if visit::is_method_call(call, "GetDescendants") || visit::is_method_call(call, "GetChildren") {
+            if visit::is_method_call(call, "GetDescendants") || visit::is_method_call(call, "GetChildren") {
                 if !visit::is_likely_for_iterator(source, pos) {
                     hits.push(Hit {
                         pos,
@@ -471,6 +466,9 @@ impl Rule for FilterThenFirst {
                 let inner = lines[j].trim();
                 if inner == "end" { break; }
                 if inner.starts_with("if ") && (inner.contains(":IsA(") || inner.contains(".Name ==") || inner.contains(".ClassName ==")) {
+                    if inner.contains(" and ") || inner.contains(" ~= ") || inner.contains(" or ") {
+                        break;
+                    }
                     let mut found_collect = false;
                     for k in (j + 1)..lines.len().min(j + 5) {
                         let deeper = lines[k].trim();

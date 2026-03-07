@@ -84,12 +84,23 @@ impl Rule for SetParentInLoop {
 
         let loop_depth = build_loop_depth_map(source);
         let line_starts = line_start_offsets(source);
+        let lines: Vec<&str> = source.lines().collect();
 
         parent_positions
             .into_iter()
             .filter(|&pos| {
                 let line = line_starts.partition_point(|&s| s <= pos).saturating_sub(1);
-                line < loop_depth.len() && loop_depth[line] > 0
+                if line >= loop_depth.len() || loop_depth[line] == 0 {
+                    return false;
+                }
+                let start = if line >= 5 { line - 5 } else { 0 };
+                for k in start..line {
+                    let prev = lines[k].trim();
+                    if prev.contains("Instance.new(") || prev.contains(":Clone()") {
+                        return false;
+                    }
+                }
+                true
             })
             .map(|pos| Hit {
                 pos,
@@ -114,8 +125,16 @@ impl Rule for PropertyBeforeParent {
             return vec![];
         }
 
+        let loop_depth = build_loop_depth_map(source);
+        let line_starts = line_start_offsets(source);
+
         let mut hits = Vec::new();
         for &parent_pos in &parent_positions {
+            let line = line_starts.partition_point(|&s| s <= parent_pos).saturating_sub(1);
+            if line < loop_depth.len() && loop_depth[line] > 0 {
+                continue;
+            }
+
             let search_start = visit::floor_char(source, parent_pos.saturating_sub(300));
             let before = &source[search_start..parent_pos];
             if !before.contains("Instance.new(") {

@@ -110,7 +110,7 @@ impl Rule for InstanceNewInLoop {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_loop && visit::is_dot_call(call, "Instance", "new") {
+            if ctx.in_hot_loop && visit::is_dot_call(call, "Instance", "new") {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
                     msg: "Instance.new() in loop - consider Clone() or pre-allocation".into(),
@@ -128,7 +128,7 @@ impl Rule for CFrameNewInLoop {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if !ctx.in_loop {
+            if !ctx.in_hot_loop {
                 return;
             }
             let is_cframe = visit::is_dot_call(call, "CFrame", "new")
@@ -154,7 +154,7 @@ impl Rule for Vector3NewInLoop {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_loop && visit::is_dot_call(call, "Vector3", "new") {
+            if ctx.in_hot_loop && visit::is_dot_call(call, "Vector3", "new") {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
                     msg: "Vector3.new() in loop - cache if arguments are loop-invariant".into(),
@@ -283,7 +283,7 @@ impl Rule for Color3NewInLoop {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if !ctx.in_loop {
+            if !ctx.in_hot_loop {
                 return;
             }
             let is_color3 = visit::is_dot_call(call, "Color3", "new")
@@ -308,7 +308,7 @@ impl Rule for UDim2NewInLoop {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if !ctx.in_loop {
+            if !ctx.in_hot_loop {
                 return;
             }
             let is_udim2 = visit::is_dot_call(call, "UDim2", "new")
@@ -551,7 +551,7 @@ impl Rule for BrickColorNewInLoop {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_loop && visit::is_dot_call(call, "BrickColor", "new") {
+            if ctx.in_hot_loop && visit::is_dot_call(call, "BrickColor", "new") {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
                     msg: "BrickColor.new() in loop allocates each iteration - cache outside if arguments are loop-invariant".into(),

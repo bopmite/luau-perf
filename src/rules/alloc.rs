@@ -74,8 +74,7 @@ impl Rule for StringConcatInLoop {
             return vec![];
         }
 
-        // build a line-level loop depth map from keywords
-        let loop_depth = build_loop_depth_map(source);
+        let loop_depth = build_hot_loop_depth_map(source);
         let line_starts = line_start_offsets(source);
 
         concat_positions
@@ -126,6 +125,24 @@ fn build_loop_depth_map(source: &str) -> Vec<u32> {
     depths
 }
 
+fn build_hot_loop_depth_map(source: &str) -> Vec<u32> {
+    let mut depth: u32 = 0;
+    let mut depths = Vec::new();
+    for line in source.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("while ") || trimmed.starts_with("repeat") {
+            depth += 1;
+        } else if trimmed.starts_with("for ") && !trimmed.contains(" in ") {
+            depth += 1;
+        }
+        depths.push(depth);
+        if trimmed == "end" || trimmed.starts_with("end ") || trimmed.starts_with("until ") || trimmed == "until" {
+            depth = depth.saturating_sub(1);
+        }
+    }
+    depths
+}
+
 impl Rule for StringFormatInLoop {
     fn id(&self) -> &'static str { "alloc::string_format_in_loop" }
     fn severity(&self) -> Severity { Severity::Warn }
@@ -133,7 +150,7 @@ impl Rule for StringFormatInLoop {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_loop && (visit::is_dot_call(call, "string", "format") || visit::is_method_call(call, "format")) {
+            if ctx.in_hot_loop && (visit::is_dot_call(call, "string", "format") || visit::is_method_call(call, "format")) {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
                     msg: "string.format() in loop - allocates a new string each iteration".into(),
@@ -179,7 +196,7 @@ impl Rule for TostringInLoop {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_loop && visit::is_bare_call(call, "tostring") {
+            if ctx.in_hot_loop && visit::is_bare_call(call, "tostring") {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
                     msg: "tostring() in loop - allocates a new string each call".into(),
@@ -434,7 +451,7 @@ impl Rule for StringInterpInLoop {
             return vec![];
         }
 
-        let loop_depth = build_loop_depth_map(source);
+        let loop_depth = build_hot_loop_depth_map(source);
         let line_starts = line_start_offsets(source);
         let mut hits = Vec::new();
         let mut skip_until = 0usize;
