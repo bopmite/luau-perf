@@ -213,12 +213,13 @@ impl Rule for RepeatedFindFirstChild {
             if let Some(&first_pos) = seen.get(&key) {
                 if pos - first_pos < 1000 {
                     let between = &source[first_pos..*pos];
-                    let has_branch_break = between.lines().any(|l| {
+                    let has_scope_break = between.lines().any(|l| {
                         let t = l.trim();
                         t == "return" || t.starts_with("return ") || t == "return;"
                             || t == "else" || t.starts_with("elseif ")
+                            || t.starts_with("function ") || t.starts_with("local function ")
                     });
-                    if !has_branch_break {
+                    if !has_scope_break {
                         hits.push(Hit {
                             pos: *pos,
                             msg: format!("duplicate FindFirstChild({arg}) on same object - cache the result in a local variable"),
