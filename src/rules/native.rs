@@ -55,10 +55,13 @@ impl Rule for DynamicRequire {
                 let s = format!("{arg}");
                 let trimmed = s.trim();
                 if trimmed.contains('[') {
-                    hits.push(Hit {
-                        pos: visit::call_pos(call),
-                        msg: "dynamic require() with bracket indexing - prevents static analysis and GETIMPORT".into(),
-                    });
+                    let has_string_literal = trimmed.contains("[\"") || trimmed.contains("['");
+                    if !has_string_literal {
+                        hits.push(Hit {
+                            pos: visit::call_pos(call),
+                            msg: "dynamic require() with bracket indexing - prevents static analysis and GETIMPORT".into(),
+                        });
+                    }
                 }
             }
         });
