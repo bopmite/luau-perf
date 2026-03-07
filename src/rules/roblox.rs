@@ -322,17 +322,29 @@ impl Rule for StringValueOverAttribute {
     fn id(&self) -> &'static str { "roblox::string_value_over_attribute" }
     fn severity(&self) -> Severity { Severity::Warn }
 
-    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+    fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
-        let value_classes = ["StringValue", "IntValue", "BoolValue", "NumberValue", "ObjectValue"];
+        let value_classes = ["StringValue", "IntValue", "BoolValue", "NumberValue"];
         visit::each_call(ast, |call, _ctx| {
             if !visit::is_dot_call(call, "Instance", "new") {
                 return;
             }
             if let Some(class) = visit::first_string_arg(call) {
                 if value_classes.contains(&class.as_str()) {
+                    let pos = visit::call_pos(call);
+                    let line_start = source[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
+                    let line_prefix = source[line_start..pos].trim();
+                    let var_name = line_prefix.strip_prefix("local ").unwrap_or(line_prefix)
+                        .split('=').next().unwrap_or("").trim();
+                    let after_end = (pos + 800).min(source.len());
+                    let after = &source[pos..after_end];
+                    let is_tween_target = !var_name.is_empty() && after.contains("TweenService:Create(")
+                        && after.contains(&format!("TweenService:Create({var_name}"));
+                    if is_tween_target {
+                        return;
+                    }
                     hits.push(Hit {
-                        pos: visit::call_pos(call),
+                        pos,
                         msg: format!("Instance.new(\"{class}\") - use Attributes instead (lighter, no instance overhead)"),
                     });
                 }
@@ -604,24 +616,25 @@ impl Rule for RequireInConnect {
         let mut hits = Vec::new();
         let connect_positions = visit::find_pattern_positions(source, ":Connect(");
         for &pos in &connect_positions {
-            let after_end = visit::ceil_char(source, (pos + 500).min(source.len()));
-            let callback = &source[pos..after_end];
-            if !callback.contains("function") {
+            let after = &source[pos + ":Connect(".len()..];
+            let trimmed = after.trim_start();
+            if !trimmed.starts_with("function") {
                 continue;
             }
-            let func_start = callback.find("function").unwrap_or(0);
-            let body = &callback[func_start..];
-            let body_lines: Vec<&str> = body.lines().take(15).collect();
-            for line in &body_lines[1..] {
-                if line.contains("require(") {
-                    let _line_start = source[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
-                    let abs_pos = pos + callback[..callback.find("require(").unwrap_or(0)].len();
-                    hits.push(Hit {
-                        pos: abs_pos.min(source.len().saturating_sub(1)),
-                        msg: "require() inside :Connect() callback - runs on every event fire, move to module level".into(),
-                    });
-                    break;
-                }
+            let func_offset = pos + ":Connect(".len() + (after.len() - trimmed.len());
+            let body_end = ["\nend)", "\n\tend)", "\n\t\tend)", "\n    end)", "\n        end)"]
+                .iter()
+                .filter_map(|m| source[func_offset..].find(m))
+                .min()
+                .unwrap_or(500.min(source.len() - func_offset));
+            let callback = &source[func_offset..func_offset + body_end];
+            for require_pos in visit::find_pattern_positions(callback, "require(") {
+                let abs_pos = func_offset + require_pos;
+                hits.push(Hit {
+                    pos: abs_pos,
+                    msg: "require() inside :Connect() callback - runs on every event fire, move to module level".into(),
+                });
+                break;
             }
         }
         hits

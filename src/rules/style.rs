@@ -218,7 +218,16 @@ impl Rule for PrintInHotPath {
                 let pos = visit::call_pos(call);
                 let before_start = visit::floor_char(source, pos.saturating_sub(300));
                 let before = &source[before_start..pos];
-                let has_rs = before.contains("Heartbeat:Connect(") || before.contains("RenderStepped:Connect(") || before.contains("Stepped:Connect(");
+                let rs_patterns = ["Heartbeat:Connect(", "RenderStepped:Connect(", "Stepped:Connect("];
+                let has_rs = rs_patterns.iter().any(|pat| {
+                    if let Some(connect_idx) = before.rfind(pat) {
+                        let between = &before[connect_idx + pat.len()..];
+                        !between.contains("\nend)") && !between.contains("\n\tend)")
+                            && !between.contains("\n\t\tend)")
+                    } else {
+                        false
+                    }
+                });
                 if has_rs {
                     hits.push(Hit {
                         pos,
