@@ -13,6 +13,7 @@ pub struct UnnecessaryTonumber;
 pub struct LerpManual;
 pub struct AbsForSignCheck;
 pub struct Vector3ZeroConstant;
+pub struct Vector2ZeroConstant;
 pub struct CFrameIdentityConstant;
 pub struct HugeComparison;
 pub struct ExpOverPow;
@@ -283,6 +284,29 @@ impl Rule for Vector3ZeroConstant {
                 hits.push(Hit { pos, msg: "Vector3.new(0, 0, 0) - use Vector3.zero (pre-allocated, no allocation)".into() });
             } else if args == "1,1,1" {
                 hits.push(Hit { pos, msg: "Vector3.new(1, 1, 1) - use Vector3.one (pre-allocated, no allocation)".into() });
+            }
+        }
+        hits
+    }
+}
+
+impl Rule for Vector2ZeroConstant {
+    fn id(&self) -> &'static str { "math::vector2_zero_constant" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        for pos in visit::find_pattern_positions(source, "Vector2.new(") {
+            let after = &source[pos + "Vector2.new(".len()..];
+            let close = match after.find(')') {
+                Some(i) => i,
+                None => continue,
+            };
+            let args = after[..close].replace(' ', "");
+            if args == "0,0" {
+                hits.push(Hit { pos, msg: "Vector2.new(0, 0) - use Vector2.zero (pre-allocated, no allocation)".into() });
+            } else if args == "1,1" {
+                hits.push(Hit { pos, msg: "Vector2.new(1, 1) - use Vector2.one (pre-allocated, no allocation)".into() });
             }
         }
         hits
@@ -592,6 +616,30 @@ mod tests {
         let src = "local v = math.exp(2)";
         let ast = parse(src);
         let hits = ExpOverPow.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn vector2_zero_detected() {
+        let src = "local v = Vector2.new(0, 0)";
+        let ast = parse(src);
+        let hits = Vector2ZeroConstant.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn vector2_one_detected() {
+        let src = "local v = Vector2.new(1, 1)";
+        let ast = parse(src);
+        let hits = Vector2ZeroConstant.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn vector2_other_not_flagged() {
+        let src = "local v = Vector2.new(0.5, 0.5)";
+        let ast = parse(src);
+        let hits = Vector2ZeroConstant.check(src, &ast);
         assert_eq!(hits.len(), 0);
     }
 }

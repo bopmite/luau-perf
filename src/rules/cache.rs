@@ -8,6 +8,7 @@ pub struct RaycastParamsInFunction;
 pub struct InstanceNewInLoop;
 pub struct CFrameNewInLoop;
 pub struct Vector3NewInLoop;
+pub struct Vector2NewInLoop;
 pub struct OverlapParamsInFunction;
 pub struct NumberRangeInFunction;
 pub struct NumberSequenceInFunction;
@@ -158,6 +159,24 @@ impl Rule for Vector3NewInLoop {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
                     msg: "Vector3.new() in loop - cache if arguments are loop-invariant".into(),
+                });
+            }
+        });
+        hits
+    }
+}
+
+impl Rule for Vector2NewInLoop {
+    fn id(&self) -> &'static str { "cache::vector2_new_in_loop" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        visit::each_call(ast, |call, ctx| {
+            if ctx.in_hot_loop && visit::is_dot_call(call, "Vector2", "new") {
+                hits.push(Hit {
+                    pos: visit::call_pos(call),
+                    msg: "Vector2.new() in loop - cache if arguments are loop-invariant".into(),
                 });
             }
         });
