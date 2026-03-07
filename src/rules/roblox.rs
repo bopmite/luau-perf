@@ -526,17 +526,17 @@ impl Rule for GameLoadedRace {
     fn severity(&self) -> Severity { Severity::Error }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
-        let has_is_loaded = !visit::find_pattern_positions(source, ":IsLoaded()").is_empty()
+        let game_is_loaded = visit::find_pattern_positions(source, "game:IsLoaded()");
+        let has_game_loaded = !game_is_loaded.is_empty()
             || !visit::find_pattern_positions(source, "game.Loaded").is_empty();
-        if !has_is_loaded {
+        if !has_game_loaded {
             return vec![];
         }
         let has_loaded_wait = source.contains("Loaded:Wait()") || source.contains("Loaded:wait()");
         if has_loaded_wait {
             return vec![];
         }
-        let is_loaded_positions = visit::find_pattern_positions(source, ":IsLoaded()");
-        if let Some(&pos) = is_loaded_positions.first() {
+        if let Some(&pos) = game_is_loaded.first() {
             return vec![Hit {
                 pos,
                 msg: "game:IsLoaded() without game.Loaded:Wait() fallback - race condition if game hasn't loaded yet".into(),
