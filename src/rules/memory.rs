@@ -212,25 +212,60 @@ impl Rule for ConnectInConnect {
                 continue;
             }
 
-            for &inner_pos in &connect_positions[i + 1..] {
-                let between = &source[outer_end..inner_pos];
+            let mut body_end = outer_end;
+            {
                 let mut depth: i32 = 0;
-                for line in between.lines() {
+                let mut started = false;
+                let mut offset = outer_end;
+                for line in source[outer_end..].lines() {
                     let t = line.trim();
-                    if t.starts_with("function") || t.contains("= function") || t.ends_with("function()") || t.ends_with("function ()") {
-                        depth += 1;
+                    offset += line.len() + 1;
+                    if t.starts_with("--") {
+                        continue;
                     }
-                    if t == "end" || t == "end)" || t == "end))" || t.starts_with("end)") {
+                    let has_func = t.contains("function(") || t.contains("function (") || t.starts_with("function ");
+                    let has_end = t == "end" || t.starts_with("end)") || t.starts_with("end })") || t.starts_with("end,") || t == "end;";
+                    let is_single_line = has_func && (t.contains(" end)") || t.contains(" end ") || t.ends_with(" end"));
+                    if is_single_line {
+                        if !started {
+                            body_end = offset.min(source.len());
+                            break;
+                        }
+                        continue;
+                    }
+                    if has_func && has_end {
+                        if !started {
+                            body_end = offset.min(source.len());
+                            break;
+                        }
+                        continue;
+                    }
+                    if has_func {
+                        depth += 1;
+                        started = true;
+                    }
+                    if has_end {
                         depth -= 1;
                     }
+                    if started && depth <= 0 {
+                        body_end = offset.min(source.len());
+                        break;
+                    }
                 }
-                if depth > 0 {
-                    hits.push(Hit {
-                        pos: inner_pos,
-                        msg: ":Connect() nested inside another :Connect() callback - inner connection leaks on every outer fire".into(),
-                    });
+            }
+
+            for &inner_pos in &connect_positions[i + 1..] {
+                if inner_pos >= body_end {
                     break;
                 }
+                let between = &source[outer_end..inner_pos];
+                if between.contains(":Disconnect()") {
+                    break;
+                }
+                hits.push(Hit {
+                    pos: inner_pos,
+                    msg: ":Connect() nested inside another :Connect() callback - inner connection leaks on every outer fire".into(),
+                });
                 break;
             }
         }
