@@ -31,7 +31,7 @@ rules marked `[allow]` are off by default - enable them in `luauperf.toml` if yo
 | `typeof_in_loop` | allow | pedantic | typeof() in loop crosses Lua-C++ bridge - cache outside |
 | `setmetatable_in_loop` | warn | strict | setmetatable() in loop - consider object pooling |
 
-## cache (23)
+## cache (24)
 
 | rule | severity | level | what |
 |------|----------|-------|------|
@@ -42,6 +42,7 @@ rules marked `[allow]` are off by default - enable them in `luauperf.toml` if yo
 | `instance_new_in_loop` | warn | strict | Instance.new() in loop - consider Clone() or pre-allocation |
 | `cframe_new_in_loop` | warn | pedantic | CFrame constructor in loop - cache if arguments are loop-invariant |
 | `vector3_new_in_loop` | warn | pedantic | Vector3.new() in loop - cache if arguments are loop-invariant |
+| `vector2_new_in_loop` | warn | pedantic | Vector2.new() in loop - cache if arguments are loop-invariant |
 | `overlap_params_in_function` | warn | strict | OverlapParams.new() in function - cache at module level |
 | `number_range_in_function` | warn | pedantic | NumberRange.new() in function - cache as module-level constant |
 | `number_sequence_in_function` | warn | pedantic | NumberSequence.new() in function - cache as module-level constant |
@@ -102,7 +103,7 @@ rules marked `[allow]` are off by default - enable them in `luauperf.toml` if yo
 | `destroy_in_loop` | warn | strict | :Destroy() in loop fires events per call - use :ClearAllChildren() |
 | `get_children_in_loop` | warn | strict | :GetChildren/:GetDescendants in loop - cache outside |
 
-## math (15)
+## math (16)
 
 | rule | severity | level | what |
 |------|----------|-------|------|
@@ -117,8 +118,9 @@ rules marked `[allow]` are off by default - enable them in `luauperf.toml` if yo
 | `unnecessary_tonumber` | warn | strict | tonumber() on numeric literal - value is already a number |
 | `lerp_manual` | allow | pedantic | a + (b - a) * t - use :Lerp() method |
 | `abs_for_sign_check` | allow | pedantic | math.abs(x) > 0 is x ~= 0 - avoid function call |
-| `vector3_zero_constant` | allow | pedantic | Vector3.new(0,0,0) - use Vector3.zero (pre-allocated) |
-| `cframe_identity_constant` | allow | pedantic | CFrame.new() - use CFrame.identity (pre-allocated) |
+| `vector3_zero_constant` | warn | pedantic | Vector3.new(0,0,0) - use Vector3.zero (pre-allocated) |
+| `vector2_zero_constant` | warn | pedantic | Vector2.new(0,0) - use Vector2.zero (pre-allocated) |
+| `cframe_identity_constant` | warn | pedantic | CFrame.new() - use CFrame.identity (pre-allocated) |
 | `huge_comparison` | allow | pedantic | math.huge in loop - cache in local |
 | `exp_over_pow` | allow | pedantic | math.exp() in loop with constant exponent - cache outside |
 
