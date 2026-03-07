@@ -88,7 +88,7 @@ impl Rule for FreezeInLoop {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_loop && visit::is_dot_call(call, "table", "freeze") {
+            if ctx.in_hot_loop && visit::is_dot_call(call, "table", "freeze") {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
                     msg: "table.freeze() in loop - freeze tables once at creation, not per-iteration".into(),
@@ -373,7 +373,7 @@ impl Rule for SortComparisonAllocation {
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
-        let loop_depth = build_loop_depth_map(source);
+        let loop_depth = build_hot_loop_depth_map(source);
         let line_starts = line_start_offsets(source);
 
         for pos in visit::find_pattern_positions(source, "table.sort(") {
@@ -402,7 +402,7 @@ impl Rule for ClearVsNew {
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
-        let loop_depth = build_loop_depth_map(source);
+        let loop_depth = build_hot_loop_depth_map(source);
         let line_starts = line_start_offsets(source);
 
         for pos in visit::find_pattern_positions(source, "= {}") {
@@ -462,7 +462,7 @@ impl Rule for ConcatWithSeparatorLoop {
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
-        let loop_depth = build_loop_depth_map(source);
+        let loop_depth = build_hot_loop_depth_map(source);
         let line_starts = line_start_offsets(source);
 
         for pos in visit::find_pattern_positions(source, " = ") {
@@ -497,12 +497,14 @@ fn line_start_offsets(source: &str) -> Vec<usize> {
     starts
 }
 
-fn build_loop_depth_map(source: &str) -> Vec<u32> {
+fn build_hot_loop_depth_map(source: &str) -> Vec<u32> {
     let mut depth: u32 = 0;
     let mut depths = Vec::new();
     for line in source.lines() {
         let trimmed = line.trim();
-        if trimmed.starts_with("for ") || trimmed.starts_with("while ") || trimmed.starts_with("repeat") {
+        if trimmed.starts_with("while ") || trimmed.starts_with("repeat") {
+            depth += 1;
+        } else if trimmed.starts_with("for ") && !trimmed.contains(" in ") {
             depth += 1;
         }
         depths.push(depth);
@@ -567,7 +569,7 @@ impl Rule for RawsetInLoop {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_loop && visit::is_bare_call(call, "rawset") {
+            if ctx.in_hot_loop && visit::is_bare_call(call, "rawset") {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
                     msg: "rawset() in loop bypasses __newindex metamethod but is not a FASTCALL builtin - regular t[k] = v is faster when no metatable is set".into(),
@@ -772,7 +774,7 @@ mod tests {
 
     #[test]
     fn concat_with_separator_loop_detected() {
-        let src = "for _, v in items do\n  result = result .. \", \" .. v\nend";
+        let src = "while true do\n  result = result .. \", \" .. v\nend";
         let ast = parse(src);
         let hits = ConcatWithSeparatorLoop.check(src, &ast);
         assert_eq!(hits.len(), 1);

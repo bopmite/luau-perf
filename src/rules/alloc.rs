@@ -107,22 +107,6 @@ fn line_start_offsets(source: &str) -> Vec<usize> {
     starts
 }
 
-fn build_loop_depth_map(source: &str) -> Vec<u32> {
-    let mut depth: u32 = 0;
-    let mut depths = Vec::new();
-    for line in source.lines() {
-        let trimmed = line.trim();
-        if trimmed.starts_with("for ") || trimmed.starts_with("while ") || trimmed.starts_with("repeat") {
-            depth += 1;
-        }
-        depths.push(depth);
-        if trimmed == "end" || trimmed.starts_with("end ") || trimmed.starts_with("until ") || trimmed == "until" {
-            depth = depth.saturating_sub(1);
-        }
-    }
-    depths
-}
-
 fn build_hot_loop_depth_map(source: &str) -> Vec<u32> {
     let mut depth: u32 = 0;
     let mut depths = Vec::new();
@@ -377,7 +361,7 @@ impl Rule for UnpackInLoop {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if !ctx.in_loop {
+            if !ctx.in_hot_loop {
                 return;
             }
             if visit::is_bare_call(call, "unpack") || visit::is_dot_call(call, "table", "unpack") {
@@ -403,7 +387,7 @@ impl Rule for RepeatedStringByte {
             return vec![];
         }
 
-        let loop_depth = build_loop_depth_map(source);
+        let loop_depth = build_hot_loop_depth_map(source);
         let line_starts = line_start_offsets(source);
         let mut hits = Vec::new();
         let mut loop_calls: Vec<(usize, String)> = Vec::new();
@@ -486,7 +470,7 @@ impl Rule for SelectInLoop {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_loop && visit::is_bare_call(call, "select") {
+            if ctx.in_hot_loop && visit::is_bare_call(call, "select") {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
                     msg: "select() in loop - O(n) per call on varargs, cache results outside loop".into(),
@@ -544,7 +528,7 @@ impl Rule for BufferOverStringPack {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_loop && (visit::is_dot_call(call, "string", "pack") || visit::is_dot_call(call, "string", "unpack")) {
+            if ctx.in_hot_loop && (visit::is_dot_call(call, "string", "pack") || visit::is_dot_call(call, "string", "unpack")) {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
                     msg: "string.pack/unpack in loop allocates a string per call - use buffer library (buffer.writeu32/readu32) for zero-allocation binary I/O".into(),
@@ -611,7 +595,7 @@ impl Rule for TypeofInLoop {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_loop && visit::is_bare_call(call, "typeof") {
+            if ctx.in_hot_loop && visit::is_bare_call(call, "typeof") {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
                     msg: "typeof() in loop crosses the Lua-C++ bridge each call - cache outside if checking the same value: local t = typeof(obj)".into(),
@@ -629,7 +613,7 @@ impl Rule for SetmetatableInLoop {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_loop && visit::is_bare_call(call, "setmetatable") {
+            if ctx.in_hot_loop && visit::is_bare_call(call, "setmetatable") {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
                     msg: "setmetatable() in loop creates a new metatable-linked object per iteration - consider a constructor pattern or object pooling".into(),
@@ -860,7 +844,7 @@ mod tests {
 
     #[test]
     fn typeof_in_loop_detected() {
-        let src = "for _, v in items do\n  if typeof(v) == \"Instance\" then end\nend";
+        let src = "for i = 1, 10 do\n  if typeof(v) == \"Instance\" then end\nend";
         let ast = parse(src);
         let hits = TypeofInLoop.check(src, &ast);
         assert_eq!(hits.len(), 1);

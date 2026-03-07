@@ -22,7 +22,7 @@ impl Rule for SpatialQueryInLoop {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if !ctx.in_loop {
+            if !ctx.in_hot_loop {
                 return;
             }
             let is_spatial = visit::is_method_call(call, "Raycast")
@@ -50,7 +50,7 @@ impl Rule for MoveToInLoop {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_loop && visit::is_method_call(call, "MoveTo") {
+            if ctx.in_hot_loop && visit::is_method_call(call, "MoveTo") {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
                     msg: ":MoveTo() in loop - consider workspace:BulkMoveTo() for batch part movement".into(),
@@ -98,7 +98,7 @@ impl Rule for SetNetworkOwnerInLoop {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_loop && visit::is_method_call(call, "SetNetworkOwner") {
+            if ctx.in_hot_loop && visit::is_method_call(call, "SetNetworkOwner") {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
                     msg: ":SetNetworkOwner() in loop - expensive network ownership change per iteration".into(),
@@ -131,7 +131,7 @@ impl Rule for CollisionGroupStringInLoop {
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
-        let loop_depth = build_loop_depth_map(source);
+        let loop_depth = build_hot_loop_depth_map(source);
         let line_starts = line_start_offsets(source);
         for pos in visit::find_pattern_positions(source, ".CollisionGroup = ") {
             let line = line_starts.partition_point(|&s| s <= pos).saturating_sub(1);
@@ -176,7 +176,7 @@ impl Rule for RaycastParamsInLoop {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_loop && visit::is_dot_call(call, "RaycastParams", "new") {
+            if ctx.in_hot_loop && visit::is_dot_call(call, "RaycastParams", "new") {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
                     msg: "RaycastParams.new() in loop - allocates new params each iteration, create once and reuse".into(),
@@ -281,22 +281,6 @@ fn build_hot_loop_depth_map(source: &str) -> Vec<u32> {
     depths
 }
 
-fn build_loop_depth_map(source: &str) -> Vec<u32> {
-    let mut depth: u32 = 0;
-    let mut depths = Vec::new();
-    for line in source.lines() {
-        let trimmed = line.trim();
-        if trimmed.starts_with("for ") || trimmed.starts_with("while ") || trimmed.starts_with("repeat") {
-            depth += 1;
-        }
-        depths.push(depth);
-        if trimmed == "end" || trimmed.starts_with("end ") || trimmed.starts_with("until ") || trimmed == "until" {
-            depth = depth.saturating_sub(1);
-        }
-    }
-    depths
-}
-
 impl Rule for MasslessNotSet {
     fn id(&self) -> &'static str { "physics::massless_not_set" }
     fn severity(&self) -> Severity { Severity::Allow }
@@ -327,7 +311,7 @@ impl Rule for AssemblyVelocityInLoop {
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
-        let loop_depth = build_loop_depth_map(source);
+        let loop_depth = build_hot_loop_depth_map(source);
         let line_starts = line_start_offsets(source);
         let patterns = [".AssemblyLinearVelocity =", ".AssemblyAngularVelocity ="];
         for pat in &patterns {
@@ -372,7 +356,7 @@ mod tests {
 
     #[test]
     fn move_to_in_loop_detected() {
-        let src = "for _, part in parts do\n  part:MoveTo(pos)\nend";
+        let src = "while true do\n  part:MoveTo(pos)\nend";
         let ast = parse(src);
         let hits = MoveToInLoop.check(src, &ast);
         assert_eq!(hits.len(), 1);
@@ -404,7 +388,7 @@ mod tests {
 
     #[test]
     fn set_network_owner_in_loop_detected() {
-        let src = "for _, part in parts do\n  part:SetNetworkOwner(player)\nend";
+        let src = "while true do\n  part:SetNetworkOwner(player)\nend";
         let ast = parse(src);
         let hits = SetNetworkOwnerInLoop.check(src, &ast);
         assert_eq!(hits.len(), 1);
@@ -428,7 +412,7 @@ mod tests {
 
     #[test]
     fn collision_group_in_loop_detected() {
-        let src = "for _, part in parts do\n  part.CollisionGroup = \"Players\"\nend";
+        let src = "while true do\n  part.CollisionGroup = \"Players\"\nend";
         let ast = parse(src);
         let hits = CollisionGroupStringInLoop.check(src, &ast);
         assert_eq!(hits.len(), 1);
@@ -524,7 +508,7 @@ mod tests {
 
     #[test]
     fn assembly_velocity_in_loop_detected() {
-        let src = "for _, part in parts do\n  part.AssemblyLinearVelocity = Vector3.new(0, 10, 0)\nend";
+        let src = "while true do\n  part.AssemblyLinearVelocity = Vector3.new(0, 10, 0)\nend";
         let ast = parse(src);
         let hits = AssemblyVelocityInLoop.check(src, &ast);
         assert_eq!(hits.len(), 1);

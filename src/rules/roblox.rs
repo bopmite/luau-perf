@@ -168,7 +168,7 @@ impl Rule for PcallInLoop {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_loop && (visit::is_bare_call(call, "pcall") || visit::is_bare_call(call, "xpcall")) {
+            if ctx.in_hot_loop && (visit::is_bare_call(call, "pcall") || visit::is_bare_call(call, "xpcall")) {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
                     msg: "pcall/xpcall in loop - not a FASTCALL builtin, significant per-call overhead".into(),
@@ -553,7 +553,7 @@ impl Rule for HumanoidStatePolling {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_loop && visit::is_method_call(call, "GetState") {
+            if ctx.in_hot_loop && visit::is_method_call(call, "GetState") {
                 let src = format!("{call}");
                 if src.contains("Humanoid") || src.contains("humanoid") {
                     hits.push(Hit {

@@ -421,7 +421,7 @@ impl Rule for WorkspaceLookupInLoop {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if !ctx.in_loop {
+            if !ctx.in_hot_loop {
                 return;
             }
             let tok = match visit::prefix_token(call) {

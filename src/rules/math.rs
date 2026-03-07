@@ -42,7 +42,7 @@ impl Rule for RandomNewInLoop {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_loop && visit::is_dot_call(call, "Random", "new") {
+            if ctx.in_hot_loop && visit::is_dot_call(call, "Random", "new") {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
                     msg: "Random.new() in loop - create once outside the loop".into(),
@@ -312,7 +312,7 @@ impl Rule for HugeComparison {
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
-        let loop_depth = build_loop_depth_map(source);
+        let loop_depth = build_hot_loop_depth_map(source);
         let line_starts = line_start_offsets(source);
         for pos in visit::find_pattern_positions(source, "math.huge") {
             let line = line_starts.partition_point(|&s| s <= pos).saturating_sub(1);
@@ -334,7 +334,7 @@ impl Rule for ExpOverPow {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_loop && visit::is_dot_call(call, "math", "exp") {
+            if ctx.in_hot_loop && visit::is_dot_call(call, "math", "exp") {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
                     msg: "math.exp() in loop - if the exponent is constant, cache the result outside: local e = math.exp(k)".into(),
@@ -353,12 +353,14 @@ fn line_start_offsets(source: &str) -> Vec<usize> {
     starts
 }
 
-fn build_loop_depth_map(source: &str) -> Vec<u32> {
+fn build_hot_loop_depth_map(source: &str) -> Vec<u32> {
     let mut depth: u32 = 0;
     let mut depths = Vec::new();
     for line in source.lines() {
         let trimmed = line.trim();
-        if trimmed.starts_with("for ") || trimmed.starts_with("while ") || trimmed.starts_with("repeat") {
+        if trimmed.starts_with("while ") || trimmed.starts_with("repeat") {
+            depth += 1;
+        } else if trimmed.starts_with("for ") && !trimmed.contains(" in ") {
             depth += 1;
         }
         depths.push(depth);

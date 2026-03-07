@@ -125,7 +125,7 @@ impl Rule for VarargInNative {
 
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_loop && visit::is_bare_call(call, "select") {
+            if ctx.in_hot_loop && visit::is_bare_call(call, "select") {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
                     msg: "select() in loop in --!native script - vararg access prevents some native optimizations".into(),
@@ -147,7 +147,7 @@ impl Rule for StringPatternInNative {
 
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if !ctx.in_loop {
+            if !ctx.in_hot_loop {
                 return;
             }
             let is_pattern = visit::is_dot_call(call, "string", "match")
@@ -432,7 +432,7 @@ impl Rule for MethodCallDefeatsFastcall {
         let fastcall_methods = ["byte", "char", "sub", "len"];
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if !ctx.in_loop { return; }
+            if !ctx.in_hot_loop { return; }
             for method in &fastcall_methods {
                 if visit::is_method_call(call, method) {
                     let pos = visit::call_pos(call);
@@ -494,7 +494,7 @@ impl Rule for ImportChainTooDeep {
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
-        let loop_depth = build_loop_depth_map(source);
+        let loop_depth = build_hot_loop_depth_map(source);
         let line_starts = line_start_offsets(source);
         let lines: Vec<&str> = source.lines().collect();
         for (i, line) in lines.iter().enumerate() {
@@ -522,20 +522,24 @@ fn line_start_offsets(source: &str) -> Vec<usize> {
     starts
 }
 
-fn build_loop_depth_map(source: &str) -> Vec<u32> {
-    let mut depth: u32 = 0;
-    let mut depths = Vec::new();
-    for line in source.lines() {
-        let trimmed = line.trim();
-        if trimmed.starts_with("for ") || trimmed.starts_with("while ") || trimmed.starts_with("repeat") {
-            depth += 1;
+fn build_hot_loop_depth_map(source: &str) -> Vec<i32> {
+    let lines: Vec<&str> = source.lines().collect();
+    let mut depth = vec![0i32; lines.len()];
+    let mut current: i32 = 0;
+    for (i, line) in lines.iter().enumerate() {
+        let t = line.trim();
+        if t.starts_with("while ") || t == "while" || t.starts_with("repeat") || t == "repeat" {
+            current += 1;
         }
-        depths.push(depth);
-        if trimmed == "end" || trimmed.starts_with("end ") || trimmed.starts_with("until ") || trimmed == "until" {
-            depth = depth.saturating_sub(1);
+        depth[i] = current;
+        if (t == "end" || t.starts_with("end ") || t.starts_with("end)") || t.starts_with("end,")) && current > 0 {
+            current -= 1;
+        }
+        if t.starts_with("until ") && current > 0 {
+            current -= 1;
         }
     }
-    depths
+    depth
 }
 
 impl Rule for PcallInNative {
@@ -548,7 +552,7 @@ impl Rule for PcallInNative {
         }
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_loop && (visit::is_bare_call(call, "pcall") || visit::is_bare_call(call, "xpcall")) {
+            if ctx.in_hot_loop && (visit::is_bare_call(call, "pcall") || visit::is_bare_call(call, "xpcall")) {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
                     msg: "pcall/xpcall in loop in --!native script forces interpreter fallback for the protected call - move error handling outside the loop".into(),
@@ -568,7 +572,7 @@ impl Rule for DynamicTableKeyInNative {
             return vec![];
         }
         let mut hits = Vec::new();
-        let loop_depth = build_loop_depth_map(source);
+        let loop_depth = build_hot_loop_depth_map(source);
         let line_starts = line_start_offsets(source);
         for pos in visit::find_pattern_positions(source, "[") {
             if pos == 0 { continue; }
@@ -772,7 +776,7 @@ mod tests {
 
     #[test]
     fn import_chain_in_loop_detected() {
-        let src = "for _, p in parts do\n  local x = game.Workspace.Model.Part.Position.X\nend";
+        let src = "while true do\n  local x = game.Workspace.Model.Part.Position.X\nend";
         let ast = parse(src);
         let hits = ImportChainTooDeep.check(src, &ast);
         assert_eq!(hits.len(), 1);
@@ -780,7 +784,7 @@ mod tests {
 
     #[test]
     fn short_chain_ok() {
-        let src = "for _, p in parts do\n  local x = game.Workspace.Model\nend";
+        let src = "while true do\n  local x = game.Workspace.Model\nend";
         let ast = parse(src);
         let hits = ImportChainTooDeep.check(src, &ast);
         assert_eq!(hits.len(), 0);

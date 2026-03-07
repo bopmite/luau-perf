@@ -30,7 +30,7 @@ impl Rule for TableFindInLoop {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_loop && visit::is_dot_call(call, "table", "find") {
+            if ctx.in_hot_loop && visit::is_dot_call(call, "table", "find") {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
                     msg: "table.find() in loop - use a hashmap for O(1) lookup".into(),
@@ -48,7 +48,7 @@ impl Rule for GetDescendantsInLoop {
     fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if !ctx.in_loop {
+            if !ctx.in_hot_loop {
                 return;
             }
             let pos = visit::call_pos(call);
@@ -95,7 +95,7 @@ impl Rule for TableSortInLoop {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_loop && visit::is_dot_call(call, "table", "sort") {
+            if ctx.in_hot_loop && visit::is_dot_call(call, "table", "sort") {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
                     msg: "table.sort() in loop - O(n log n) per iteration, sort once outside".into(),
@@ -113,7 +113,7 @@ impl Rule for GetTaggedInLoop {
     fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if !ctx.in_loop {
+            if !ctx.in_hot_loop {
                 return;
             }
             let pos = visit::call_pos(call);
@@ -135,7 +135,7 @@ impl Rule for GetPlayersInLoop {
     fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if !ctx.in_loop {
+            if !ctx.in_hot_loop {
                 return;
             }
             let pos = visit::call_pos(call);
@@ -175,7 +175,7 @@ impl Rule for WaitForChildInLoop {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_loop && visit::is_method_call(call, "WaitForChild") {
+            if ctx.in_hot_loop && visit::is_method_call(call, "WaitForChild") {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
                     msg: ":WaitForChild() in loop - yields per iteration, cache result outside loop".into(),
@@ -338,7 +338,7 @@ impl Rule for AccumulatingRebuild {
         ];
         for pat in &patterns {
             for pos in visit::find_pattern_positions(source, pat) {
-                let loop_depth = build_loop_depth_map(source);
+                let loop_depth = build_hot_loop_depth_map(source);
                 let line_starts = line_start_offsets(source);
                 let line = line_starts.partition_point(|&s| s <= pos).saturating_sub(1);
                 if line < loop_depth.len() && loop_depth[line] > 0 {
@@ -433,22 +433,6 @@ fn line_start_offsets(source: &str) -> Vec<usize> {
     starts
 }
 
-fn build_loop_depth_map(source: &str) -> Vec<u32> {
-    let mut depth: u32 = 0;
-    let mut depths = Vec::new();
-    for line in source.lines() {
-        let trimmed = line.trim();
-        if trimmed.starts_with("for ") || trimmed.starts_with("while ") || trimmed.starts_with("repeat") {
-            depth += 1;
-        }
-        depths.push(depth);
-        if trimmed == "end" || trimmed.starts_with("end ") || trimmed.starts_with("until ") || trimmed == "until" {
-            depth = depth.saturating_sub(1);
-        }
-    }
-    depths
-}
-
 fn build_hot_loop_depth_map(source: &str) -> Vec<u32> {
     let mut depth: u32 = 0;
     let mut depths = Vec::new();
@@ -516,7 +500,7 @@ impl Rule for NestedTableFind {
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
-        let loop_depth = build_loop_depth_map(source);
+        let loop_depth = build_hot_loop_depth_map(source);
         let line_starts = line_start_offsets(source);
         for pos in visit::find_pattern_positions(source, "table.find(") {
             let line = line_starts.partition_point(|&s| s <= pos).saturating_sub(1);
@@ -567,7 +551,7 @@ impl Rule for PromiseChainInLoop {
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
-        let loop_depth = build_loop_depth_map(source);
+        let loop_depth = build_hot_loop_depth_map(source);
         let line_starts = line_start_offsets(source);
         for pos in visit::find_pattern_positions(source, ":andThen(") {
             let line = line_starts.partition_point(|&s| s <= pos).saturating_sub(1);
@@ -737,7 +721,7 @@ mod tests {
 
     #[test]
     fn accumulating_rebuild_detected() {
-        let src = "for _, item in items do\n  result = {unpack(result), item}\nend";
+        let src = "while true do\n  result = {unpack(result), item}\nend";
         let ast = parse(src);
         let hits = AccumulatingRebuild.check(src, &ast);
         assert_eq!(hits.len(), 1);
@@ -785,7 +769,7 @@ mod tests {
 
     #[test]
     fn nested_table_find_detected() {
-        let src = "for _, a in items do\n  for _, b in others do\n    if table.find(list, a) then end\n  end\nend";
+        let src = "while true do\n  while true do\n    if table.find(list, a) then end\n  end\nend";
         let ast = parse(src);
         let hits = NestedTableFind.check(src, &ast);
         assert_eq!(hits.len(), 1);

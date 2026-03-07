@@ -55,14 +55,23 @@ impl Rule for ClearAllChildrenLoop {
     fn id(&self) -> &'static str { "instance::clear_all_children_loop" }
     fn severity(&self) -> Severity { Severity::Warn }
 
-    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+    fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
+        let lines: Vec<&str> = source.lines().collect();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_loop && visit::is_method_call(call, "Destroy") {
+            if ctx.in_hot_loop && visit::is_method_call(call, "Destroy") {
                 let src = format!("{call}");
                 if src.contains("child") || src.contains("obj") || src.contains("item") || src.contains("v:") {
+                    let pos = visit::call_pos(call);
+                    let line_idx = source[..pos].matches('\n').count();
+                    let start = line_idx.saturating_sub(5);
+                    let end = (line_idx + 1).min(lines.len());
+                    let context = lines[start..end].join("\n");
+                    if context.contains(":IsA(") || context.contains(".ClassName") {
+                        return;
+                    }
                     hits.push(Hit {
-                        pos: visit::call_pos(call),
+                        pos,
                         msg: ":Destroy() in loop over children - use :ClearAllChildren() instead".into(),
                     });
                 }
@@ -125,7 +134,7 @@ impl Rule for PropertyBeforeParent {
             return vec![];
         }
 
-        let loop_depth = build_loop_depth_map(source);
+        let loop_depth = build_hot_loop_depth_map(source);
         let line_starts = line_start_offsets(source);
 
         let mut hits = Vec::new();
@@ -203,10 +212,18 @@ impl Rule for RepeatedFindFirstChild {
             let key = format!("{obj}:{arg}");
             if let Some(&first_pos) = seen.get(&key) {
                 if pos - first_pos < 1000 {
-                    hits.push(Hit {
-                        pos: *pos,
-                        msg: format!("duplicate FindFirstChild({arg}) on same object - cache the result in a local variable"),
+                    let between = &source[first_pos..*pos];
+                    let has_branch_break = between.lines().any(|l| {
+                        let t = l.trim();
+                        t == "return" || t.starts_with("return ") || t == "return;"
+                            || t == "else" || t.starts_with("elseif ")
                     });
+                    if !has_branch_break {
+                        hits.push(Hit {
+                            pos: *pos,
+                            msg: format!("duplicate FindFirstChild({arg}) on same object - cache the result in a local variable"),
+                        });
+                    }
                 }
             } else {
                 seen.insert(key, *pos);
@@ -292,7 +309,7 @@ impl Rule for CollectionServiceInLoop {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if !ctx.in_loop {
+            if !ctx.in_hot_loop {
                 return;
             }
             let pos = visit::call_pos(call);
@@ -317,7 +334,7 @@ impl Rule for NameIndexingInLoop {
     fn severity(&self) -> Severity { Severity::Allow }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
-        let loop_depth = build_loop_depth_map(source);
+        let loop_depth = build_hot_loop_depth_map(source);
         let line_starts = line_start_offsets(source);
         let mut hits = Vec::new();
 
@@ -376,22 +393,6 @@ fn line_start_offsets(source: &str) -> Vec<usize> {
     starts
 }
 
-fn build_loop_depth_map(source: &str) -> Vec<u32> {
-    let mut depth: u32 = 0;
-    let mut depths = Vec::new();
-    for line in source.lines() {
-        let trimmed = line.trim();
-        if trimmed.starts_with("for ") || trimmed.starts_with("while ") || trimmed.starts_with("repeat") {
-            depth += 1;
-        }
-        depths.push(depth);
-        if trimmed == "end" || trimmed.starts_with("end ") || trimmed.starts_with("until ") || trimmed == "until" {
-            depth = depth.saturating_sub(1);
-        }
-    }
-    depths
-}
-
 fn build_hot_loop_depth_map(source: &str) -> Vec<u32> {
     let mut depth: u32 = 0;
     let mut depths = Vec::new();
@@ -417,7 +418,7 @@ impl Rule for DestroyInLoop {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_loop && visit::is_method_call(call, "Destroy") {
+            if ctx.in_hot_loop && visit::is_method_call(call, "Destroy") {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
                     msg: ":Destroy() in loop triggers ancestry-changed events per call - consider :ClearAllChildren() on the parent or batch with Debris".into(),
@@ -435,7 +436,7 @@ impl Rule for GetChildrenInLoop {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_loop && (visit::is_method_call(call, "GetChildren") || visit::is_method_call(call, "GetDescendants")) {
+            if ctx.in_hot_loop && (visit::is_method_call(call, "GetChildren") || visit::is_method_call(call, "GetDescendants")) {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
                     msg: ":GetChildren/:GetDescendants in loop allocates a new table each call - cache outside the loop".into(),
@@ -515,7 +516,7 @@ mod tests {
 
     #[test]
     fn collection_service_in_loop_detected() {
-        let src = "for _, part in parts do\n  part:AddTag(\"Tagged\")\nend";
+        let src = "while true do\n  part:AddTag(\"Tagged\")\nend";
         let ast = parse(src);
         let hits = CollectionServiceInLoop.check(src, &ast);
         assert_eq!(hits.len(), 1);
@@ -547,7 +548,7 @@ mod tests {
 
     #[test]
     fn destroy_in_loop_detected() {
-        let src = "for _, child in children do\n  child:Destroy()\nend";
+        let src = "while true do\n  child:Destroy()\nend";
         let ast = parse(src);
         let hits = DestroyInLoop.check(src, &ast);
         assert_eq!(hits.len(), 1);

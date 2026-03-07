@@ -45,7 +45,7 @@ impl Rule for RepInLoop {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_loop && (visit::is_dot_call(call, "string", "rep") || visit::is_method_call(call, "rep")) {
+            if ctx.in_hot_loop && (visit::is_dot_call(call, "string", "rep") || visit::is_method_call(call, "rep")) {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
                     msg: "string.rep() in loop - allocates a new string each iteration".into(),
@@ -109,7 +109,7 @@ impl Rule for ByteComparison {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_loop && (visit::is_dot_call(call, "string", "sub") || visit::is_method_call(call, "sub")) {
+            if ctx.in_hot_loop && (visit::is_dot_call(call, "string", "sub") || visit::is_method_call(call, "sub")) {
                 if visit::call_arg_count(call) >= 2 {
                     if let (Some(start), Some(end_arg)) = (visit::nth_arg(call, 0), visit::nth_arg(call, 1)) {
                         let s = format!("{start}");
@@ -349,7 +349,7 @@ impl Rule for ReverseInLoop {
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
-        let loop_depth = build_loop_depth_map(source);
+        let loop_depth = build_hot_loop_depth_map(source);
         let line_starts = line_start_offsets(source);
         let patterns = [":reverse()", "string.reverse("];
         for pat in &patterns {
@@ -402,20 +402,24 @@ fn line_start_offsets(source: &str) -> Vec<usize> {
     starts
 }
 
-fn build_loop_depth_map(source: &str) -> Vec<u32> {
-    let mut depth: u32 = 0;
-    let mut depths = Vec::new();
-    for line in source.lines() {
-        let trimmed = line.trim();
-        if trimmed.starts_with("for ") || trimmed.starts_with("while ") || trimmed.starts_with("repeat") {
-            depth += 1;
+fn build_hot_loop_depth_map(source: &str) -> Vec<i32> {
+    let lines: Vec<&str> = source.lines().collect();
+    let mut depth = vec![0i32; lines.len()];
+    let mut current: i32 = 0;
+    for (i, line) in lines.iter().enumerate() {
+        let t = line.trim();
+        if t.starts_with("while ") || t == "while" || t.starts_with("repeat") || t == "repeat" {
+            current += 1;
         }
-        depths.push(depth);
-        if trimmed == "end" || trimmed.starts_with("end ") || trimmed.starts_with("until ") || trimmed == "until" {
-            depth = depth.saturating_sub(1);
+        depth[i] = current;
+        if (t == "end" || t.starts_with("end ") || t.starts_with("end)") || t.starts_with("end,")) && current > 0 {
+            current -= 1;
+        }
+        if t.starts_with("until ") && current > 0 {
+            current -= 1;
         }
     }
-    depths
+    depth
 }
 
 #[cfg(test)]
@@ -605,7 +609,7 @@ mod tests {
 
     #[test]
     fn reverse_in_loop_detected() {
-        let src = "for i = 1, 10 do\n  local r = s:reverse()\nend";
+        let src = "while true do\n  local r = s:reverse()\nend";
         let ast = parse(src);
         let hits = ReverseInLoop.check(src, &ast);
         assert_eq!(hits.len(), 1);
