@@ -272,6 +272,18 @@ impl Rule for IndexFunctionMetatable {
         let patterns = ["__index = function", "__index=function"];
         for pattern in &patterns {
             for pos in visit::find_pattern_positions(source, pattern) {
+                let func_start = pos + pattern.len();
+                let body_end = source[func_start..].find("\n\tend")
+                    .or_else(|| source[func_start..].find("\nend"))
+                    .unwrap_or(500.min(source.len() - func_start));
+                let body = &source[func_start..func_start + body_end];
+                let is_proxy = body.contains("if key") || body.contains("if k ")
+                    || body.contains("if type(key)") || body.contains("if type(k)")
+                    || body.contains("[key]") || body.contains("[k]")
+                    || body.contains("rawget");
+                if is_proxy {
+                    continue;
+                }
                 hits.push(Hit {
                     pos,
                     msg: "__index = function(...) prevents inline caching - use __index = methodTable for faster lookups".into(),

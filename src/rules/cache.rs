@@ -72,14 +72,24 @@ impl Rule for TweenInfoInFunction {
     fn id(&self) -> &'static str { "cache::tween_info_in_function" }
     fn severity(&self) -> Severity { Severity::Warn }
 
-    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+    fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
             if ctx.in_func && visit::is_dot_call(call, "TweenInfo", "new") {
-                hits.push(Hit {
-                    pos: visit::call_pos(call),
-                    msg: "TweenInfo.new() in function - cache as module-level constant".into(),
-                });
+                let pos = visit::call_pos(call);
+                let call_start = pos + "TweenInfo.new(".len();
+                let call_end = source[call_start..].find(')').map(|i| call_start + i).unwrap_or(call_start);
+                let args = &source[call_start..call_end];
+                let has_variable = args.split(',').next().map(|first| {
+                    let first = first.trim();
+                    !first.is_empty() && first.chars().next().map(|c| c.is_ascii_lowercase()).unwrap_or(false)
+                }).unwrap_or(false);
+                let msg = if has_variable {
+                    "TweenInfo.new() with dynamic duration in function - allocates each call, consider caching if inputs are stable"
+                } else {
+                    "TweenInfo.new() in function - cache as module-level constant if arguments are fixed"
+                };
+                hits.push(Hit { pos, msg: msg.into() });
             }
         });
         hits
@@ -242,14 +252,21 @@ impl Rule for ColorSequenceInFunction {
     fn id(&self) -> &'static str { "cache::color_sequence_in_function" }
     fn severity(&self) -> Severity { Severity::Warn }
 
-    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+    fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
             if ctx.in_func && visit::is_dot_call(call, "ColorSequence", "new") {
-                hits.push(Hit {
-                    pos: visit::call_pos(call),
-                    msg: "ColorSequence.new() in function - cache as module-level constant".into(),
-                });
+                let pos = visit::call_pos(call);
+                let line_start = source[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
+                let line = &source[line_start..source[pos..].find('\n').map(|i| pos + i).unwrap_or(source.len())];
+                let has_variable_arg = line.contains("keypoints") || line.contains("colors")
+                    || line.contains("Keypoint") || line.contains("table");
+                let msg = if has_variable_arg {
+                    "ColorSequence.new() with dynamic keypoints in function - allocates each call, consider caching if inputs are stable"
+                } else {
+                    "ColorSequence.new() in function - cache as module-level constant if arguments are fixed"
+                };
+                hits.push(Hit { pos, msg: msg.into() });
             }
         });
         hits
@@ -281,12 +298,21 @@ impl Rule for GetAttributeInLoop {
     fn id(&self) -> &'static str { "cache::get_attribute_in_loop" }
     fn severity(&self) -> Severity { Severity::Warn }
 
-    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+    fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
             if ctx.in_hot_loop && visit::is_method_call(call, "GetAttribute") {
+                let pos = visit::call_pos(call);
+                let before = &source[..pos];
+                let while_pos = before.rfind("while ");
+                if let Some(wp) = while_pos {
+                    let loop_window = &source[wp..(pos + 1000).min(source.len())];
+                    if loop_window.contains("task.wait") {
+                        return;
+                    }
+                }
                 hits.push(Hit {
-                    pos: visit::call_pos(call),
+                    pos,
                     msg: ":GetAttribute() in loop - ~247ns bridge cost per call, cache outside loop".into(),
                 });
             }
