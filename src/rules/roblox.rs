@@ -762,6 +762,9 @@ impl Rule for ChangedEventUnfiltered {
             if accessor == "self" || accessor.contains("self.") || accessor.contains("self._") {
                 continue;
             }
+            if word_start > 0 && source.as_bytes().get(word_start - 1) == Some(&b')') {
+                continue;
+            }
             let last_word = accessor.rsplit('.').next().unwrap_or(accessor);
             let lw = last_word.to_lowercase();
             if lw.ends_with("value") || lw.ends_with("action") || lw.ends_with("state")
@@ -1372,6 +1375,9 @@ impl Rule for FindFirstChildNoCheck {
                 let line_start = source[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
                 let line = &source[line_start..source[line_start..].find('\n').map(|i| line_start + i).unwrap_or(source.len())];
                 if line.contains("if ") || line.contains("and ") || line.contains("or ") { continue; }
+                if line.contains("require") || line.contains("loader") || line.contains("bootstrap") { continue; }
+                let call_args = &source[pos + ":FindFirstChild(".len()..pos + ":FindFirstChild(".len() + close];
+                if call_args.contains("Loader") || call_args.contains("loader") { continue; }
                 hits.push(Hit {
                     pos,
                     msg: format!(":FindFirstChild() result accessed directly (.{prop}) without nil check - will error if child doesn't exist"),

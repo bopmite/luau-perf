@@ -149,13 +149,22 @@ impl Rule for PackOverLiteral {
     fn id(&self) -> &'static str { "table::pack_over_literal" }
     fn severity(&self) -> Severity { Severity::Warn }
 
-    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+    fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, _ctx| {
             if visit::is_dot_call(call, "table", "pack") {
+                let pos = visit::call_pos(call);
+                let after_start = pos + "table.pack(".len();
+                let after_end = (after_start + 30).min(source.len());
+                let after_end = visit::ceil_char(source, after_end);
+                let args = &source[after_start..after_end];
+                let inner = args.split(')').next().unwrap_or("").trim();
+                if inner.contains("...") || inner.contains('(') {
+                    return;
+                }
                 hits.push(Hit {
-                    pos: visit::call_pos(call),
-                    msg: "table.pack(...) - use {...} instead (table constructor is significantly faster)".into(),
+                    pos,
+                    msg: "table.pack() - use {...} instead (table constructor is significantly faster)".into(),
                 });
             }
         });

@@ -364,17 +364,42 @@ impl Rule for CircularConnectionRef {
         let mut hits = Vec::new();
         let connect_positions = visit::find_pattern_positions(source, ":Connect(");
         for &pos in &connect_positions {
-            let before_start = visit::floor_char(source, pos.saturating_sub(100));
+            let before_start = visit::floor_char(source, pos.saturating_sub(200));
             let before = &source[before_start..pos];
-            let obj_name = before.rsplit_once(|c: char| c == '\n' || c == '\t' || c == ' ' || c == '(')
+            let trimmed_before = before.trim_end();
+            let scan_from = if trimmed_before.ends_with(')') {
+                let mut depth = 0i32;
+                let mut found = None;
+                for (i, ch) in trimmed_before.char_indices().rev() {
+                    match ch {
+                        ')' => depth += 1,
+                        '(' => { depth -= 1; if depth == 0 { found = Some(i); break; } }
+                        _ => {}
+                    }
+                }
+                match found {
+                    Some(paren_pos) => &trimmed_before[..paren_pos],
+                    None => trimmed_before,
+                }
+            } else {
+                trimmed_before
+            };
+            let obj_name = scan_from.rsplit_once(|c: char| c == '\n' || c == '\t' || c == ' ' || c == '(')
                 .map(|(_, r)| r)
-                .unwrap_or(before)
+                .unwrap_or(scan_from)
                 .trim();
-            let root_var = obj_name.split('.').next().unwrap_or("").trim();
+            let root_var = obj_name.split(|c: char| c == '.' || c == ':').next().unwrap_or("").trim();
             if root_var.is_empty() || root_var.len() < 2 {
                 continue;
             }
             if matches!(root_var, "game" | "workspace" | "script" | "plugin" | "self") {
+                continue;
+            }
+
+            let line_start = source[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
+            let line = &source[line_start..source[line_start..].find('\n').map(|i| line_start + i).unwrap_or(source.len())];
+            let ll = line.to_lowercase();
+            if ll.contains("maid") || ll.contains("janitor") || ll.contains("trove") || ll.contains("givetask") || ll.contains("add(") {
                 continue;
             }
 

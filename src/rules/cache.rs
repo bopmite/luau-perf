@@ -58,10 +58,15 @@ impl Rule for UncachedGetService {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
             if ctx.in_func && visit::is_method_call(call, "GetService") {
-                hits.push(Hit {
-                    pos: visit::call_pos(call),
-                    msg: ":GetService() inside function body - cache at module level".into(),
-                });
+                if let Some(tok) = visit::prefix_token(call) {
+                    let name = visit::tok_text(tok);
+                    if name == "game" {
+                        hits.push(Hit {
+                            pos: visit::call_pos(call),
+                            msg: "game:GetService() inside function body - cache at module level".into(),
+                        });
+                    }
+                }
             }
         });
         hits
