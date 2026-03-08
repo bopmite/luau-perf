@@ -8,17 +8,19 @@ pub struct CallCtx {
     pub in_func: bool,
     pub loop_depth: u32,
     pub in_hot_loop: bool,
+    pub in_loop_direct: bool,
 }
 
 struct Walker<F> {
     loop_depth: u32,
     hot_loop_depth: u32,
     func_depth: u32,
+    func_in_loop_depth: u32,
     cb: F,
 }
 
 pub fn each_call(ast: &Ast, f: impl FnMut(&FunctionCall, &CallCtx)) {
-    let mut w = Walker { loop_depth: 0, hot_loop_depth: 0, func_depth: 0, cb: f };
+    let mut w = Walker { loop_depth: 0, hot_loop_depth: 0, func_depth: 0, func_in_loop_depth: 0, cb: f };
     w.visit_ast(ast);
 }
 
@@ -31,14 +33,21 @@ impl<F: FnMut(&FunctionCall, &CallCtx)> Visitor for Walker<F> {
     fn visit_generic_for_end(&mut self, _: &GenericFor) { self.loop_depth -= 1; }
     fn visit_repeat(&mut self, _: &Repeat) { self.loop_depth += 1; self.hot_loop_depth += 1; }
     fn visit_repeat_end(&mut self, _: &Repeat) { self.loop_depth -= 1; self.hot_loop_depth -= 1; }
-    fn visit_function_body(&mut self, _: &FunctionBody) { self.func_depth += 1; }
-    fn visit_function_body_end(&mut self, _: &FunctionBody) { self.func_depth -= 1; }
+    fn visit_function_body(&mut self, _: &FunctionBody) {
+        self.func_depth += 1;
+        if self.loop_depth > 0 { self.func_in_loop_depth += 1; }
+    }
+    fn visit_function_body_end(&mut self, _: &FunctionBody) {
+        self.func_depth -= 1;
+        if self.func_in_loop_depth > 0 { self.func_in_loop_depth -= 1; }
+    }
     fn visit_function_call(&mut self, node: &FunctionCall) {
         let ctx = CallCtx {
             in_loop: self.loop_depth > 0,
             in_func: self.func_depth > 0,
             loop_depth: self.loop_depth,
             in_hot_loop: self.hot_loop_depth > 0,
+            in_loop_direct: self.loop_depth > 0 && self.func_in_loop_depth == 0,
         };
         (self.cb)(node, &ctx);
     }

@@ -20,7 +20,7 @@ impl Rule for FireInLoop {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if !ctx.in_loop {
+            if !ctx.in_loop_direct {
                 return;
             }
             let is_remote_fire = visit::is_method_call(call, "FireServer")
@@ -43,7 +43,7 @@ impl Rule for InvokeServerInLoop {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if !ctx.in_loop {
+            if !ctx.in_loop_direct {
                 return;
             }
             if visit::is_method_call(call, "InvokeServer") || visit::is_method_call(call, "InvokeClient") {
@@ -141,7 +141,7 @@ impl Rule for DataStoreInLoop {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if !ctx.in_loop {
+            if !ctx.in_loop_direct {
                 return;
             }
             let is_ds = visit::is_method_call(call, "GetAsync")
@@ -245,7 +245,7 @@ impl Rule for HttpServiceInLoop {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if !ctx.in_loop { return; }
+            if !ctx.in_loop_direct { return; }
             let methods = ["GetAsync", "PostAsync", "RequestAsync", "JSONEncode", "JSONDecode"];
             for m in &methods {
                 if visit::is_method_call(call, m) {
@@ -275,7 +275,7 @@ impl Rule for MarketplaceInfoInLoop {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_loop && visit::is_method_call(call, "GetProductInfo") {
+            if ctx.in_loop_direct && visit::is_method_call(call, "GetProductInfo") {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
                     msg: ":GetProductInfo() in loop makes an HTTP request per iteration - cache results in a table".into(),
