@@ -1,6 +1,13 @@
 use crate::lint::{Hit, Rule, Severity};
 use crate::visit;
 
+fn is_test_file(source: &str) -> bool {
+    (source.contains("describe(") && source.contains("it("))
+        || (source.contains("expect(") && source.contains("toEqual"))
+        || source.contains("getfenv().it")
+        || source.contains("getfenv().describe")
+}
+
 pub struct DeprecatedWait;
 pub struct DeprecatedSpawn;
 pub struct DebrisAddItem;
@@ -132,6 +139,9 @@ impl Rule for MissingNative {
         if source.lines().count() < 10 {
             return vec![];
         }
+        if is_test_file(source) {
+            return vec![];
+        }
         let total_lines = source.lines().filter(|l| !l.trim().is_empty() && !l.trim().starts_with("--")).count();
         if total_lines > 0 {
             let require_lines = source.lines().filter(|l| l.contains("require(")).count();
@@ -199,6 +209,9 @@ impl Rule for MissingStrict {
             return vec![];
         }
         if !source.contains("game:") && !source.contains("workspace") && !source.contains("Instance") {
+            return vec![];
+        }
+        if is_test_file(source) {
             return vec![];
         }
         vec![Hit {
