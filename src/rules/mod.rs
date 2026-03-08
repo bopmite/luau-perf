@@ -133,6 +133,7 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(roblox::GameWorkspace),
         Box::new(roblox::CoroutineResumeCreate),
         Box::new(roblox::CharacterAddedNoWait),
+        Box::new(roblox::GetServiceWorkspace),
         // alloc
         Box::new(alloc::StringConcatInLoop),
         Box::new(alloc::StringFormatInLoop),
@@ -183,6 +184,7 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(math::CFrameIdentityConstant),
         Box::new(math::HugeComparison),
         Box::new(math::ExpOverPow),
+        Box::new(math::FloorRoundManual),
         // string
         Box::new(string::LenOverHash),
         Box::new(string::RepInLoop),
@@ -683,6 +685,8 @@ fn explain_text(id: &str) -> &'static str {
         "roblox::game_workspace" => "game.Workspace crosses the Lua-C++ bridge to look up the Workspace service. The global `workspace` is a direct reference that avoids this overhead.",
         "roblox::coroutine_resume_create" => "coroutine.resume(coroutine.create(f)) is the Lua 5.1 pattern for spawning threads. In Luau, task.spawn(f) is simpler, handles errors properly (prints traceback instead of silently failing), and integrates with the task scheduler.",
         "roblox::character_added_no_wait" => "CharacterAdded only fires when a NEW character spawns. If the character already exists when you connect (e.g., late-loading scripts), the handler won't fire for it. Check player.Character first and handle the existing character.",
+        "roblox::getservice_workspace" => "game:GetService(\"Workspace\") returns the same thing as the global `workspace`. The global is a direct reference that doesn't cross the Lua-C++ bridge, making it simpler and marginally faster.",
+        "math::floor_round_manual" => "math.floor(x + 0.5) is a manual rounding idiom from Lua 5.1. Luau provides math.round(x) which is clearer and handles edge cases (negative numbers, .5 rounding) correctly.",
         "complexity::string_match_in_loop" => "string.match() compiles the pattern each call. In a loop, the same pattern is compiled N times. Use gmatch for iteration or cache results outside the loop.",
         "complexity::promise_chain_in_loop" => "Promise chaining (:andThen, :catch) in a loop creates N promise objects per iteration. Collect items and use Promise.all() for batch processing.",
 

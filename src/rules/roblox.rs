@@ -49,6 +49,7 @@ pub struct PlayerAddedRace;
 pub struct GameWorkspace;
 pub struct CoroutineResumeCreate;
 pub struct CharacterAddedNoWait;
+pub struct GetServiceWorkspace;
 
 impl Rule for DeprecatedWait {
     fn id(&self) -> &'static str { "roblox::deprecated_wait" }
@@ -1306,6 +1307,28 @@ impl Rule for CharacterAddedNoWait {
     }
 }
 
+impl Rule for GetServiceWorkspace {
+    fn id(&self) -> &'static str { "roblox::getservice_workspace" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        for pos in visit::find_pattern_positions(source, ":GetService(\"Workspace\")") {
+            hits.push(Hit {
+                pos,
+                msg: ":GetService(\"Workspace\") is unnecessary - use the global `workspace` directly".into(),
+            });
+        }
+        for pos in visit::find_pattern_positions(source, ":GetService('Workspace')") {
+            hits.push(Hit {
+                pos,
+                msg: ":GetService('Workspace') is unnecessary - use the global `workspace` directly".into(),
+            });
+        }
+        hits
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1777,6 +1800,22 @@ mod tests {
         let src = "if player.Character then setup(player.Character) end\nplayer.CharacterAdded:Connect(function(char)\n  setup(char)\nend)";
         let ast = parse(src);
         let hits = CharacterAddedNoWait.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn getservice_workspace_detected() {
+        let src = "local workspace = game:GetService(\"Workspace\")";
+        let ast = parse(src);
+        let hits = GetServiceWorkspace.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn workspace_global_direct_ok() {
+        let src = "local ws = workspace";
+        let ast = parse(src);
+        let hits = GetServiceWorkspace.check(src, &ast);
         assert_eq!(hits.len(), 0);
     }
 }

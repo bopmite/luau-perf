@@ -17,6 +17,7 @@ pub struct Vector2ZeroConstant;
 pub struct CFrameIdentityConstant;
 pub struct HugeComparison;
 pub struct ExpOverPow;
+pub struct FloorRoundManual;
 
 impl Rule for RandomDeprecated {
     fn id(&self) -> &'static str { "math::random_deprecated" }
@@ -394,6 +395,28 @@ fn build_hot_loop_depth_map(source: &str) -> Vec<u32> {
     depths
 }
 
+impl Rule for FloorRoundManual {
+    fn id(&self) -> &'static str { "math::floor_round_manual" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        for pos in visit::find_pattern_positions(source, "math.floor(") {
+            let after = &source[pos + "math.floor(".len()..];
+            if let Some(close) = after.find(')') {
+                let inner = &after[..close];
+                if inner.contains("+ 0.5") || inner.contains("+0.5") {
+                    hits.push(Hit {
+                        pos,
+                        msg: "math.floor(x + 0.5) - use math.round(x) instead".into(),
+                    });
+                }
+            }
+        }
+        hits
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -640,6 +663,22 @@ mod tests {
         let src = "local v = Vector2.new(0.5, 0.5)";
         let ast = parse(src);
         let hits = Vector2ZeroConstant.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn floor_round_manual_detected() {
+        let src = "local rounded = math.floor(health + 0.5)";
+        let ast = parse(src);
+        let hits = FloorRoundManual.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn floor_normal_ok() {
+        let src = "local floored = math.floor(x)";
+        let ast = parse(src);
+        let hits = FloorRoundManual.check(src, &ast);
         assert_eq!(hits.len(), 0);
     }
 }

@@ -123,6 +123,7 @@ rules marked `[allow]` are off by default - enable them in `luauperf.toml` if yo
 | `cframe_identity_constant` | warn | pedantic | CFrame.new() - use CFrame.identity (pre-allocated) `--fix` |
 | `huge_comparison` | allow | pedantic | math.huge in loop - cache in local |
 | `exp_over_pow` | allow | pedantic | math.exp() in loop with constant exponent - cache outside |
+| `floor_round_manual` | warn | pedantic | math.floor(x + 0.5) - use math.round(x) |
 
 ## memory
 
@@ -273,6 +274,7 @@ rules marked `[allow]` are off by default - enable them in `luauperf.toml` if yo
 | `game_workspace` | allow | pedantic | game.Workspace - use the global `workspace` |
 | `coroutine_resume_create` | warn | default | coroutine.resume(coroutine.create(f)) - use task.spawn(f) |
 | `character_added_no_wait` | warn | strict | CharacterAdded without checking existing character |
+| `getservice_workspace` | warn | pedantic | :GetService("Workspace") - use `workspace` global |
 
 ## string
 
