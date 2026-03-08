@@ -69,6 +69,13 @@ impl Rule for GsubForFind {
             let paren_end = after.find(')').unwrap_or(after.len());
             let inside = &after[..paren_end];
             if inside.contains(", \"\"") || inside.contains(", ''") {
+                let after_paren = after.get(paren_end + 1..).unwrap_or("").trim_start();
+                if after_paren.starts_with(':') || after_paren.starts_with('.') {
+                    continue;
+                }
+                if pos > 0 && source.as_bytes().get(pos - 1) == Some(&b')') {
+                    continue;
+                }
                 hits.push(Hit {
                     pos,
                     msg: ":gsub(pattern, \"\") to strip chars - use string.find() if only checking existence".into(),
