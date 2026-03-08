@@ -186,12 +186,32 @@ impl Rule for ManualCopyLoop {
             }
             let after_end = visit::ceil_char(source, (pos + 200).min(source.len()));
             let after = &source[pos..after_end];
-            if after.contains("] = ") && after.contains("end") {
-                hits.push(Hit {
-                    pos,
-                    msg: "manual table copy loop - use table.clone() instead (single C call, no iteration overhead)".into(),
-                });
+            let end_pos = after.find("\nend").or_else(|| after.find(" end")).unwrap_or(after.len());
+            let body = &after[..end_pos];
+            if !body.contains("] = ") { continue; }
+            let do_pos = match body.find("do") {
+                Some(p) => p + 2,
+                None => continue,
+            };
+            let body_content = body[do_pos..].trim();
+            let body_lines: Vec<&str> = body_content.lines().map(|l| l.trim()).filter(|l| !l.is_empty()).collect();
+            if body_lines.len() != 1 { continue; }
+            let line = body_lines[0];
+            if line.contains("if ") || line.contains("or ") || line.contains("and ")
+                || line.contains("nil") || line.contains("(") || line.contains("+")
+                || line.contains("-") || line.contains("..") || line.contains("not ")
+            {
+                continue;
             }
+            if let Some(bracket_content) = line.split('[').nth(1).and_then(|s| s.split(']').next()) {
+                if bracket_content.contains('.') || bracket_content.contains(':') {
+                    continue;
+                }
+            }
+            hits.push(Hit {
+                pos,
+                msg: "manual table copy loop - use table.clone() instead (single C call, no iteration overhead)".into(),
+            });
         }
         hits
     }
