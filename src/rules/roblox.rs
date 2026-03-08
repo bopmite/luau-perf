@@ -52,6 +52,8 @@ pub struct CharacterAddedNoWait;
 pub struct GetServiceWorkspace;
 pub struct FindFirstChildNoCheck;
 pub struct GetFullNameInLoop;
+pub struct BindToRenderStepNoCleanup;
+pub struct CFrameOldConstructor;
 
 impl Rule for DeprecatedWait {
     fn id(&self) -> &'static str { "roblox::deprecated_wait" }
@@ -350,6 +352,14 @@ impl Rule for StringValueOverAttribute {
                     let is_tween_target = !var_name.is_empty() && after.contains("TweenService:Create(")
                         && after.contains(&format!("TweenService:Create({var_name}"));
                     if is_tween_target {
+                        return;
+                    }
+                    let func_window_start = pos.saturating_sub(500);
+                    let func_context = &source[func_window_start..after_end];
+                    if func_context.contains("leaderstats") || func_context.contains("Leaderstats") {
+                        return;
+                    }
+                    if class == "ObjectValue" {
                         return;
                     }
                     hits.push(Hit {
@@ -1381,6 +1391,59 @@ impl Rule for GetFullNameInLoop {
     }
 }
 
+impl Rule for CFrameOldConstructor {
+    fn id(&self) -> &'static str { "roblox::cframe_old_constructor" }
+    fn severity(&self) -> Severity { Severity::Allow }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        for pos in visit::find_pattern_positions(source, "CFrame.new(") {
+            let after = &source[pos + "CFrame.new(".len()..];
+            let mut depth = 1i32;
+            let mut end = 0;
+            for (i, ch) in after.char_indices() {
+                match ch {
+                    '(' => depth += 1,
+                    ')' => {
+                        depth -= 1;
+                        if depth == 0 { end = i; break; }
+                    }
+                    _ => {}
+                }
+            }
+            if end == 0 { continue; }
+            let args = &after[..end];
+            let comma_count = args.chars().filter(|&c| c == ',').count();
+            if comma_count == 11 {
+                hits.push(Hit {
+                    pos,
+                    msg: "CFrame.new() with 12 args is deprecated - use CFrame.fromMatrix(pos, rightVector, upVector, lookVector)".into(),
+                });
+            }
+        }
+        hits
+    }
+}
+
+impl Rule for BindToRenderStepNoCleanup {
+    fn id(&self) -> &'static str { "roblox::bind_to_render_step_no_cleanup" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        let has_unbind = source.contains("UnbindFromRenderStep");
+        if has_unbind { return hits; }
+
+        for pos in visit::find_pattern_positions(source, ":BindToRenderStep(") {
+            hits.push(Hit {
+                pos,
+                msg: ":BindToRenderStep() without matching :UnbindFromRenderStep() - binding will persist and leak if script is reused".into(),
+            });
+        }
+        hits
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1908,6 +1971,46 @@ mod tests {
         let src = "print(inst:GetFullName())";
         let ast = parse(src);
         let hits = GetFullNameInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn cframe_old_constructor_detected() {
+        let src = "local cf = CFrame.new(0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1)";
+        let ast = parse(src);
+        let hits = CFrameOldConstructor.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn cframe_new_3_args_ok() {
+        let src = "local cf = CFrame.new(0, 5, 0)";
+        let ast = parse(src);
+        let hits = CFrameOldConstructor.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn cframe_new_no_args_ok() {
+        let src = "local cf = CFrame.new()";
+        let ast = parse(src);
+        let hits = CFrameOldConstructor.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn bind_to_render_step_no_cleanup_detected() {
+        let src = "RunService:BindToRenderStep(\"Camera\", 200, updateCamera)";
+        let ast = parse(src);
+        let hits = BindToRenderStepNoCleanup.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn bind_to_render_step_with_unbind_ok() {
+        let src = "RunService:BindToRenderStep(\"Camera\", 200, updateCamera)\nRunService:UnbindFromRenderStep(\"Camera\")";
+        let ast = parse(src);
+        let hits = BindToRenderStepNoCleanup.check(src, &ast);
         assert_eq!(hits.len(), 0);
     }
 }

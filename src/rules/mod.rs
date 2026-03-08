@@ -136,6 +136,8 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(roblox::GetServiceWorkspace),
         Box::new(roblox::FindFirstChildNoCheck),
         Box::new(roblox::GetFullNameInLoop),
+        Box::new(roblox::BindToRenderStepNoCleanup),
+        Box::new(roblox::CFrameOldConstructor),
         // alloc
         Box::new(alloc::StringConcatInLoop),
         Box::new(alloc::StringFormatInLoop),
@@ -307,6 +309,7 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(style::UDim2PreferFromOffset),
         Box::new(style::UDim2PreferFromScale),
         Box::new(style::TostringMathFloor),
+        Box::new(style::DeepParentChain),
     ]
 }
 
@@ -570,6 +573,7 @@ pub fn rule_level(id: &str) -> crate::lint::Level {
         | "roblox::player_added_race"
         | "roblox::character_added_no_wait"
         | "roblox::find_first_child_no_check"
+        | "roblox::bind_to_render_step_no_cleanup"
         | "string::format_redundant_tostring"
 
         // native
@@ -703,6 +707,8 @@ fn explain_text(id: &str) -> &'static str {
         "string::format_redundant_tostring" => "string.format's %s specifier already calls tostring() internally. Wrapping the argument in tostring() is redundant and adds unnecessary overhead.",
         "roblox::find_first_child_no_check" => "FindFirstChild returns nil if the child doesn't exist. Accessing a property on the result without checking for nil will throw 'attempt to index nil' at runtime. Store in a local and check before accessing.",
         "roblox::get_full_name_in_loop" => "GetFullName() builds the full ancestry path string each call. In a loop, this allocates N strings. Cache the result outside the loop if the instance doesn't change.",
+        "roblox::bind_to_render_step_no_cleanup" => "BindToRenderStep registers a named callback to run every frame. Without a matching UnbindFromRenderStep, the binding persists indefinitely, leaking if the script is reused or the feature is toggled off.",
+        "roblox::cframe_old_constructor" => "CFrame.new() with 12 positional number args (position + rotation matrix) is deprecated and harder to read. Use CFrame.fromMatrix(pos, rightVector, upVector, lookVector) or CFrame.new(pos) * CFrame.fromEulerAngles() instead.",
         "complexity::string_match_in_loop" => "string.match() compiles the pattern each call. In a loop, the same pattern is compiled N times. Use gmatch for iteration or cache results outside the loop.",
         "complexity::promise_chain_in_loop" => "Promise chaining (:andThen, :catch) in a loop creates N promise objects per iteration. Collect items and use Promise.all() for batch processing.",
 
@@ -944,6 +950,7 @@ fn explain_text(id: &str) -> &'static str {
         "style::udim2_prefer_from_offset" => "UDim2.new(0, x, 0, y) is equivalent to UDim2.fromOffset(x, y). The fromOffset form is shorter, clearer, and communicates intent better.",
         "style::udim2_prefer_from_scale" => "UDim2.new(sx, 0, sy, 0) is equivalent to UDim2.fromScale(sx, sy). The fromScale form is shorter, clearer, and communicates intent better.",
         "style::tostring_math_floor" => "tostring(math.floor(x)) nests two function calls. Consider storing the floor result first, or using string.format(\"%d\", x) if you just need a truncated integer string.",
+        "style::deep_parent_chain" => "script.Parent.Parent.Parent traverses 3+ levels up the instance hierarchy. This is fragile - any reparenting breaks the reference. Use :FindFirstAncestor(name) or store a reference to the root module at the top of your codebase.",
 
         _ => "No detailed explanation available for this rule. Run --list-rules to see all rules.",
     }

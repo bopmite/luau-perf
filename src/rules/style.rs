@@ -25,6 +25,7 @@ pub struct MultipleReturns;
 pub struct UDim2PreferFromOffset;
 pub struct UDim2PreferFromScale;
 pub struct TostringMathFloor;
+pub struct DeepParentChain;
 
 impl Rule for ServiceLocatorAntiPattern {
     fn id(&self) -> &'static str { "style::duplicate_get_service" }
@@ -768,6 +769,25 @@ impl Rule for TostringMathFloor {
     }
 }
 
+impl Rule for DeepParentChain {
+    fn id(&self) -> &'static str { "style::deep_parent_chain" }
+    fn severity(&self) -> Severity { Severity::Allow }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        for pos in visit::find_pattern_positions(source, ".Parent.Parent.Parent") {
+            let after = &source[pos + ".Parent.Parent.Parent".len()..];
+            let extra = after.starts_with(".Parent");
+            let depth = if extra { "4+" } else { "3" };
+            hits.push(Hit {
+                pos,
+                msg: format!("{depth}-deep .Parent chain is fragile and breaks if hierarchy changes - store a reference higher up or use :FindFirstAncestor()"),
+            });
+        }
+        hits
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1010,6 +1030,22 @@ mod tests {
         let src = "local s = tostring(health)";
         let ast = parse(src);
         let hits = TostringMathFloor.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn deep_parent_chain_detected() {
+        let src = "local root = script.Parent.Parent.Parent";
+        let ast = parse(src);
+        let hits = DeepParentChain.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn two_parents_ok() {
+        let src = "local root = script.Parent.Parent";
+        let ast = parse(src);
+        let hits = DeepParentChain.check(src, &ast);
         assert_eq!(hits.len(), 0);
     }
 }

@@ -278,6 +278,8 @@ rules marked `[allow]` are off by default - enable them in `luauperf.toml` if yo
 | `getservice_workspace` | warn | pedantic | :GetService("Workspace") - use `workspace` global `--fix` |
 | `find_first_child_no_check` | warn | strict | FindFirstChild().Property without nil check |
 | `get_full_name_in_loop` | allow | pedantic | :GetFullName() in loop - allocates string each call |
+| `bind_to_render_step_no_cleanup` | warn | strict | :BindToRenderStep() without matching :UnbindFromRenderStep() |
+| `cframe_old_constructor` | allow | pedantic | CFrame.new() with 12 args - use CFrame.fromMatrix() |
 
 ## string
 
@@ -327,6 +329,7 @@ rules marked `[allow]` are off by default - enable them in `luauperf.toml` if yo
 | `udim2_prefer_from_offset` | allow | pedantic | UDim2.new(0, x, 0, y) - use UDim2.fromOffset(x, y) `--fix` |
 | `udim2_prefer_from_scale` | allow | pedantic | UDim2.new(sx, 0, sy, 0) - use UDim2.fromScale(sx, sy) `--fix` |
 | `tostring_math_floor` | allow | pedantic | tostring(math.floor(x)) - separate or use string.format |
+| `deep_parent_chain` | allow | pedantic | script.Parent.Parent.Parent - fragile, use :FindFirstAncestor() |
 
 ## table
 

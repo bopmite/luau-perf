@@ -278,9 +278,16 @@ impl Rule for TableCreateForDict {
                 if trimmed == "end" || trimmed.starts_with("return") {
                     break;
                 }
-                if (trimmed.contains('.') && trimmed.contains(" = "))
-                    || (trimmed.contains("[\"") && trimmed.contains("\"] = "))
-                {
+                let is_string_key = trimmed.contains("[\"") && trimmed.contains("\"] = ");
+                let is_dot_assign = !trimmed.starts_with("local ") && {
+                    if let Some(eq_pos) = trimmed.find(" = ") {
+                        let lhs = &trimmed[..eq_pos];
+                        lhs.contains('.') && !lhs.contains('(') && !lhs.contains('[')
+                    } else {
+                        false
+                    }
+                };
+                if is_string_key || is_dot_assign {
                     string_key_count += 1;
                 }
             }
