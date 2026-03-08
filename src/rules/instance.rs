@@ -58,6 +58,12 @@ impl Rule for PropertyChangeSignalWrong {
             {
                 continue;
             }
+            if !accessor.contains('.') {
+                let first_char = accessor.chars().next().unwrap_or('A');
+                if first_char.is_ascii_lowercase() && !matches!(accessor, "part" | "gui" | "button" | "frame" | "label" | "instance" | "inst" | "obj" | "descendant" | "child" | "player" | "character" | "humanoid" | "camera" | "sound" | "model" | "tool" | "workspace") {
+                    continue;
+                }
+            }
             hits.push(Hit {
                 pos,
                 msg: ".Changed fires for ANY property - use GetPropertyChangedSignal(\"Prop\") for specific properties".into(),
