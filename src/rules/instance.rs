@@ -124,6 +124,10 @@ impl Rule for SetParentInLoop {
                 if line >= loop_depth.len() || loop_depth[line] == 0 {
                     return false;
                 }
+                let current = lines.get(line).map(|l| l.trim()).unwrap_or("");
+                if current.contains(").Parent") || current.contains("].Parent") {
+                    return false;
+                }
                 let start = if line >= 5 { line - 5 } else { 0 };
                 for k in start..line {
                     let prev = lines[k].trim();

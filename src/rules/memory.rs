@@ -67,6 +67,9 @@ impl Rule for UntrackedConnection {
                         }
                     }
                 }
+                if src.contains("OnClientEvent") || src.contains("OnServerEvent") {
+                    return;
+                }
                 hits.push(Hit {
                     pos,
                     msg: ":Connect() result not stored - track for cleanup to prevent memory leaks".into(),
@@ -860,7 +863,9 @@ impl Rule for UnboundedTableGrowth {
                     let has_remove = callback.contains("table.remove(")
                         || callback.contains("table.clear(")
                         || callback.contains(":Disconnect()");
-                    if !has_remove {
+                    let has_size_guard = callback.contains("< ") && callback.contains("#")
+                        || callback.contains("> ") && callback.contains("#");
+                    if !has_remove && !has_size_guard {
                         hits.push(Hit {
                             pos: start_pos,
                             msg: "table growth in callback without cleanup - table.insert in a per-event/per-frame callback without corresponding removal causes unbounded memory growth".into(),

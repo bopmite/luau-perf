@@ -1,6 +1,29 @@
 use crate::lint::{Hit, Rule, Severity};
 use crate::visit;
 
+fn is_in_error_or_debug_path(source: &str, pos: usize) -> bool {
+    let line_start = source[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
+    let line = &source[line_start..(pos + 500).min(source.len())];
+    let line_end = line.find('\n').map(|i| &line[..i]).unwrap_or(line);
+    let t = line_end.trim();
+    if t.starts_with("error(") || t.starts_with("error (") || t.contains("error(Error")
+        || t.starts_with("warn(") || t.starts_with("warn (") {
+        return true;
+    }
+    let before = &source[pos.saturating_sub(300)..pos];
+    for bl in before.lines().rev().take(10) {
+        let bt = bl.trim();
+        if bt.starts_with("if __DEBUG__") || bt.starts_with("if __DEV__")
+            || bt.starts_with("elseif __DEBUG__") || bt.starts_with("elseif __DEV__") {
+            return true;
+        }
+        if bt.starts_with("for ") || bt.starts_with("while ") || bt.starts_with("repeat") {
+            break;
+        }
+    }
+    false
+}
+
 pub struct StringConcatInLoop;
 pub struct StringFormatInLoop;
 pub struct ClosureInLoop;
@@ -87,7 +110,10 @@ impl Rule for StringConcatInLoop {
                     return false;
                 }
                 let line = line_starts.partition_point(|&s| s <= pos).saturating_sub(1);
-                line < loop_depth.len() && loop_depth[line] > 0
+                if line >= loop_depth.len() || loop_depth[line] == 0 {
+                    return false;
+                }
+                !is_in_error_or_debug_path(source, pos)
             })
             .map(|pos| Hit {
                 pos,
@@ -148,12 +174,14 @@ impl Rule for StringFormatInLoop {
     fn id(&self) -> &'static str { "alloc::string_format_in_loop" }
     fn severity(&self) -> Severity { Severity::Warn }
 
-    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+    fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
             if ctx.in_hot_loop && (visit::is_dot_call(call, "string", "format") || visit::is_method_call(call, "format")) {
+                let pos = visit::call_pos(call);
+                if is_in_error_or_debug_path(source, pos) { return; }
                 hits.push(Hit {
-                    pos: visit::call_pos(call),
+                    pos,
                     msg: "string.format() in loop - allocates a new string each iteration".into(),
                 });
             }
@@ -194,12 +222,14 @@ impl Rule for TostringInLoop {
     fn id(&self) -> &'static str { "alloc::tostring_in_loop" }
     fn severity(&self) -> Severity { Severity::Warn }
 
-    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+    fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
             if ctx.in_hot_loop && visit::is_bare_call(call, "tostring") {
+                let pos = visit::call_pos(call);
+                if is_in_error_or_debug_path(source, pos) { return; }
                 hits.push(Hit {
-                    pos: visit::call_pos(call),
+                    pos,
                     msg: "tostring() in loop - allocates a new string each call".into(),
                 });
             }
@@ -252,12 +282,18 @@ impl Rule for CoroutineWrapInLoop {
     fn id(&self) -> &'static str { "alloc::coroutine_wrap_in_loop" }
     fn severity(&self) -> Severity { Severity::Warn }
 
-    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+    fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
             if ctx.in_hot_loop && visit::is_dot_call(call, "coroutine", "wrap") {
+                let pos = visit::call_pos(call);
+                let window_end = (pos + 500).min(source.len());
+                let after = &source[pos..window_end];
+                if after.contains("coroutine.yield") {
+                    return;
+                }
                 hits.push(Hit {
-                    pos: visit::call_pos(call),
+                    pos,
                     msg: "coroutine.wrap() in loop - ~200x slower than a closure, allocates coroutine per iteration".into(),
                 });
             }
@@ -390,15 +426,24 @@ impl Rule for UnpackInLoop {
     fn id(&self) -> &'static str { "alloc::unpack_in_loop" }
     fn severity(&self) -> Severity { Severity::Warn }
 
-    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+    fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
             if !ctx.in_hot_loop {
                 return;
             }
             if visit::is_bare_call(call, "unpack") || visit::is_dot_call(call, "table", "unpack") {
+                let pos = visit::call_pos(call);
+                let line_start = source[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
+                let line_end = source[pos..].find('\n').map(|i| pos + i).unwrap_or(source.len());
+                let line = &source[line_start..line_end];
+                if line.contains("[i]") || line.contains("[j]") || line.contains("[k]")
+                    || line.contains("[index]") || line.contains("[idx]")
+                    || line.contains("shift(") || line.contains("remove(") {
+                    return;
+                }
                 hits.push(Hit {
-                    pos: visit::call_pos(call),
+                    pos,
                     msg: "unpack() in loop - creates temporary values on stack each iteration, cache results outside loop".into(),
                 });
             }

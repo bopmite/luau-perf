@@ -459,7 +459,6 @@ impl Rule for DeprecatedRegion3 {
             ("FindPartsInRegion3WithWhiteList(", "FindPartsInRegion3WithWhiteList"),
             ("FindPartsInRegion3WithIgnoreList(", "FindPartsInRegion3WithIgnoreList"),
             ("FindPartsInRegion3(", "FindPartsInRegion3"),
-            ("Region3.new(", "Region3.new"),
         ];
         let mut hits = Vec::new();
         for (pattern, name) in &deprecated {

@@ -258,7 +258,7 @@ impl Rule for PairsInPairs {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.loop_depth >= 2 {
+            if ctx.loop_depth >= 2 && ctx.in_loop_direct {
                 let is_iter = visit::is_bare_call(call, "pairs")
                     || visit::is_bare_call(call, "ipairs");
                 if is_iter {
