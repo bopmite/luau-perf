@@ -549,8 +549,27 @@ fn build_hot_loop_depth_map(source: &str) -> Vec<i32> {
     let lines: Vec<&str> = source.lines().collect();
     let mut depth = vec![0i32; lines.len()];
     let mut current: i32 = 0;
+    let mut in_block_comment = false;
     for (i, line) in lines.iter().enumerate() {
+        if in_block_comment {
+            if line.contains("]=]") || line.contains("]]") {
+                in_block_comment = false;
+            }
+            depth[i] = current;
+            continue;
+        }
         let t = line.trim();
+        if t.starts_with("--[") && (t.contains("--[[") || t.contains("--[=[")) {
+            if !t.contains("]]") && !t.contains("]=]") {
+                in_block_comment = true;
+            }
+            depth[i] = current;
+            continue;
+        }
+        if t.starts_with("--") {
+            depth[i] = current;
+            continue;
+        }
         if t.starts_with("while ") || t == "while" || t.starts_with("repeat") || t == "repeat" {
             current += 1;
         }

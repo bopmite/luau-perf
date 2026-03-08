@@ -529,8 +529,27 @@ fn line_start_offsets(source: &str) -> Vec<usize> {
 fn build_hot_loop_depth_map(source: &str) -> Vec<u32> {
     let mut depth: u32 = 0;
     let mut depths = Vec::new();
+    let mut in_block_comment = false;
     for line in source.lines() {
+        if in_block_comment {
+            if line.contains("]=]") || line.contains("]]") {
+                in_block_comment = false;
+            }
+            depths.push(depth);
+            continue;
+        }
         let trimmed = line.trim();
+        if trimmed.starts_with("--[") && (trimmed.contains("--[[") || trimmed.contains("--[=[")) {
+            if !trimmed.contains("]]") && !trimmed.contains("]=]") {
+                in_block_comment = true;
+            }
+            depths.push(depth);
+            continue;
+        }
+        if trimmed.starts_with("--") {
+            depths.push(depth);
+            continue;
+        }
         if trimmed.starts_with("while ") || trimmed.starts_with("repeat") {
             depth += 1;
         } else if trimmed.starts_with("for ") && !trimmed.contains(" in ") {
