@@ -276,6 +276,13 @@ impl Rule for ConnectInConnect {
                 }
             }
 
+            let outer_line_start = source[..outer_pos].rfind('\n').map(|p| p + 1).unwrap_or(0);
+            let outer_line = &source[outer_line_start..outer_pos];
+            let is_instance_added = outer_line.contains("GetInstanceAddedSignal")
+                || outer_line.contains("ChildAdded")
+                || outer_line.contains("DescendantAdded")
+                || outer_line.contains("Destroying");
+
             for &inner_pos in &connect_positions[i + 1..] {
                 if inner_pos >= body_end {
                     break;
@@ -283,6 +290,15 @@ impl Rule for ConnectInConnect {
                 let between = &source[outer_end..inner_pos];
                 if between.contains(":Disconnect()") {
                     break;
+                }
+                if is_instance_added {
+                    let inner_line_start = source[..inner_pos].rfind('\n').map(|p| p + 1).unwrap_or(0);
+                    let inner_prefix = source[inner_line_start..inner_pos].trim();
+                    let inner_obj = inner_prefix.split(|c: char| c == '.' || c == ':').next().unwrap_or("");
+                    let outer_obj = outer_line.trim().split(|c: char| c == '.' || c == ':').next().unwrap_or("");
+                    if inner_obj != outer_obj {
+                        break;
+                    }
                 }
                 hits.push(Hit {
                     pos: inner_pos,
@@ -420,6 +436,9 @@ impl Rule for CircularConnectionRef {
                 | "UserInputService" | "TweenService" | "HttpService" | "MarketplaceService") {
                 continue;
             }
+            if obj_name.contains("Destroying") {
+                continue;
+            }
 
             let line_start = source[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
             let line = &source[line_start..source[line_start..].find('\n').map(|i| line_start + i).unwrap_or(source.len())];
@@ -432,6 +451,14 @@ impl Rule for CircularConnectionRef {
                 Some(i) => i,
                 None => continue,
             };
+            let connect_arg_start = pos + ":Connect(".len();
+            if connect_arg_start + func_start > source.len() {
+                continue;
+            }
+            let between_connect_and_func = &source[connect_arg_start..pos + func_start];
+            if between_connect_and_func.contains(')') {
+                continue;
+            }
             let body_start = func_start + "function".len();
             let body_src = &after[body_start..];
             let mut depth = 0i32;
@@ -468,6 +495,10 @@ impl Rule for CircularConnectionRef {
                 } else if callback_end == i { break; }
             }
             let body = &body_src[..callback_end];
+
+            if body.contains(":Disconnect(") {
+                continue;
+            }
 
             if contains_word(body, root_var) {
                 let body_lines: Vec<&str> = body.lines().collect();
@@ -534,9 +565,15 @@ impl Rule for RunServiceNoDisconnect {
                 let is_stored = line_prefix.contains('=');
 
                 let has_disconnect = source.contains(":Disconnect()") || source.contains("Disconnect()");
-                let has_cleanup = source.contains("Maid") || source.contains("Trove") || source.contains("Janitor");
+                let has_cleanup = source.contains("Maid") || source.contains("Trove") || source.contains("Janitor")
+                    || source.contains("cleanup(");
 
-                if !is_stored && !has_disconnect && !has_cleanup {
+                let is_arg = {
+                    let before_trimmed = before[line_start..].trim();
+                    before_trimmed.ends_with('(') || before_trimmed.ends_with(',')
+                };
+
+                if !is_stored && !is_arg && !has_disconnect && !has_cleanup {
                     hits.push(Hit {
                         pos,
                         msg: format!("RunService.{event}:Connect() result not stored - connection can never be cleaned up, memory leak"),

@@ -24,7 +24,6 @@ impl Rule for FireInLoop {
                 return;
             }
             let is_remote_fire = visit::is_method_call(call, "FireServer")
-                || visit::is_method_call(call, "FireClient")
                 || visit::is_method_call(call, "FireAllClients");
             if is_remote_fire {
                 hits.push(Hit {
@@ -298,10 +297,18 @@ mod tests {
 
     #[test]
     fn fire_in_loop_detected() {
-        let src = "for _, player in players do\n  remote:FireClient(player, data)\nend";
+        let src = "for _, player in players do\n  remote:FireServer(data)\nend";
         let ast = parse(src);
         let hits = FireInLoop.check(src, &ast);
         assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn fire_client_in_loop_ok() {
+        let src = "for _, player in players do\n  remote:FireClient(player, data)\nend";
+        let ast = parse(src);
+        let hits = FireInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 0);
     }
 
     #[test]

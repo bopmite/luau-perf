@@ -62,17 +62,32 @@ impl Rule for ClampManual {
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
-        for pos in visit::find_pattern_positions(source, "math.min(math.max(") {
-            hits.push(Hit {
-                pos,
-                msg: "math.min(math.max(...)) - use math.clamp(x, min, max) instead".into(),
-            });
-        }
-        for pos in visit::find_pattern_positions(source, "math.max(math.min(") {
-            hits.push(Hit {
-                pos,
-                msg: "math.max(math.min(...)) - use math.clamp(x, min, max) instead".into(),
-            });
+        let patterns = ["math.min(math.max(", "math.max(math.min("];
+        for pat in &patterns {
+            for pos in visit::find_pattern_positions(source, pat) {
+                let inner_start = pos + pat.len();
+                let mut depth = 1i32;
+                let mut j = inner_start;
+                let bytes = source.as_bytes();
+                while j < bytes.len() && depth > 0 {
+                    match bytes[j] {
+                        b'(' => depth += 1,
+                        b')' => depth -= 1,
+                        _ => {}
+                    }
+                    if depth > 0 { j += 1; }
+                }
+                if j < bytes.len() {
+                    let after_inner = &source[j + 1..];
+                    let next_ch = after_inner.trim_start().chars().next().unwrap_or(' ');
+                    if next_ch == ',' || next_ch == ')' {
+                        hits.push(Hit {
+                            pos,
+                            msg: format!("{} - use math.clamp(x, min, max) instead", &pat[..pat.len() - 1]),
+                        });
+                    }
+                }
+            }
         }
         hits
     }

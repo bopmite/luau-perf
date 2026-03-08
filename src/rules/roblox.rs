@@ -1062,7 +1062,8 @@ impl Rule for CloneSetParent {
                     if next.starts_with(&format!("{var}.Parent")) {
                         let mut props_before_parent = 0;
                         for j in (i + 2)..lines.len().min(i + 10) {
-                            if lines[j].trim().starts_with(&format!("{var}.")) {
+                            let after_line = lines[j].trim();
+                            if after_line.starts_with(&format!("{var}.")) && after_line.contains(" = ") {
                                 props_before_parent += 1;
                             } else {
                                 break;

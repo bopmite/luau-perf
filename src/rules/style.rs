@@ -296,7 +296,8 @@ impl Rule for IndexFunctionMetatable {
                     || body.contains("if type(key)") || body.contains("if type(k)")
                     || body.contains("[key]") || body.contains("[k]")
                     || body.contains("rawget") || body.contains("error(")
-                    || body.contains("warn(") || body.contains("console.");
+                    || body.contains("throw(") || body.contains("warn(")
+                    || body.contains("console.") || body.contains("if index");
                 if is_proxy {
                     continue;
                 }

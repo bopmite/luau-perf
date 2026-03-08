@@ -48,13 +48,26 @@ impl Rule for MagnitudeOverSquared {
         visit::find_pattern_positions(source, ".Magnitude")
             .into_iter()
             .filter(|&pos| {
-                // Only flag when used in comparison context (< > <= >= == ~=)
                 let after_start = pos + ".Magnitude".len();
                 let after_end = visit::ceil_char(source, (after_start + 30).min(source.len()));
                 let after = source[after_start..after_end].trim_start();
-                after.starts_with('<') || after.starts_with('>')
+                if !(after.starts_with('<') || after.starts_with('>')
                     || after.starts_with("==") || after.starts_with("~=")
-                    || after.starts_with("then")
+                    || after.starts_with("then")) {
+                    return false;
+                }
+                let line_start = source[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
+                let line_end = source[pos..].find('\n').map(|i| pos + i).unwrap_or(source.len());
+                let line = &source[line_start..line_end];
+                if line.contains(".Unit") {
+                    return false;
+                }
+                let cmp_val = after.trim_start_matches(|c: char| c == '<' || c == '>' || c == '=' || c == '~')
+                    .trim_start();
+                if cmp_val.starts_with('0') && !cmp_val[1..].starts_with(|c: char| c.is_ascii_digit() || c == '.') {
+                    return false;
+                }
+                true
             })
             .map(|pos| Hit {
                 pos,

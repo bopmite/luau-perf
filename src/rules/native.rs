@@ -380,7 +380,7 @@ impl Rule for ShadowedBuiltin {
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let builtins = [
-            "math", "string", "table", "bit32", "buffer", "coroutine", "debug",
+            "math", "string", "table", "bit32", "coroutine", "debug",
             "os", "utf8", "vector", "task",
             "pairs", "ipairs", "next", "select", "type", "typeof",
             "tonumber", "tostring", "error", "assert", "pcall", "xpcall",
@@ -395,6 +395,10 @@ impl Rule for ShadowedBuiltin {
                 let value_end = after.find('\n').unwrap_or(after.len());
                 let value = after[..value_end].trim();
                 if value == *builtin {
+                    continue;
+                }
+                if value.starts_with(&format!("game and {builtin}"))
+                    || value.starts_with(builtin) && value.contains(" or ") {
                     continue;
                 }
                 hits.push(Hit {
