@@ -28,7 +28,7 @@ impl Rule for UntrackedConnection {
 
     fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
-        visit::each_stmt(ast.nodes(), false, &mut |stmt, _in_loop| {
+        visit::each_stmt_ctx(ast.nodes(), visit::StmtCtx { in_loop: false, in_for_in: false, func_depth: 0 }, &mut |stmt, ctx| {
             let call = match stmt {
                 Stmt::FunctionCall(c) => c,
                 _ => return,
@@ -36,6 +36,9 @@ impl Rule for UntrackedConnection {
             if visit::is_method_call(call, "Connect") && visit::method_call_arg_count(call, "Connect") == 1 {
                 let suffix_count = call.suffixes().count();
                 if suffix_count < 2 {
+                    return;
+                }
+                if ctx.func_depth == 0 {
                     return;
                 }
                 let src = format!("{call}");
@@ -137,7 +140,7 @@ impl Rule for ConnectInLoop {
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
-        visit::each_stmt_ctx(ast.nodes(), visit::StmtCtx { in_loop: false, in_for_in: false }, &mut |stmt, ctx| {
+        visit::each_stmt_ctx(ast.nodes(), visit::StmtCtx { in_loop: false, in_for_in: false, func_depth: 0 }, &mut |stmt, ctx| {
             if !ctx.in_loop || ctx.in_for_in {
                 return;
             }

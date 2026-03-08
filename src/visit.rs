@@ -216,10 +216,7 @@ pub fn is_likely_for_iterator(source: &str, pos: usize) -> bool {
 pub struct StmtCtx {
     pub in_loop: bool,
     pub in_for_in: bool,
-}
-
-pub fn each_stmt(block: &Block, in_loop: bool, f: &mut impl FnMut(&Stmt, bool)) {
-    each_stmt_ctx(block, StmtCtx { in_loop, in_for_in: false }, &mut |stmt, ctx| f(stmt, ctx.in_loop));
+    pub func_depth: u32,
 }
 
 pub fn each_stmt_ctx(block: &Block, ctx: StmtCtx, f: &mut impl FnMut(&Stmt, &StmtCtx)) {
@@ -230,27 +227,30 @@ pub fn each_stmt_ctx(block: &Block, ctx: StmtCtx, f: &mut impl FnMut(&Stmt, &Stm
 }
 
 fn walk_children_ctx(stmt: &Stmt, ctx: &StmtCtx, f: &mut impl FnMut(&Stmt, &StmtCtx)) {
-    let hot = StmtCtx { in_loop: true, in_for_in: false };
-    let for_in = StmtCtx { in_loop: true, in_for_in: true };
+    let fd = ctx.func_depth;
+    let hot = StmtCtx { in_loop: true, in_for_in: false, func_depth: fd };
+    let for_in = StmtCtx { in_loop: true, in_for_in: true, func_depth: fd };
+    let same = StmtCtx { in_loop: ctx.in_loop, in_for_in: ctx.in_for_in, func_depth: fd };
+    let in_func = StmtCtx { in_loop: false, in_for_in: false, func_depth: fd + 1 };
     match stmt {
-        Stmt::Do(s) => each_stmt_ctx(s.block(), StmtCtx { in_loop: ctx.in_loop, in_for_in: ctx.in_for_in }, f),
+        Stmt::Do(s) => each_stmt_ctx(s.block(), same, f),
         Stmt::While(s) => each_stmt_ctx(s.block(), hot, f),
         Stmt::Repeat(s) => each_stmt_ctx(s.block(), hot, f),
         Stmt::NumericFor(s) => each_stmt_ctx(s.block(), hot, f),
         Stmt::GenericFor(s) => each_stmt_ctx(s.block(), for_in, f),
         Stmt::If(s) => {
-            each_stmt_ctx(s.block(), StmtCtx { in_loop: ctx.in_loop, in_for_in: ctx.in_for_in }, f);
+            each_stmt_ctx(s.block(), StmtCtx { in_loop: ctx.in_loop, in_for_in: ctx.in_for_in, func_depth: fd }, f);
             if let Some(eis) = s.else_if() {
                 for ei in eis {
-                    each_stmt_ctx(ei.block(), StmtCtx { in_loop: ctx.in_loop, in_for_in: ctx.in_for_in }, f);
+                    each_stmt_ctx(ei.block(), StmtCtx { in_loop: ctx.in_loop, in_for_in: ctx.in_for_in, func_depth: fd }, f);
                 }
             }
             if let Some(eb) = s.else_block() {
-                each_stmt_ctx(eb, StmtCtx { in_loop: ctx.in_loop, in_for_in: ctx.in_for_in }, f);
+                each_stmt_ctx(eb, StmtCtx { in_loop: ctx.in_loop, in_for_in: ctx.in_for_in, func_depth: fd }, f);
             }
         }
-        Stmt::FunctionDeclaration(s) => each_stmt_ctx(s.body().block(), StmtCtx { in_loop: false, in_for_in: false }, f),
-        Stmt::LocalFunction(s) => each_stmt_ctx(s.body().block(), StmtCtx { in_loop: false, in_for_in: false }, f),
+        Stmt::FunctionDeclaration(s) => each_stmt_ctx(s.body().block(), in_func, f),
+        Stmt::LocalFunction(s) => each_stmt_ctx(s.body().block(), in_func, f),
         _ => {}
     }
 }
