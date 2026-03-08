@@ -185,6 +185,7 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(math::HugeComparison),
         Box::new(math::ExpOverPow),
         Box::new(math::FloorRoundManual),
+        Box::new(math::MaxMinSingleArg),
         // string
         Box::new(string::LenOverHash),
         Box::new(string::RepInLoop),
@@ -201,6 +202,7 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(string::PatternBacktracking),
         Box::new(string::ReverseInLoop),
         Box::new(string::FormatKnownTypes),
+        Box::new(string::FormatNoArgs),
         // table
         Box::new(table::ForeachDeprecated),
         Box::new(table::GetnDeprecated),
@@ -301,6 +303,7 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(style::MultipleReturns),
         Box::new(style::UDim2PreferFromOffset),
         Box::new(style::UDim2PreferFromScale),
+        Box::new(style::TostringMathFloor),
     ]
 }
 
@@ -442,6 +445,7 @@ pub fn rule_level(id: &str) -> crate::lint::Level {
         | "roblox::color3_new_misuse"
         | "roblox::raycast_filter_deprecated"
         | "roblox::coroutine_resume_create"
+        | "math::max_min_single_arg"
         => Level::Default,
 
         // === STRICT: Optimization suggestions worth fixing ===
@@ -689,6 +693,8 @@ fn explain_text(id: &str) -> &'static str {
         "roblox::character_added_no_wait" => "CharacterAdded only fires when a NEW character spawns. If the character already exists when you connect (e.g., late-loading scripts), the handler won't fire for it. Check player.Character first and handle the existing character.",
         "roblox::getservice_workspace" => "game:GetService(\"Workspace\") returns the same thing as the global `workspace`. The global is a direct reference that doesn't cross the Lua-C++ bridge, making it simpler and marginally faster.",
         "math::floor_round_manual" => "math.floor(x + 0.5) is a manual rounding idiom from Lua 5.1. Luau provides math.round(x) which is clearer and handles edge cases (negative numbers, .5 rounding) correctly.",
+        "math::max_min_single_arg" => "math.max(x) and math.min(x) with a single argument just return that argument unchanged. This is likely a bug - you probably meant to compare against another value like math.max(x, 0) or math.min(x, limit).",
+        "string::format_no_args" => "string.format(\"literal\") with no format arguments returns the string unchanged. Just use the string directly instead of wrapping it in string.format().",
         "complexity::string_match_in_loop" => "string.match() compiles the pattern each call. In a loop, the same pattern is compiled N times. Use gmatch for iteration or cache results outside the loop.",
         "complexity::promise_chain_in_loop" => "Promise chaining (:andThen, :catch) in a loop creates N promise objects per iteration. Collect items and use Promise.all() for batch processing.",
 
@@ -929,6 +935,7 @@ fn explain_text(id: &str) -> &'static str {
 
         "style::udim2_prefer_from_offset" => "UDim2.new(0, x, 0, y) is equivalent to UDim2.fromOffset(x, y). The fromOffset form is shorter, clearer, and communicates intent better.",
         "style::udim2_prefer_from_scale" => "UDim2.new(sx, 0, sy, 0) is equivalent to UDim2.fromScale(sx, sy). The fromScale form is shorter, clearer, and communicates intent better.",
+        "style::tostring_math_floor" => "tostring(math.floor(x)) nests two function calls. Consider storing the floor result first, or using string.format(\"%d\", x) if you just need a truncated integer string.",
 
         _ => "No detailed explanation available for this rule. Run --list-rules to see all rules.",
     }

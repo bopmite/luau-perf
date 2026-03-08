@@ -24,6 +24,7 @@ pub struct UnusedVariable;
 pub struct MultipleReturns;
 pub struct UDim2PreferFromOffset;
 pub struct UDim2PreferFromScale;
+pub struct TostringMathFloor;
 
 impl Rule for ServiceLocatorAntiPattern {
     fn id(&self) -> &'static str { "style::duplicate_get_service" }
@@ -745,6 +746,28 @@ impl Rule for UDim2PreferFromScale {
     }
 }
 
+impl Rule for TostringMathFloor {
+    fn id(&self) -> &'static str { "style::tostring_math_floor" }
+    fn severity(&self) -> Severity { Severity::Allow }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        for pos in visit::find_pattern_positions(source, "tostring(math.floor(") {
+            hits.push(Hit {
+                pos,
+                msg: "tostring(math.floor(x)) - use string.format(\"%d\", x) or separate the floor and tostring".into(),
+            });
+        }
+        for pos in visit::find_pattern_positions(source, "tostring(math.ceil(") {
+            hits.push(Hit {
+                pos,
+                msg: "tostring(math.ceil(x)) - use string.format(\"%d\", math.ceil(x)) or separate the ceil and tostring".into(),
+            });
+        }
+        hits
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -971,6 +994,22 @@ mod tests {
         let src = "setmetatable({}, {\n\t__index = function(_, key)\n\t\treturn cache[key]\n\tend,\n})";
         let ast = parse(src);
         let hits = IndexFunctionMetatable.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn tostring_math_floor_detected() {
+        let src = "local s = tostring(math.floor(health))";
+        let ast = parse(src);
+        let hits = TostringMathFloor.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn tostring_alone_ok() {
+        let src = "local s = tostring(health)";
+        let ast = parse(src);
+        let hits = TostringMathFloor.check(src, &ast);
         assert_eq!(hits.len(), 0);
     }
 }

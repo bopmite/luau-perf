@@ -124,6 +124,7 @@ rules marked `[allow]` are off by default - enable them in `luauperf.toml` if yo
 | `huge_comparison` | allow | pedantic | math.huge in loop - cache in local |
 | `exp_over_pow` | allow | pedantic | math.exp() in loop with constant exponent - cache outside |
 | `floor_round_manual` | warn | pedantic | math.floor(x + 0.5) - use math.round(x) `--fix` |
+| `max_min_single_arg` | warn | default | math.max/min with single arg is a no-op - likely a bug |
 
 ## memory
 
@@ -295,6 +296,7 @@ rules marked `[allow]` are off by default - enable them in `luauperf.toml` if yo
 | `pattern_backtracking` | warn | strict | multiple greedy quantifiers can cause exponential backtracking |
 | `reverse_in_loop` | warn | strict | string.reverse() in loop - cache outside if input unchanged |
 | `format_known_types` | allow | pedantic | string.format("%s", x) is just tostring(x) with overhead |
+| `format_no_args` | warn | pedantic | string.format("literal") with no args - just use the string |
 
 ## style
 
@@ -321,6 +323,7 @@ rules marked `[allow]` are off by default - enable them in `luauperf.toml` if yo
 | `multiple_returns_hot_path` | allow | pedantic | returning many values from hot-path function |
 | `udim2_prefer_from_offset` | allow | pedantic | UDim2.new(0, x, 0, y) - use UDim2.fromOffset(x, y) `--fix` |
 | `udim2_prefer_from_scale` | allow | pedantic | UDim2.new(sx, 0, sy, 0) - use UDim2.fromScale(sx, sy) `--fix` |
+| `tostring_math_floor` | allow | pedantic | tostring(math.floor(x)) - separate or use string.format |
 
 ## table
 

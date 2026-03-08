@@ -16,6 +16,7 @@ pub struct SubForPrefixCheck;
 pub struct PatternBacktracking;
 pub struct ReverseInLoop;
 pub struct FormatKnownTypes;
+pub struct FormatNoArgs;
 
 impl Rule for LenOverHash {
     fn id(&self) -> &'static str { "string::len_over_hash" }
@@ -422,6 +423,34 @@ fn build_hot_loop_depth_map(source: &str) -> Vec<i32> {
     depth
 }
 
+impl Rule for FormatNoArgs {
+    fn id(&self) -> &'static str { "string::format_no_args" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        for pos in visit::find_pattern_positions(source, "string.format(") {
+            let after = &source[pos + "string.format(".len()..];
+            let quote = after.chars().next().unwrap_or(' ');
+            if quote != '"' && quote != '\'' { continue; }
+            if let Some(close_quote) = after[1..].find(quote) {
+                let after_quote = &after[close_quote + 2..];
+                let next = after_quote.chars().next().unwrap_or(' ');
+                if next == ')' {
+                    let fmt_str = &after[1..close_quote + 1];
+                    if !fmt_str.contains('%') {
+                        hits.push(Hit {
+                            pos,
+                            msg: "string.format() with no format arguments - just use the string directly".into(),
+                        });
+                    }
+                }
+            }
+        }
+        hits
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -636,6 +665,30 @@ mod tests {
         let src = "local s = string.format(\"%s: %d\", name, val)";
         let ast = parse(src);
         let hits = FormatKnownTypes.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn format_no_args_detected() {
+        let src = "local s = string.format(\"hello world\")";
+        let ast = parse(src);
+        let hits = FormatNoArgs.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn format_with_percent_ok() {
+        let src = "local s = string.format(\"%s world\", name)";
+        let ast = parse(src);
+        let hits = FormatNoArgs.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn format_with_args_ok() {
+        let src = "local s = string.format(\"%d\", x)";
+        let ast = parse(src);
+        let hits = FormatNoArgs.check(src, &ast);
         assert_eq!(hits.len(), 0);
     }
 }

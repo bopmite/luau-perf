@@ -18,6 +18,7 @@ pub struct CFrameIdentityConstant;
 pub struct HugeComparison;
 pub struct ExpOverPow;
 pub struct FloorRoundManual;
+pub struct MaxMinSingleArg;
 
 impl Rule for RandomDeprecated {
     fn id(&self) -> &'static str { "math::random_deprecated" }
@@ -417,6 +418,28 @@ impl Rule for FloorRoundManual {
     }
 }
 
+impl Rule for MaxMinSingleArg {
+    fn id(&self) -> &'static str { "math::max_min_single_arg" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        visit::each_call(ast, |call, _ctx| {
+            let is_max = visit::is_dot_call(call, "math", "max");
+            let is_min = visit::is_dot_call(call, "math", "min");
+            if !is_max && !is_min { return; }
+            if visit::call_arg_count(call) == 1 {
+                let name = if is_max { "math.max" } else { "math.min" };
+                hits.push(Hit {
+                    pos: visit::call_pos(call),
+                    msg: format!("{name}() with single argument is a no-op - needs at least 2 arguments to compare"),
+                });
+            }
+        });
+        hits
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -680,5 +703,29 @@ mod tests {
         let ast = parse(src);
         let hits = FloorRoundManual.check(src, &ast);
         assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn max_single_arg_detected() {
+        let src = "local x = math.max(value)";
+        let ast = parse(src);
+        let hits = MaxMinSingleArg.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn max_two_args_ok() {
+        let src = "local x = math.max(a, b)";
+        let ast = parse(src);
+        let hits = MaxMinSingleArg.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn min_single_arg_detected() {
+        let src = "local x = math.min(value)";
+        let ast = parse(src);
+        let hits = MaxMinSingleArg.check(src, &ast);
+        assert_eq!(hits.len(), 1);
     }
 }
