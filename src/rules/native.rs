@@ -393,8 +393,12 @@ impl Rule for ShadowedBuiltin {
             for pos in visit::find_pattern_positions(source, &pattern) {
                 let after = &source[pos + pattern.len()..];
                 let value_end = after.find('\n').unwrap_or(after.len());
-                let value = after[..value_end].trim();
+                let raw_value = after[..value_end].trim();
+                let value = raw_value.split("--").next().unwrap_or(raw_value).trim();
                 if value == *builtin {
+                    continue;
+                }
+                if value == "nil" {
                     continue;
                 }
                 if value.starts_with(&format!("game and {builtin}"))
