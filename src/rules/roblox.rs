@@ -362,6 +362,16 @@ impl Rule for StringValueOverAttribute {
                     if class == "ObjectValue" {
                         return;
                     }
+                    if !var_name.is_empty() {
+                        let changed_pat = format!("{var_name}.Changed");
+                        let observe_pat = format!("{var_name})");
+                        if after.contains(&changed_pat)
+                            || (after.contains(&observe_pat) && (after.contains("Observe") || after.contains("Subscribe") || after.contains("Blend")))
+                            || after.contains(&format!("{var_name}.Parent =")) || after.contains(&format!("{var_name}.Parent="))
+                        {
+                            return;
+                        }
+                    }
                     hits.push(Hit {
                         pos,
                         msg: format!("Instance.new(\"{class}\") - use Attributes instead (lighter, no instance overhead)"),

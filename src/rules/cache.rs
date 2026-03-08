@@ -506,7 +506,22 @@ impl Rule for LocalPlayerUncached {
         let positions = visit::find_pattern_positions(source, ".LocalPlayer");
         let positions: Vec<_> = positions.into_iter().filter(|&p| {
             let after = &source[p + ".LocalPlayer".len()..];
-            !after.starts_with("Uncached") && !after.starts_with("_")
+            if after.starts_with("Uncached") || after.starts_with("_") {
+                return false;
+            }
+            let line_start = source[..p].rfind('\n').map(|i| i + 1).unwrap_or(0);
+            let line_end = source[p..].find('\n').map(|i| p + i).unwrap_or(source.len());
+            let line = &source[line_start..line_end];
+            if line.contains("~= nil") || line.contains("== nil") {
+                return false;
+            }
+            if line.contains("LocalPlayer =") && line.contains(".LocalPlayer") {
+                let lhs = line.split('=').next().unwrap_or("").trim();
+                if lhs.ends_with("LocalPlayer") {
+                    return false;
+                }
+            }
+            true
         }).collect();
         if positions.len() < 2 {
             return vec![];
