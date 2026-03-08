@@ -34,6 +34,10 @@ impl Rule for UntrackedConnection {
                 _ => return,
             };
             if visit::is_method_call(call, "Connect") && visit::method_call_arg_count(call, "Connect") == 1 {
+                let suffix_count = call.suffixes().count();
+                if suffix_count < 2 {
+                    return;
+                }
                 hits.push(Hit {
                     pos: visit::call_pos(call),
                     msg: ":Connect() result not stored - track for cleanup to prevent memory leaks".into(),
