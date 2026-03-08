@@ -402,7 +402,6 @@ impl Rule for CircularConnectionRef {
             if ll.contains("maid") || ll.contains("janitor") || ll.contains("trove") || ll.contains("givetask") || ll.contains("add(") {
                 continue;
             }
-
             let after = &source[pos..];
             let func_start = match after.find("function") {
                 Some(i) => i,

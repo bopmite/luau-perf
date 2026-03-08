@@ -76,6 +76,13 @@ impl Rule for GsubForFind {
                 if pos > 0 && source.as_bytes().get(pos - 1) == Some(&b')') {
                     continue;
                 }
+                let line_start = source[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
+                let line_before = source[line_start..pos].trim();
+                if line_before.contains("= ") || line_before.starts_with("return")
+                    || line_before.starts_with("local ")
+                {
+                    continue;
+                }
                 hits.push(Hit {
                     pos,
                     msg: ":gsub(pattern, \"\") to strip chars - use string.find() if only checking existence".into(),
@@ -536,7 +543,7 @@ mod tests {
 
     #[test]
     fn gsub_for_find_detected() {
-        let src = "local clean = s:gsub(\"%s\", \"\")";
+        let src = "if s:gsub(\"%s\", \"\") then end";
         let ast = parse(src);
         let hits = GsubForFind.check(src, &ast);
         assert_eq!(hits.len(), 1);
