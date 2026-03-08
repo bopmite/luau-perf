@@ -384,7 +384,7 @@ impl Rule for ShadowedBuiltin {
             "os", "utf8", "vector", "task",
             "pairs", "ipairs", "next", "select", "type", "typeof",
             "tonumber", "tostring", "error", "assert", "pcall", "xpcall",
-            "print", "warn", "require", "setmetatable", "getmetatable",
+            "print", "warn", "setmetatable", "getmetatable",
             "rawget", "rawset", "rawequal", "rawlen", "unpack",
         ];
         let mut hits = Vec::new();

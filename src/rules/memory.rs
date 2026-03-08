@@ -621,10 +621,14 @@ impl Rule for SoundNotDestroyed {
             }
             let before_start = pos.saturating_sub(400);
             let before = &source[before_start..pos];
-            let is_sound = before.contains("Instance.new(\"Sound") || before.contains("sound");
+            let accessor = line.trim();
+            let dot_count = accessor.chars().filter(|&c| c == '.').count();
+            let is_sound = before.contains("Instance.new(\"Sound")
+                || (accessor.to_lowercase().contains("sound") && !accessor.contains('.'));
             if !is_sound { continue; }
             let is_existing = before.contains("FindFirstChild") || before.contains("FindFirstChildWhichIsA")
-                || before.contains("FindFirstDescendant") || before.contains(": Sound");
+                || before.contains("FindFirstDescendant") || before.contains(": Sound")
+                || dot_count >= 2;
             if is_existing { continue; }
             if has_cleanup_fn { continue; }
             let after_end = (pos + 300).min(source.len());
