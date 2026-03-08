@@ -751,23 +751,28 @@ impl Rule for ChangedEventUnfiltered {
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         for pos in visit::find_pattern_positions(source, ".Changed:Connect(") {
+            let before = &source[..pos];
             let before_start = visit::floor_char(source, pos.saturating_sub(100));
-            let before = &source[before_start..pos];
-            if before.contains("GetPropertyChangedSignal") || before.contains("AttributeChanged") {
+            let near = &source[before_start..pos];
+            if near.contains("GetPropertyChangedSignal") || near.contains("AttributeChanged") {
                 continue;
             }
-            let src_after = &source[pos..];
-            if src_after.starts_with(".Changed:Connect(") {
-                let after = &src_after[".Changed:Connect(".len()..];
-                let callback_end = after.find("end)").unwrap_or(after.len().min(500));
-                let callback = &after[..callback_end];
-                if !callback.contains("GetPropertyChangedSignal") {
-                    hits.push(Hit {
-                        pos,
-                        msg: ".Changed fires for ANY property change - use GetPropertyChangedSignal(\"Prop\") for specific properties".into(),
-                    });
-                }
+            let word_start = before.rfind(|c: char| !c.is_alphanumeric() && c != '_' && c != '.').map(|i| i + 1).unwrap_or(0);
+            let accessor = &source[word_start..pos];
+            if accessor == "self" || accessor.contains("self.") || accessor.contains("self._") {
+                continue;
             }
+            let last_word = accessor.rsplit('.').next().unwrap_or(accessor);
+            let lw = last_word.to_lowercase();
+            if lw.ends_with("value") || lw.ends_with("action") || lw.ends_with("state")
+                || lw.ends_with("object") || lw.ends_with("signal")
+            {
+                continue;
+            }
+            hits.push(Hit {
+                pos,
+                msg: ".Changed fires for ANY property change - use GetPropertyChangedSignal(\"Prop\") for specific properties".into(),
+            });
         }
         hits
     }

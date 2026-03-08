@@ -40,12 +40,25 @@ impl Rule for PropertyChangeSignalWrong {
         let mut hits = Vec::new();
         for pos in visit::find_pattern_positions(source, ".Changed:Connect") {
             let before = &source[..pos];
-            if !before.ends_with("GetPropertyChangedSignal") && !before.ends_with("Humanoid") {
-                hits.push(Hit {
-                    pos,
-                    msg: ".Changed fires for ANY property - use GetPropertyChangedSignal(\"Prop\") for specific properties".into(),
-                });
+            if before.ends_with("GetPropertyChangedSignal") || before.ends_with("Humanoid") {
+                continue;
             }
+            let word_start = before.rfind(|c: char| !c.is_alphanumeric() && c != '_' && c != '.').map(|i| i + 1).unwrap_or(0);
+            let accessor = &source[word_start..pos];
+            if accessor == "self" || accessor.contains("self.") || accessor.contains("self._") {
+                continue;
+            }
+            let last_word = accessor.rsplit('.').next().unwrap_or(accessor);
+            let lw = last_word.to_lowercase();
+            if lw.ends_with("value") || lw.ends_with("action") || lw.ends_with("state")
+                || lw.ends_with("object") || lw.ends_with("signal")
+            {
+                continue;
+            }
+            hits.push(Hit {
+                pos,
+                msg: ".Changed fires for ANY property - use GetPropertyChangedSignal(\"Prop\") for specific properties".into(),
+            });
         }
         hits
     }

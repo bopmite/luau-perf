@@ -161,12 +161,14 @@ fn check_block_for_infinite_loops(block: &Block, source: &str, hits: &mut Vec<Hi
             let cond = format!("{}", w.condition());
             if cond.trim() == "true" {
                 let body = format!("{}", w.block());
-                let has_yield = body.contains("task.wait")
+                let has_exit = body.contains("task.wait")
                     || body.contains("wait(")
                     || body.contains(":Wait(")
                     || body.contains("task.yield")
-                    || body.contains("coroutine.yield");
-                if !has_yield {
+                    || body.contains("coroutine.yield")
+                    || body.contains("break")
+                    || body.contains("return");
+                if !has_exit {
                     let pos = w.while_token().start_position().bytes();
                     hits.push(Hit {
                         pos,
@@ -370,6 +372,9 @@ impl Rule for CircularConnectionRef {
                 .trim();
             let root_var = obj_name.split('.').next().unwrap_or("").trim();
             if root_var.is_empty() || root_var.len() < 2 {
+                continue;
+            }
+            if matches!(root_var, "game" | "workspace" | "script" | "plugin" | "self") {
                 continue;
             }
 
@@ -937,6 +942,30 @@ mod tests {
         let src = "part:GetAttributeChangedSignal(\"Health\"):Connect(function() end)";
         let ast = parse(src);
         let hits = AttributeChangedInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn while_true_no_yield_detected() {
+        let src = "while true do\n  x = x + 1\nend";
+        let ast = parse(src);
+        let hits = WhileTrueNoYield.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn while_true_with_break_ok() {
+        let src = "while true do\n  local item = table.remove(queue, 1)\n  if item == nil then break end\nend";
+        let ast = parse(src);
+        let hits = WhileTrueNoYield.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn while_true_with_yield_ok() {
+        let src = "while true do\n  task.wait(1)\n  process()\nend";
+        let ast = parse(src);
+        let hits = WhileTrueNoYield.check(src, &ast);
         assert_eq!(hits.len(), 0);
     }
 }
