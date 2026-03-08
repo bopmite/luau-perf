@@ -218,11 +218,12 @@ fn walk_children(stmt: &Stmt, in_loop: bool, f: &mut impl FnMut(&Stmt, bool)) {
 }
 
 pub fn find_pattern_positions(source: &str, pattern: &str) -> Vec<usize> {
+    let comment_ranges = build_comment_ranges(source);
     let mut positions = Vec::new();
     let mut start = 0;
     while let Some(pos) = source[start..].find(pattern) {
         let abs = start + pos;
-        if !in_string_or_comment(source, abs) {
+        if !in_comment_range(&comment_ranges, abs) && !in_line_comment_or_string(source, abs) {
             positions.push(abs);
         }
         start = abs + pattern.len();
@@ -230,20 +231,91 @@ pub fn find_pattern_positions(source: &str, pattern: &str) -> Vec<usize> {
     positions
 }
 
-fn in_string_or_comment(source: &str, pos: usize) -> bool {
+fn in_comment_range(ranges: &[(usize, usize)], pos: usize) -> bool {
+    ranges.iter().any(|&(start, end)| pos >= start && pos < end)
+}
+
+fn build_comment_ranges(source: &str) -> Vec<(usize, usize)> {
+    let mut ranges = Vec::new();
+    let bytes = source.as_bytes();
+    let len = bytes.len();
+    let mut i = 0;
+    while i < len {
+        if i + 1 < len && bytes[i] == b'-' && bytes[i + 1] == b'-' {
+            let start = i;
+            i += 2;
+            if i < len && bytes[i] == b'[' {
+                let (is_block, end) = try_block_close(source, i);
+                if is_block {
+                    ranges.push((start, end));
+                    i = end;
+                    continue;
+                }
+            }
+            continue;
+        }
+        if bytes[i] == b'"' {
+            i += 1;
+            while i < len && bytes[i] != b'"' {
+                if bytes[i] == b'\\' { i += 1; }
+                i += 1;
+            }
+            if i < len { i += 1; }
+            continue;
+        }
+        if bytes[i] == b'\'' {
+            i += 1;
+            while i < len && bytes[i] != b'\'' {
+                if bytes[i] == b'\\' { i += 1; }
+                i += 1;
+            }
+            if i < len { i += 1; }
+            continue;
+        }
+        if bytes[i] == b'[' {
+            let (is_block, end) = try_block_close(source, i);
+            if is_block {
+                i = end;
+                continue;
+            }
+        }
+        i += 1;
+    }
+    ranges
+}
+
+fn in_line_comment_or_string(source: &str, pos: usize) -> bool {
     let before = &source[..pos];
     let line_start = before.rfind('\n').map(|i| i + 1).unwrap_or(0);
     let line = &source[line_start..pos];
-    if line.contains("--") {
-        if let Some(comment_start) = line.find("--") {
-            if line_start + comment_start < pos {
-                return true;
-            }
+    if let Some(comment_start) = line.find("--") {
+        if line_start + comment_start < pos {
+            return true;
         }
     }
     let single_quotes = line.chars().filter(|&c| c == '\'').count();
     let double_quotes = line.chars().filter(|&c| c == '"').count();
     single_quotes % 2 != 0 || double_quotes % 2 != 0
+}
+
+fn try_block_close(source: &str, bracket_pos: usize) -> (bool, usize) {
+    let bytes = source.as_bytes();
+    let mut j = bracket_pos + 1;
+    let mut eq_count = 0;
+    while j < bytes.len() && bytes[j] == b'=' {
+        eq_count += 1;
+        j += 1;
+    }
+    if j < bytes.len() && bytes[j] == b'[' {
+        let mut close = String::from("]");
+        for _ in 0..eq_count { close.push('='); }
+        close.push(']');
+        if let Some(end) = source[j + 1..].find(&close) {
+            return (true, j + 1 + end + close.len());
+        }
+        return (true, source.len());
+    }
+    (false, 0)
 }
 
 /// Snap a byte offset down to the nearest valid UTF-8 char boundary.
