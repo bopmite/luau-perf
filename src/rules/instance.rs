@@ -269,11 +269,15 @@ impl Rule for ChangedOnMovingPart {
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         for pos in visit::find_pattern_positions(source, ".Changed:Connect") {
-            let search_start = visit::floor_char(source, pos.saturating_sub(200));
-            let before = &source[search_start..pos];
-            let part_indicators = ["BasePart", "Part", "MeshPart", "UnionOperation", "Model",
-                                   "PrimaryPart", ".Position", ".CFrame"];
-            let is_likely_part = part_indicators.iter().any(|ind| before.contains(ind));
+            let before = &source[..pos];
+            let word_start = before.rfind(|c: char| !c.is_alphanumeric() && c != '_' && c != '.').map(|i| i + 1).unwrap_or(0);
+            let accessor = &source[word_start..pos];
+            if accessor == "self" || accessor.contains("self.") { continue; }
+            if word_start > 0 && source.as_bytes().get(word_start - 1) == Some(&b')') { continue; }
+            let al = accessor.to_lowercase();
+            let is_likely_part = al.contains("part") || al.contains("model") || al.contains("mesh")
+                || al.contains("union") || al == "workspace" || al.ends_with("cframe")
+                || al.ends_with("position");
             if is_likely_part {
                 hits.push(Hit {
                     pos,
