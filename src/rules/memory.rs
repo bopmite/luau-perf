@@ -378,13 +378,47 @@ impl Rule for CircularConnectionRef {
                 continue;
             }
 
-            let after_end = visit::ceil_char(source, (pos + 500).min(source.len()));
-            let callback = &source[pos..after_end];
-            if !callback.contains("function") {
-                continue;
+            let after = &source[pos..];
+            let func_start = match after.find("function") {
+                Some(i) => i,
+                None => continue,
+            };
+            let body_start = func_start + "function".len();
+            let body_src = &after[body_start..];
+            let mut depth = 0i32;
+            let mut callback_end = body_src.len();
+            let words = ["function", "if", "do", "end"];
+            let mut i = 0;
+            while i < body_src.len() {
+                let remaining = &body_src[i..];
+                let mut matched = false;
+                for &kw in &words {
+                    if remaining.starts_with(kw) {
+                        let after_kw = remaining.get(kw.len()..kw.len() + 1).unwrap_or(" ");
+                        let is_boundary = after_kw.chars().next().map(|c| !c.is_alphanumeric() && c != '_').unwrap_or(true);
+                        if is_boundary {
+                            if kw == "end" {
+                                if depth == 0 {
+                                    callback_end = i;
+                                    matched = true;
+                                    break;
+                                }
+                                depth -= 1;
+                            } else {
+                                depth += 1;
+                            }
+                            i += kw.len();
+                            matched = true;
+                            break;
+                        }
+                    }
+                }
+                if !matched {
+                    i += 1;
+                    while i < body_src.len() && !body_src.is_char_boundary(i) { i += 1; }
+                } else if callback_end == i { break; }
             }
-            let func_start = callback.find("function").unwrap_or(0);
-            let body = &callback[func_start..];
+            let body = &body_src[..callback_end];
 
             if body.contains(root_var) {
                 let body_lines: Vec<&str> = body.lines().collect();
