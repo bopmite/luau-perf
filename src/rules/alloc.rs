@@ -269,6 +269,11 @@ impl Rule for TableCreateForDict {
             if !has_assignment {
                 continue;
             }
+            let line_start = before.rfind('\n').map(|i| before_start + i + 1 - before_start.min(before_start)).unwrap_or(before_start);
+            let assign_line = source[line_start..pos].trim();
+            let var_name = assign_line.split('=').next().unwrap_or("").trim()
+                .strip_prefix("local ").unwrap_or(assign_line.split('=').next().unwrap_or("").trim())
+                .trim();
             let mut string_key_count = 0;
             for line in after.lines().skip(1).take(10) {
                 let trimmed = line.trim();
@@ -282,7 +287,8 @@ impl Rule for TableCreateForDict {
                 let is_dot_assign = !trimmed.starts_with("local ") && {
                     if let Some(eq_pos) = trimmed.find(" = ") {
                         let lhs = &trimmed[..eq_pos];
-                        lhs.contains('.') && !lhs.contains('(') && !lhs.contains('[')
+                        let matches_var = var_name.is_empty() || lhs.starts_with(var_name);
+                        matches_var && lhs.contains('.') && !lhs.contains('(') && !lhs.contains('[')
                     } else {
                         false
                     }
