@@ -987,7 +987,11 @@ impl Rule for RenderSteppedOnServer {
             if line.contains("Server") || line.contains("server") {
                 continue;
             }
-            if source.contains("ServerScript") || source.contains("ServerStorage") {
+            let is_server = source.contains("local ServerScriptService")
+                || source.contains("local ServerStorage")
+                || source.contains("local serverScriptService")
+                || source.contains("local serverStorage");
+            if is_server {
                 hits.push(Hit {
                     pos,
                     msg: "RenderStepped does not fire on the server - use Heartbeat or Stepped instead".into(),
