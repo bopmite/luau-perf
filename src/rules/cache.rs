@@ -81,15 +81,24 @@ impl Rule for UncachedGetService {
     fn id(&self) -> &'static str { "cache::uncached_get_service" }
     fn severity(&self) -> Severity { Severity::Warn }
 
-    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+    fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
             if ctx.in_func && visit::is_method_call(call, "GetService") {
                 if let Some(tok) = visit::prefix_token(call) {
                     let name = visit::tok_text(tok);
                     if name == "game" {
+                        let pos = visit::call_pos(call);
+                        let after_method = &source[pos..];
+                        if let Some(open) = after_method.find("GetService(") {
+                            let arg_start = &after_method[open + "GetService(".len()..];
+                            let first = arg_start.trim_start();
+                            if !first.starts_with('"') && !first.starts_with('\'') {
+                                return;
+                            }
+                        }
                         hits.push(Hit {
-                            pos: visit::call_pos(call),
+                            pos,
                             msg: "game:GetService() inside function body - cache at module level".into(),
                         });
                     }
