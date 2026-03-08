@@ -284,10 +284,19 @@ impl Rule for IndexFunctionMetatable {
                     .or_else(|| source[func_start..].find("\nend"))
                     .unwrap_or(500.min(source.len() - func_start));
                 let body = &source[func_start..func_start + body_end];
+                let same_line_end = source[func_start..].find('\n').unwrap_or(source.len() - func_start);
+                let same_line = &source[func_start..func_start + same_line_end];
+                if let Some(paren_end) = same_line.find(')') {
+                    let after_parens = same_line[paren_end + 1..].trim();
+                    if after_parens.starts_with("end") {
+                        continue;
+                    }
+                }
                 let is_proxy = body.contains("if key") || body.contains("if k ")
                     || body.contains("if type(key)") || body.contains("if type(k)")
                     || body.contains("[key]") || body.contains("[k]")
-                    || body.contains("rawget") || body.contains("error(");
+                    || body.contains("rawget") || body.contains("error(")
+                    || body.contains("warn(") || body.contains("console.");
                 if is_proxy {
                     continue;
                 }
@@ -296,7 +305,7 @@ impl Rule for IndexFunctionMetatable {
                 let param_name = params.split(',').nth(1)
                     .map(|s| s.trim().trim_start_matches('_'))
                     .unwrap_or("");
-                if !param_name.is_empty() && param_name.len() > 1 && body.contains(&format!("[{param_name}]")) {
+                if !param_name.is_empty() && body.contains(&format!("[{param_name}]")) {
                     continue;
                 }
                 hits.push(Hit {
