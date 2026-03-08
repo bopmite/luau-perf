@@ -463,6 +463,21 @@ impl Rule for SharedGlobalMutation {
     fn severity(&self) -> Severity { Severity::Error }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let has_local_shared = source.lines().any(|l| {
+            let t = l.trim();
+            if !t.starts_with("local ") || !t.contains("shared") {
+                return false;
+            }
+            let after_local = &t[6..];
+            if after_local.starts_with("shared =") || after_local.starts_with("shared=") {
+                let rhs = after_local.splitn(2, '=').nth(1).unwrap_or("").trim();
+                return rhs != "shared" && !rhs.starts_with("shared.");
+            }
+            after_local.contains("shared") && after_local.contains(',')
+        });
+        if has_local_shared {
+            return vec![];
+        }
         let mut hits = Vec::new();
         for pos in visit::find_pattern_positions(source, "shared.") {
             if pos > 0 {
@@ -814,6 +829,22 @@ mod tests {
         let ast = parse(src);
         let hits = SharedGlobalMutation.check(src, &ast);
         assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn shared_local_override_ok() {
+        let src = "local client, server, shared = require(script.LoaderUtils).toWallyFormat(script.src)\nshared.Name = \"Packages\"";
+        let ast = parse(src);
+        let hits = SharedGlobalMutation.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn shared_cached_still_flagged() {
+        let src = "local shared = shared\nshared.GameState = \"running\"";
+        let ast = parse(src);
+        let hits = SharedGlobalMutation.check(src, &ast);
+        assert_eq!(hits.len(), 1);
     }
 
     #[test]
