@@ -1,6 +1,36 @@
 use crate::lint::{Hit, Rule, Severity};
 use crate::visit;
 
+fn is_structured_traversal(source: &str, pos: usize) -> bool {
+    let before = &source[..pos];
+    let inner_line_start = before.rfind('\n').map(|i| i + 1).unwrap_or(0);
+    let inner_line = &source[inner_line_start..pos + 50.min(source.len() - pos)];
+    let inner_arg = if let Some(start) = inner_line.rfind("pairs(").or_else(|| inner_line.rfind("ipairs(")) {
+        let arg_start = inner_line[start..].find('(').map(|i| start + i + 1).unwrap_or(0);
+        let arg_end = inner_line[arg_start..].find(')').map(|i| arg_start + i).unwrap_or(inner_line.len());
+        inner_line[arg_start..arg_end].trim()
+    } else {
+        return false;
+    };
+    if inner_arg.is_empty() { return false; }
+    for line in before.lines().rev().skip(1).take(20) {
+        let t = line.trim();
+        if (t.starts_with("for ") && t.contains(" in ")) || (t.starts_with("for ") && t.contains(" do")) {
+            if let Some(binding_end) = t.find(" in ") {
+                let binding = &t[4..binding_end];
+                let vars: Vec<&str> = binding.split(',').map(|v| v.trim()).collect();
+                let root = inner_arg.split('.').next().unwrap_or(inner_arg);
+                let root = root.split('[').next().unwrap_or(root);
+                if vars.iter().any(|v| *v == root) {
+                    return true;
+                }
+            }
+            break;
+        }
+    }
+    false
+}
+
 pub struct TableFindInLoop;
 pub struct GetDescendantsInLoop;
 pub struct TableRemoveShift;
@@ -255,15 +285,17 @@ impl Rule for PairsInPairs {
     fn id(&self) -> &'static str { "complexity::pairs_in_pairs" }
     fn severity(&self) -> Severity { Severity::Warn }
 
-    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+    fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
             if ctx.loop_depth >= 2 && ctx.in_loop_direct {
                 let is_iter = visit::is_bare_call(call, "pairs")
                     || visit::is_bare_call(call, "ipairs");
                 if is_iter {
+                    let pos = visit::call_pos(call);
+                    if is_structured_traversal(source, pos) { return; }
                     hits.push(Hit {
-                        pos: visit::call_pos(call),
+                        pos,
                         msg: "nested pairs/ipairs loop - O(n*m) complexity, consider a lookup table for the inner loop".into(),
                     });
                 }
@@ -701,6 +733,14 @@ mod tests {
     #[test]
     fn single_pairs_ok() {
         let src = "for _, v in pairs(t) do\n  print(v)\nend";
+        let ast = parse(src);
+        let hits = PairsInPairs.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn pairs_structured_traversal_ok() {
+        let src = "for k, v in pairs(outer) do\n  for k2, v2 in pairs(v) do\n    print(k2, v2)\n  end\nend";
         let ast = parse(src);
         let hits = PairsInPairs.check(src, &ast);
         assert_eq!(hits.len(), 0);

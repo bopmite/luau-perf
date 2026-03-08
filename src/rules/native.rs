@@ -427,11 +427,17 @@ impl Rule for TableZeroIndex {
     fn severity(&self) -> Severity { Severity::Warn }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        if source.contains("[-") {
+            return vec![];
+        }
         let mut hits = Vec::new();
         for pos in visit::find_pattern_positions(source, "[0]") {
             let before = &source[..pos];
             let before_char = before.trim_end().chars().last().unwrap_or(' ');
             if before_char.is_alphanumeric() || before_char == '_' || before_char == ')' || before_char == ']' {
+                if before_char == ']' {
+                    return vec![];
+                }
                 hits.push(Hit {
                     pos,
                     msg: "t[0] - Luau arrays are 1-based, index 0 is in the hash part (slower) and skipped by ipairs/# operator".into(),
