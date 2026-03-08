@@ -46,6 +46,9 @@ pub struct TeleportServiceRace;
 pub struct Color3NewMisuse;
 pub struct RaycastFilterDeprecated;
 pub struct PlayerAddedRace;
+pub struct GameWorkspace;
+pub struct CoroutineResumeCreate;
+pub struct CharacterAddedNoWait;
 
 impl Rule for DeprecatedWait {
     fn id(&self) -> &'static str { "roblox::deprecated_wait" }
@@ -1237,6 +1240,72 @@ impl Rule for PlayerAddedRace {
     }
 }
 
+impl Rule for GameWorkspace {
+    fn id(&self) -> &'static str { "roblox::game_workspace" }
+    fn severity(&self) -> Severity { Severity::Allow }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        for pos in visit::find_pattern_positions(source, "game.Workspace") {
+            let after_pos = pos + "game.Workspace".len();
+            let next_char = source[after_pos..].chars().next().unwrap_or(' ');
+            if next_char.is_alphanumeric() || next_char == '_' { continue; }
+            hits.push(Hit {
+                pos,
+                msg: "game.Workspace crosses the Lua-C++ bridge - use the global `workspace` (direct reference)".into(),
+            });
+        }
+        hits
+    }
+}
+
+impl Rule for CoroutineResumeCreate {
+    fn id(&self) -> &'static str { "roblox::coroutine_resume_create" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        for pos in visit::find_pattern_positions(source, "coroutine.resume(coroutine.create(") {
+            hits.push(Hit {
+                pos,
+                msg: "coroutine.resume(coroutine.create(f)) - use task.spawn(f) instead (simpler, better error handling)".into(),
+            });
+        }
+        hits
+    }
+}
+
+impl Rule for CharacterAddedNoWait {
+    fn id(&self) -> &'static str { "roblox::character_added_no_wait" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        let has_char_added = source.contains("CharacterAdded:Connect") || source.contains("CharacterAdded:Once");
+        if !has_char_added { return hits; }
+
+        let has_char_ref = source.match_indices(".Character").any(|(i, _)| {
+            let after = &source[i + ".Character".len()..];
+            let next = after.chars().next().unwrap_or(' ');
+            !next.is_ascii_alphabetic()
+        });
+        if has_char_ref { return hits; }
+
+        for pos in visit::find_pattern_positions(source, "CharacterAdded:Connect") {
+            let before = &source[..pos];
+            if before.contains("player.Character") || before.contains("plr.Character") {
+                continue;
+            }
+            hits.push(Hit {
+                pos,
+                msg: "CharacterAdded without checking for existing character - if the character already exists when connecting, the handler won't fire for it".into(),
+            });
+            break;
+        }
+        hits
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1660,6 +1729,54 @@ mod tests {
         let src = "Players.PlayerAdded:Connect(function(player)\n  onPlayerAdded(player)\nend)\nfor _, p in Players:GetPlayers() do\n  onPlayerAdded(p)\nend";
         let ast = parse(src);
         let hits = PlayerAddedRace.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn game_workspace_detected() {
+        let src = "local part = game.Workspace:FindFirstChild(\"Part\")";
+        let ast = parse(src);
+        let hits = GameWorkspace.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn workspace_global_ok() {
+        let src = "local part = workspace:FindFirstChild(\"Part\")";
+        let ast = parse(src);
+        let hits = GameWorkspace.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn coroutine_resume_create_detected() {
+        let src = "coroutine.resume(coroutine.create(function() print(\"hi\") end))";
+        let ast = parse(src);
+        let hits = CoroutineResumeCreate.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn task_spawn_ok() {
+        let src = "task.spawn(function() print(\"hi\") end)";
+        let ast = parse(src);
+        let hits = CoroutineResumeCreate.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn character_added_no_existing_check() {
+        let src = "player.CharacterAdded:Connect(function(char)\n  setup(char)\nend)";
+        let ast = parse(src);
+        let hits = CharacterAddedNoWait.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn character_added_with_existing_char_ok() {
+        let src = "if player.Character then setup(player.Character) end\nplayer.CharacterAdded:Connect(function(char)\n  setup(char)\nend)";
+        let ast = parse(src);
+        let hits = CharacterAddedNoWait.check(src, &ast);
         assert_eq!(hits.len(), 0);
     }
 }

@@ -130,6 +130,9 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(roblox::Color3NewMisuse),
         Box::new(roblox::RaycastFilterDeprecated),
         Box::new(roblox::PlayerAddedRace),
+        Box::new(roblox::GameWorkspace),
+        Box::new(roblox::CoroutineResumeCreate),
+        Box::new(roblox::CharacterAddedNoWait),
         // alloc
         Box::new(alloc::StringConcatInLoop),
         Box::new(alloc::StringFormatInLoop),
@@ -436,6 +439,7 @@ pub fn rule_level(id: &str) -> crate::lint::Level {
         | "memory::debris_negative_duration"
         | "roblox::color3_new_misuse"
         | "roblox::raycast_filter_deprecated"
+        | "roblox::coroutine_resume_create"
         => Level::Default,
 
         // === STRICT: Optimization suggestions worth fixing ===
@@ -555,6 +559,7 @@ pub fn rule_level(id: &str) -> crate::lint::Level {
         | "roblox::yield_in_connect_callback"
         | "roblox::teleport_service_race"
         | "roblox::player_added_race"
+        | "roblox::character_added_no_wait"
 
         // native
         | "native::dynamic_require"
@@ -675,6 +680,9 @@ fn explain_text(id: &str) -> &'static str {
         "roblox::color3_new_misuse" => "Color3.new() takes values in the 0-1 range. Passing values like 255 means you probably intended Color3.fromRGB() which takes 0-255. Color3.new(255, 0, 0) produces white, not red.",
         "roblox::raycast_filter_deprecated" => "Enum.RaycastFilterType.Blacklist and Whitelist are deprecated. Use Exclude and Include respectively. The old names will be removed in a future engine update.",
         "roblox::player_added_race" => "Players.PlayerAdded only fires for players who join AFTER the event is connected. If a player joins before the script runs (common with deferred loading), they are silently missed. Always loop through Players:GetPlayers() after connecting PlayerAdded.",
+        "roblox::game_workspace" => "game.Workspace crosses the Lua-C++ bridge to look up the Workspace service. The global `workspace` is a direct reference that avoids this overhead.",
+        "roblox::coroutine_resume_create" => "coroutine.resume(coroutine.create(f)) is the Lua 5.1 pattern for spawning threads. In Luau, task.spawn(f) is simpler, handles errors properly (prints traceback instead of silently failing), and integrates with the task scheduler.",
+        "roblox::character_added_no_wait" => "CharacterAdded only fires when a NEW character spawns. If the character already exists when you connect (e.g., late-loading scripts), the handler won't fire for it. Check player.Character first and handle the existing character.",
         "complexity::string_match_in_loop" => "string.match() compiles the pattern each call. In a loop, the same pattern is compiled N times. Use gmatch for iteration or cache results outside the loop.",
         "complexity::promise_chain_in_loop" => "Promise chaining (:andThen, :catch) in a loop creates N promise objects per iteration. Collect items and use Promise.all() for batch processing.",
 

@@ -270,6 +270,9 @@ rules marked `[allow]` are off by default - enable them in `luauperf.toml` if yo
 | `color3_new_misuse` | error | default | Color3.new() with values > 1 - probably meant Color3.fromRGB() |
 | `raycast_filter_deprecated` | warn | default | RaycastFilterType.Blacklist/Whitelist - use Exclude/Include |
 | `player_added_race` | warn | strict | PlayerAdded without :GetPlayers() - misses existing players |
+| `game_workspace` | allow | pedantic | game.Workspace - use the global `workspace` |
+| `coroutine_resume_create` | warn | default | coroutine.resume(coroutine.create(f)) - use task.spawn(f) |
+| `character_added_no_wait` | warn | strict | CharacterAdded without checking existing character |
 
 ## string
 
