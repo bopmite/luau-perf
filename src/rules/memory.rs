@@ -437,6 +437,10 @@ impl Rule for CircularConnectionRef {
             if obj_name == root_var {
                 continue;
             }
+            let dot_count = obj_name.matches('.').count() + obj_name.matches(':').count();
+            if dot_count >= 2 {
+                continue;
+            }
             if matches!(root_var, "game" | "workspace" | "Workspace" | "script" | "plugin" | "self"
                 | "Players" | "ReplicatedStorage" | "ServerStorage" | "ServerScriptService"
                 | "Lighting" | "StarterGui" | "StarterPlayer" | "SoundService" | "RunService"
