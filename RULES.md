@@ -123,7 +123,7 @@ rules marked `[allow]` are off by default - enable them in `luauperf.toml` if yo
 | `cframe_identity_constant` | warn | pedantic | CFrame.new() - use CFrame.identity (pre-allocated) `--fix` |
 | `huge_comparison` | allow | pedantic | math.huge in loop - cache in local |
 | `exp_over_pow` | allow | pedantic | math.exp() in loop with constant exponent - cache outside |
-| `floor_round_manual` | warn | pedantic | math.floor(x + 0.5) - use math.round(x) |
+| `floor_round_manual` | warn | pedantic | math.floor(x + 0.5) - use math.round(x) `--fix` |
 
 ## memory
 
@@ -268,13 +268,13 @@ rules marked `[allow]` are off by default - enable them in `luauperf.toml` if yo
 | `yield_in_connect_callback` | warn | strict | task.wait/WaitForChild in :Connect - use task.spawn |
 | `deprecated_udim` | allow | pedantic | UDim2.new with zeros - use fromOffset/fromScale |
 | `teleport_service_race` | warn | strict | TeleportAsync without pcall - can fail |
-| `color3_new_misuse` | error | default | Color3.new() with values > 1 - probably meant Color3.fromRGB() |
-| `raycast_filter_deprecated` | warn | default | RaycastFilterType.Blacklist/Whitelist - use Exclude/Include |
+| `color3_new_misuse` | error | default | Color3.new() with values > 1 - probably meant Color3.fromRGB() `--fix` |
+| `raycast_filter_deprecated` | warn | default | RaycastFilterType.Blacklist/Whitelist - use Exclude/Include `--fix` |
 | `player_added_race` | warn | strict | PlayerAdded without :GetPlayers() - misses existing players |
 | `game_workspace` | allow | pedantic | game.Workspace - use the global `workspace` |
 | `coroutine_resume_create` | warn | default | coroutine.resume(coroutine.create(f)) - use task.spawn(f) |
 | `character_added_no_wait` | warn | strict | CharacterAdded without checking existing character |
-| `getservice_workspace` | warn | pedantic | :GetService("Workspace") - use `workspace` global |
+| `getservice_workspace` | warn | pedantic | :GetService("Workspace") - use `workspace` global `--fix` |
 
 ## string
 

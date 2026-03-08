@@ -617,7 +617,9 @@ fn is_fixable(id: &str) -> bool {
         "table::maxn_deprecated" |
         "style::udim2_prefer_from_offset" | "style::udim2_prefer_from_scale" |
         "math::vector3_zero_constant" | "math::vector2_zero_constant" |
-        "math::cframe_identity_constant"
+        "math::cframe_identity_constant" |
+        "roblox::color3_new_misuse" | "roblox::raycast_filter_deprecated" |
+        "roblox::getservice_workspace" | "math::floor_round_manual"
     )
 }
 

@@ -28,6 +28,10 @@ pub fn compute_fix(rule_id: &str, source: &str, pos: usize) -> Option<Fix> {
         "math::vector3_zero_constant" => fix_vector3_zero_constant(source, pos),
         "math::vector2_zero_constant" => fix_vector2_zero_constant(source, pos),
         "math::cframe_identity_constant" => fix_cframe_identity(source, pos),
+        "roblox::color3_new_misuse" => fix_color3_new_misuse(source, pos),
+        "roblox::raycast_filter_deprecated" => fix_raycast_filter_deprecated(source, pos),
+        "roblox::getservice_workspace" => fix_getservice_workspace(source, pos),
+        "math::floor_round_manual" => fix_floor_round_manual(source, pos),
         _ => None,
     }
 }
@@ -509,6 +513,75 @@ fn has_overlaps(fixes: &[Fix]) -> bool {
     false
 }
 
+fn fix_color3_new_misuse(source: &str, pos: usize) -> Option<Fix> {
+    let pattern = "Color3.new(";
+    if source.get(pos..pos + pattern.len())? != pattern { return None; }
+    Some(Fix {
+        start: pos,
+        end: pos + pattern.len(),
+        replacement: "Color3.fromRGB(".into(),
+    })
+}
+
+fn fix_raycast_filter_deprecated(source: &str, pos: usize) -> Option<Fix> {
+    let bl = "RaycastFilterType.Blacklist";
+    let wl = "RaycastFilterType.Whitelist";
+    if source.get(pos..pos + bl.len()) == Some(bl) {
+        return Some(Fix {
+            start: pos,
+            end: pos + bl.len(),
+            replacement: "RaycastFilterType.Exclude".into(),
+        });
+    }
+    if source.get(pos..pos + wl.len()) == Some(wl) {
+        return Some(Fix {
+            start: pos,
+            end: pos + wl.len(),
+            replacement: "RaycastFilterType.Include".into(),
+        });
+    }
+    None
+}
+
+fn fix_getservice_workspace(source: &str, pos: usize) -> Option<Fix> {
+    let p1 = ":GetService(\"Workspace\")";
+    let p2 = ":GetService('Workspace')";
+    let before = source[..pos].trim_end();
+    let var_start = before.rfind(|c: char| !c.is_alphanumeric() && c != '.' && c != '_')
+        .map(|i| i + 1)
+        .unwrap_or(0);
+    if source.get(pos..pos + p1.len()) == Some(p1) {
+        return Some(Fix {
+            start: var_start,
+            end: pos + p1.len(),
+            replacement: "workspace".into(),
+        });
+    }
+    if source.get(pos..pos + p2.len()) == Some(p2) {
+        return Some(Fix {
+            start: var_start,
+            end: pos + p2.len(),
+            replacement: "workspace".into(),
+        });
+    }
+    None
+}
+
+fn fix_floor_round_manual(source: &str, pos: usize) -> Option<Fix> {
+    let pattern = "math.floor(";
+    if source.get(pos..pos + pattern.len())? != pattern { return None; }
+    let after = &source[pos + pattern.len()..];
+    let close = after.find(')')?;
+    let inner = &after[..close];
+    let plus_idx = inner.rfind("+ 0.5").or_else(|| inner.rfind("+0.5"))?;
+    let arg = inner[..plus_idx].trim();
+    Some(Fix {
+        start: pos,
+        end: pos + pattern.len() + close + 1,
+        replacement: format!("math.round({arg})"),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -754,5 +827,32 @@ mod tests {
         let mut result = src.to_string();
         result.replace_range(fix.start..fix.end, &fix.replacement);
         assert_eq!(result, "local b = UDim2.fromScale(0.5, 1)");
+    }
+
+    #[test]
+    fn test_fix_color3_new_misuse() {
+        let src = "local c = Color3.new(255, 0, 0)";
+        let fix = compute_fix("roblox::color3_new_misuse", src, 10).unwrap();
+        let mut result = src.to_string();
+        result.replace_range(fix.start..fix.end, &fix.replacement);
+        assert_eq!(result, "local c = Color3.fromRGB(255, 0, 0)");
+    }
+
+    #[test]
+    fn test_fix_raycast_filter_deprecated() {
+        let src = "params.FilterType = Enum.RaycastFilterType.Blacklist";
+        let fix = compute_fix("roblox::raycast_filter_deprecated", src, 25).unwrap();
+        let mut result = src.to_string();
+        result.replace_range(fix.start..fix.end, &fix.replacement);
+        assert_eq!(result, "params.FilterType = Enum.RaycastFilterType.Exclude");
+    }
+
+    #[test]
+    fn test_fix_floor_round_manual() {
+        let src = "local x = math.floor(health + 0.5)";
+        let fix = compute_fix("math::floor_round_manual", src, 10).unwrap();
+        let mut result = src.to_string();
+        result.replace_range(fix.start..fix.end, &fix.replacement);
+        assert_eq!(result, "local x = math.round(health)");
     }
 }
