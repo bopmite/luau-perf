@@ -499,12 +499,24 @@ impl Rule for SelectInLoop {
     fn id(&self) -> &'static str { "alloc::select_in_loop" }
     fn severity(&self) -> Severity { Severity::Warn }
 
-    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+    fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
             if ctx.in_hot_loop && visit::is_bare_call(call, "select") {
+                if let Some(arg) = visit::first_string_arg(call) {
+                    if arg == "#" {
+                        return;
+                    }
+                }
+                let pos = visit::call_pos(call);
+                let before = &source[..pos];
+                let line_start = before.rfind('\n').map(|i| i + 1).unwrap_or(0);
+                let line_prefix = &source[line_start..pos].trim_start();
+                if line_prefix.starts_with("for ") {
+                    return;
+                }
                 hits.push(Hit {
-                    pos: visit::call_pos(call),
+                    pos,
                     msg: "select() in loop - O(n) per call on varargs, cache results outside loop".into(),
                 });
             }

@@ -26,7 +26,7 @@ impl Rule for UntrackedConnection {
     fn id(&self) -> &'static str { "memory::untracked_connection" }
     fn severity(&self) -> Severity { Severity::Error }
 
-    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+    fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_stmt(ast.nodes(), false, &mut |stmt, _in_loop| {
             let call = match stmt {
@@ -38,8 +38,20 @@ impl Rule for UntrackedConnection {
                 if suffix_count < 2 {
                     return;
                 }
+                let src = format!("{call}");
+                if src.contains("Destroying") {
+                    return;
+                }
+                let pos = visit::call_pos(call);
+                let line_start = source[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
+                let line_end = source[pos..].find('\n').map(|i| pos + i).unwrap_or(source.len());
+                let line = source[line_start..line_end].to_lowercase();
+                if line.contains("maid") || line.contains("janitor") || line.contains("trove")
+                    || line.contains("givetask") || line.contains(":add(") || line.contains("cleanup") {
+                    return;
+                }
                 hits.push(Hit {
-                    pos: visit::call_pos(call),
+                    pos,
                     msg: ":Connect() result not stored - track for cleanup to prevent memory leaks".into(),
                 });
             }
@@ -125,8 +137,8 @@ impl Rule for ConnectInLoop {
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
-        visit::each_stmt(ast.nodes(), false, &mut |stmt, in_loop| {
-            if !in_loop {
+        visit::each_stmt_ctx(ast.nodes(), visit::StmtCtx { in_loop: false, in_for_in: false }, &mut |stmt, ctx| {
+            if !ctx.in_loop || ctx.in_for_in {
                 return;
             }
             let call = match stmt {
@@ -153,9 +165,33 @@ impl Rule for MissingPlayerRemoving {
         let has_removing = !visit::find_pattern_positions(source, "PlayerRemoving").is_empty();
 
         if has_added && !has_removing {
-            let pos = visit::find_pattern_positions(source, "PlayerAdded");
+            let positions = visit::find_pattern_positions(source, "PlayerAdded");
+            let pos = positions.first().copied().unwrap_or(0);
+            let after = &source[pos..];
+            let callback_end = (pos + 3000).min(source.len());
+            let callback = &source[pos..callback_end];
+            let has_table_store = callback.lines().any(|l| {
+                let t = l.trim();
+                if t.starts_with("--") { return false; }
+                let has_bracket_assign = t.contains("[player]") || t.contains("[Player]")
+                    || t.contains("[player.UserId]") || t.contains("[Player.UserId]")
+                    || t.contains("[player.Name]") || t.contains("[Player.Name]")
+                    || t.contains("[tostring(player") || t.contains("[tostring(Player");
+                let has_insert = (t.contains("table.insert(") || t.contains("[#"))
+                    && !t.contains(".Parent")
+                    && (t.to_lowercase().contains("player") || t.contains("[#"));
+                has_bracket_assign || has_insert
+            });
+            if !has_table_store {
+                let has_persistent_connect = after.contains("workspace") && after.contains(":Connect(")
+                    && !after.contains(":Disconnect()") && !after.contains("Maid")
+                    && !after.contains("Trove") && !after.contains("Janitor");
+                if !has_persistent_connect {
+                    return vec![];
+                }
+            }
             return vec![Hit {
-                pos: pos.first().copied().unwrap_or(0),
+                pos,
                 msg: "PlayerAdded handler without PlayerRemoving - player data will leak on disconnect".into(),
             }];
         }
