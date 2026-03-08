@@ -50,6 +50,8 @@ pub struct GameWorkspace;
 pub struct CoroutineResumeCreate;
 pub struct CharacterAddedNoWait;
 pub struct GetServiceWorkspace;
+pub struct FindFirstChildNoCheck;
+pub struct GetFullNameInLoop;
 
 impl Rule for DeprecatedWait {
     fn id(&self) -> &'static str { "roblox::deprecated_wait" }
@@ -1329,6 +1331,56 @@ impl Rule for GetServiceWorkspace {
     }
 }
 
+impl Rule for FindFirstChildNoCheck {
+    fn id(&self) -> &'static str { "roblox::find_first_child_no_check" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        for pos in visit::find_pattern_positions(source, ":FindFirstChild(") {
+            let after_call = &source[pos + ":FindFirstChild(".len()..];
+            let close = match after_call.find(')') {
+                Some(i) => i,
+                None => continue,
+            };
+            let after_close = &after_call[close + 1..];
+            let next = after_close.chars().next().unwrap_or(' ');
+            if next == '.' || next == ':' {
+                let chained = &after_close[1..];
+                let prop_end = chained.find(|c: char| !c.is_alphanumeric() && c != '_').unwrap_or(chained.len());
+                let prop = &chained[..prop_end];
+                if prop.is_empty() { continue; }
+                let line_start = source[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
+                let line = &source[line_start..source[line_start..].find('\n').map(|i| line_start + i).unwrap_or(source.len())];
+                if line.contains("if ") || line.contains("and ") || line.contains("or ") { continue; }
+                hits.push(Hit {
+                    pos,
+                    msg: format!(":FindFirstChild() result accessed directly (.{prop}) without nil check - will error if child doesn't exist"),
+                });
+            }
+        }
+        hits
+    }
+}
+
+impl Rule for GetFullNameInLoop {
+    fn id(&self) -> &'static str { "roblox::get_full_name_in_loop" }
+    fn severity(&self) -> Severity { Severity::Allow }
+
+    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        visit::each_call(ast, |call, ctx| {
+            if ctx.in_loop && visit::is_method_call(call, "GetFullName") {
+                hits.push(Hit {
+                    pos: visit::call_pos(call),
+                    msg: ":GetFullName() in loop - allocates a new string each call, cache outside if instance doesn't change".into(),
+                });
+            }
+        });
+        hits
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1816,6 +1868,46 @@ mod tests {
         let src = "local ws = workspace";
         let ast = parse(src);
         let hits = GetServiceWorkspace.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn find_first_child_no_check_detected() {
+        let src = "local size = part:FindFirstChild(\"Handle\").Size";
+        let ast = parse(src);
+        let hits = FindFirstChildNoCheck.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn find_first_child_with_guard_ok() {
+        let src = "if part:FindFirstChild(\"Handle\") then print(\"found\") end";
+        let ast = parse(src);
+        let hits = FindFirstChildNoCheck.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn find_first_child_stored_ok() {
+        let src = "local handle = part:FindFirstChild(\"Handle\")";
+        let ast = parse(src);
+        let hits = FindFirstChildNoCheck.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn get_full_name_in_loop_detected() {
+        let src = "for _, inst in items do\n  print(inst:GetFullName())\nend";
+        let ast = parse(src);
+        let hits = GetFullNameInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn get_full_name_outside_loop_ok() {
+        let src = "print(inst:GetFullName())";
+        let ast = parse(src);
+        let hits = GetFullNameInLoop.check(src, &ast);
         assert_eq!(hits.len(), 0);
     }
 }

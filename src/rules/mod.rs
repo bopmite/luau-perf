@@ -134,6 +134,8 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(roblox::CoroutineResumeCreate),
         Box::new(roblox::CharacterAddedNoWait),
         Box::new(roblox::GetServiceWorkspace),
+        Box::new(roblox::FindFirstChildNoCheck),
+        Box::new(roblox::GetFullNameInLoop),
         // alloc
         Box::new(alloc::StringConcatInLoop),
         Box::new(alloc::StringFormatInLoop),
@@ -203,6 +205,7 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(string::ReverseInLoop),
         Box::new(string::FormatKnownTypes),
         Box::new(string::FormatNoArgs),
+        Box::new(string::FormatRedundantTostring),
         // table
         Box::new(table::ForeachDeprecated),
         Box::new(table::GetnDeprecated),
@@ -566,6 +569,8 @@ pub fn rule_level(id: &str) -> crate::lint::Level {
         | "roblox::teleport_service_race"
         | "roblox::player_added_race"
         | "roblox::character_added_no_wait"
+        | "roblox::find_first_child_no_check"
+        | "string::format_redundant_tostring"
 
         // native
         | "native::dynamic_require"
@@ -695,6 +700,9 @@ fn explain_text(id: &str) -> &'static str {
         "math::floor_round_manual" => "math.floor(x + 0.5) is a manual rounding idiom from Lua 5.1. Luau provides math.round(x) which is clearer and handles edge cases (negative numbers, .5 rounding) correctly.",
         "math::max_min_single_arg" => "math.max(x) and math.min(x) with a single argument just return that argument unchanged. This is likely a bug - you probably meant to compare against another value like math.max(x, 0) or math.min(x, limit).",
         "string::format_no_args" => "string.format(\"literal\") with no format arguments returns the string unchanged. Just use the string directly instead of wrapping it in string.format().",
+        "string::format_redundant_tostring" => "string.format's %s specifier already calls tostring() internally. Wrapping the argument in tostring() is redundant and adds unnecessary overhead.",
+        "roblox::find_first_child_no_check" => "FindFirstChild returns nil if the child doesn't exist. Accessing a property on the result without checking for nil will throw 'attempt to index nil' at runtime. Store in a local and check before accessing.",
+        "roblox::get_full_name_in_loop" => "GetFullName() builds the full ancestry path string each call. In a loop, this allocates N strings. Cache the result outside the loop if the instance doesn't change.",
         "complexity::string_match_in_loop" => "string.match() compiles the pattern each call. In a loop, the same pattern is compiled N times. Use gmatch for iteration or cache results outside the loop.",
         "complexity::promise_chain_in_loop" => "Promise chaining (:andThen, :catch) in a loop creates N promise objects per iteration. Collect items and use Promise.all() for batch processing.",
 

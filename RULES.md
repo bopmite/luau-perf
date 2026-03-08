@@ -276,6 +276,8 @@ rules marked `[allow]` are off by default - enable them in `luauperf.toml` if yo
 | `coroutine_resume_create` | warn | default | coroutine.resume(coroutine.create(f)) - use task.spawn(f) |
 | `character_added_no_wait` | warn | strict | CharacterAdded without checking existing character |
 | `getservice_workspace` | warn | pedantic | :GetService("Workspace") - use `workspace` global `--fix` |
+| `find_first_child_no_check` | warn | strict | FindFirstChild().Property without nil check |
+| `get_full_name_in_loop` | allow | pedantic | :GetFullName() in loop - allocates string each call |
 
 ## string
 
@@ -297,6 +299,7 @@ rules marked `[allow]` are off by default - enable them in `luauperf.toml` if yo
 | `reverse_in_loop` | warn | strict | string.reverse() in loop - cache outside if input unchanged |
 | `format_known_types` | allow | pedantic | string.format("%s", x) is just tostring(x) with overhead |
 | `format_no_args` | warn | pedantic | string.format("literal") with no args - just use the string |
+| `format_redundant_tostring` | warn | strict | tostring() inside string.format %s - redundant |
 
 ## style
 

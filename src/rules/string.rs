@@ -17,6 +17,7 @@ pub struct PatternBacktracking;
 pub struct ReverseInLoop;
 pub struct FormatKnownTypes;
 pub struct FormatNoArgs;
+pub struct FormatRedundantTostring;
 
 impl Rule for LenOverHash {
     fn id(&self) -> &'static str { "string::len_over_hash" }
@@ -451,6 +452,40 @@ impl Rule for FormatNoArgs {
     }
 }
 
+impl Rule for FormatRedundantTostring {
+    fn id(&self) -> &'static str { "string::format_redundant_tostring" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        for pos in visit::find_pattern_positions(source, "string.format(") {
+            let after = &source[pos + "string.format(".len()..];
+            let quote = after.chars().next().unwrap_or(' ');
+            if quote != '"' && quote != '\'' { continue; }
+            let close_quote = match after[1..].find(quote) {
+                Some(i) => i + 1,
+                None => continue,
+            };
+            let fmt_str = &after[1..close_quote];
+            let s_count = fmt_str.matches("%s").count();
+            if s_count == 0 { continue; }
+            let args_str = &after[close_quote + 1..];
+            let line_end = args_str.find('\n').unwrap_or(args_str.len());
+            let args_line = &args_str[..line_end];
+            if args_line.contains("tostring(") {
+                let tostring_pos = source[pos..].find("tostring(").map(|i| pos + i);
+                if let Some(tp) = tostring_pos {
+                    hits.push(Hit {
+                        pos: tp,
+                        msg: "tostring() inside string.format with %s is redundant - %s already calls tostring".into(),
+                    });
+                }
+            }
+        }
+        hits
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -689,6 +724,22 @@ mod tests {
         let src = "local s = string.format(\"%d\", x)";
         let ast = parse(src);
         let hits = FormatNoArgs.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn format_redundant_tostring_detected() {
+        let src = "local s = string.format(\"%s\", tostring(result))";
+        let ast = parse(src);
+        let hits = FormatRedundantTostring.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn format_tostring_non_s_ok() {
+        let src = "local s = string.format(\"%d\", tostring(x))";
+        let ast = parse(src);
+        let hits = FormatRedundantTostring.check(src, &ast);
         assert_eq!(hits.len(), 0);
     }
 }
