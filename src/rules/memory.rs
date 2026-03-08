@@ -99,6 +99,30 @@ fn contains_word(haystack: &str, word: &str) -> bool {
     false
 }
 
+fn is_at_module_scope(source: &str, pos: usize) -> bool {
+    let before = &source[..pos];
+    let mut func_depth: i32 = 0;
+    for line in before.lines() {
+        let t = line.trim();
+        if t.starts_with("--") { continue; }
+        if t.starts_with("function ") || t.starts_with("function(") || t.starts_with("local function ") {
+            func_depth += 1;
+        }
+        for kw in &["function(", "function ("] {
+            if !t.starts_with("function") && t.contains(kw) {
+                let has_end = t.contains(" end") || t.ends_with("end");
+                if !has_end {
+                    func_depth += 1;
+                }
+            }
+        }
+        if t == "end" || t.starts_with("end)") || t.starts_with("end,") || t.starts_with("end;") {
+            func_depth -= 1;
+        }
+    }
+    func_depth <= 0
+}
+
 fn is_stored_result(source: &str, pos: usize) -> bool {
     let before = &source[..pos];
     let line_start = before.rfind('\n').map(|i| i + 1).unwrap_or(0);
@@ -629,7 +653,9 @@ impl Rule for RunServiceNoDisconnect {
                     before_trimmed.ends_with('(') || before_trimmed.ends_with(',')
                 };
 
-                if !is_stored && !is_arg && !has_disconnect && !has_cleanup {
+                let is_module_level = is_at_module_scope(source, pos);
+
+                if !is_stored && !is_arg && !has_disconnect && !has_cleanup && !is_module_level {
                     hits.push(Hit {
                         pos,
                         msg: format!("RunService.{event}:Connect() result not stored - connection can never be cleaned up, memory leak"),
@@ -946,7 +972,7 @@ mod tests {
 
     #[test]
     fn runservice_no_disconnect_detected() {
-        let src = "RunService.Heartbeat:Connect(function(dt)\n  update(dt)\nend)";
+        let src = "function init()\n  RunService.Heartbeat:Connect(function(dt)\n    update(dt)\n  end)\nend";
         let ast = parse(src);
         let hits = RunServiceNoDisconnect.check(src, &ast);
         assert_eq!(hits.len(), 1);
