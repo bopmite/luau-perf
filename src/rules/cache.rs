@@ -1,6 +1,20 @@
 use crate::lint::{Hit, Rule, Severity};
 use crate::visit;
 
+fn has_dynamic_args(call: &full_moon::ast::FunctionCall) -> bool {
+    if let Some(args) = visit::call_args(call) {
+        if let full_moon::ast::FunctionArgs::Parentheses { arguments, .. } = args {
+            for arg in arguments.iter() {
+                let s = format!("{arg}").trim().to_string();
+                if s.contains(|c: char| c.is_ascii_lowercase()) && !s.starts_with("Enum.") {
+                    return true;
+                }
+            }
+        }
+    }
+    false
+}
+
 pub struct MagnitudeOverSquared;
 pub struct UncachedGetService;
 pub struct TweenInfoInFunction;
@@ -224,10 +238,10 @@ impl Rule for NumberRangeInFunction {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_func && visit::is_dot_call(call, "NumberRange", "new") {
+            if ctx.in_func && visit::is_dot_call(call, "NumberRange", "new") && !has_dynamic_args(call) {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
-                    msg: "NumberRange.new() in function - cache as module-level constant".into(),
+                    msg: "NumberRange.new() in function - cache as module-level constant if arguments are fixed".into(),
                 });
             }
         });
@@ -242,10 +256,10 @@ impl Rule for NumberSequenceInFunction {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_func && visit::is_dot_call(call, "NumberSequence", "new") {
+            if ctx.in_func && visit::is_dot_call(call, "NumberSequence", "new") && !has_dynamic_args(call) {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
-                    msg: "NumberSequence.new() in function - cache as module-level constant".into(),
+                    msg: "NumberSequence.new() in function - cache as module-level constant if arguments are fixed".into(),
                 });
             }
         });
@@ -260,7 +274,7 @@ impl Rule for ColorSequenceInFunction {
     fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_func && visit::is_dot_call(call, "ColorSequence", "new") {
+            if ctx.in_func && visit::is_dot_call(call, "ColorSequence", "new") && !has_dynamic_args(call) {
                 let pos = visit::call_pos(call);
                 let line_start = source[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
                 let line = &source[line_start..source[pos..].find('\n').map(|i| pos + i).unwrap_or(source.len())];

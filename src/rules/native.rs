@@ -457,6 +457,12 @@ impl Rule for SharedGlobalMutation {
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         for pos in visit::find_pattern_positions(source, "shared.") {
+            if pos > 0 {
+                let prev = source.as_bytes()[pos - 1];
+                if prev.is_ascii_alphanumeric() || prev == b'_' || prev == b'.' || prev == b':' {
+                    continue;
+                }
+            }
             let after = &source[pos + 7..];
             if after.contains('=') {
                 let line_end = after.find('\n').unwrap_or(after.len());
@@ -477,6 +483,12 @@ impl Rule for SharedGlobalMutation {
             }
         }
         for pos in visit::find_pattern_positions(source, "shared[") {
+            if pos > 0 {
+                let prev = source.as_bytes()[pos - 1];
+                if prev.is_ascii_alphanumeric() || prev == b'_' || prev == b'.' || prev == b':' {
+                    continue;
+                }
+            }
             let after = &source[pos..];
             let line_end = after.find('\n').unwrap_or(after.len());
             let line = &after[..line_end];

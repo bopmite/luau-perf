@@ -65,6 +65,21 @@ impl Rule for UntrackedTaskSpawn {
     }
 }
 
+fn contains_word(haystack: &str, word: &str) -> bool {
+    let mut start = 0;
+    while let Some(i) = haystack[start..].find(word) {
+        let abs = start + i;
+        let before_ok = abs == 0 || !haystack.as_bytes()[abs - 1].is_ascii_alphanumeric() && haystack.as_bytes()[abs - 1] != b'_';
+        let after_pos = abs + word.len();
+        let after_ok = after_pos >= haystack.len() || !haystack.as_bytes()[after_pos].is_ascii_alphanumeric() && haystack.as_bytes()[after_pos] != b'_';
+        if before_ok && after_ok {
+            return true;
+        }
+        start = abs + word.len();
+    }
+    false
+}
+
 fn is_stored_result(source: &str, pos: usize) -> bool {
     let before = &source[..pos];
     let line_start = before.rfind('\n').map(|i| i + 1).unwrap_or(0);
@@ -392,7 +407,13 @@ impl Rule for CircularConnectionRef {
             if root_var.is_empty() || root_var.len() < 2 {
                 continue;
             }
-            if matches!(root_var, "game" | "workspace" | "script" | "plugin" | "self") {
+            if obj_name == root_var {
+                continue;
+            }
+            if matches!(root_var, "game" | "workspace" | "Workspace" | "script" | "plugin" | "self"
+                | "Players" | "ReplicatedStorage" | "ServerStorage" | "ServerScriptService"
+                | "Lighting" | "StarterGui" | "StarterPlayer" | "SoundService" | "RunService"
+                | "UserInputService" | "TweenService" | "HttpService" | "MarketplaceService") {
                 continue;
             }
 
@@ -444,10 +465,13 @@ impl Rule for CircularConnectionRef {
             }
             let body = &body_src[..callback_end];
 
-            if body.contains(root_var) {
+            if contains_word(body, root_var) {
                 let body_lines: Vec<&str> = body.lines().collect();
                 let inner_refs = body_lines.iter().skip(1)
-                    .any(|line| line.contains(root_var));
+                    .any(|line| {
+                        let t = line.trim_start();
+                        !t.starts_with("--") && contains_word(line, root_var)
+                    });
                 if inner_refs {
                     hits.push(Hit {
                         pos,

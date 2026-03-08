@@ -287,8 +287,16 @@ impl Rule for IndexFunctionMetatable {
                 let is_proxy = body.contains("if key") || body.contains("if k ")
                     || body.contains("if type(key)") || body.contains("if type(k)")
                     || body.contains("[key]") || body.contains("[k]")
-                    || body.contains("rawget");
+                    || body.contains("rawget") || body.contains("error(");
                 if is_proxy {
+                    continue;
+                }
+                let func_sig_end = source[func_start..].find(')').unwrap_or(0);
+                let params = &source[func_start..func_start + func_sig_end];
+                let param_name = params.split(',').nth(1)
+                    .map(|s| s.trim().trim_start_matches('_'))
+                    .unwrap_or("");
+                if !param_name.is_empty() && param_name.len() > 1 && body.contains(&format!("[{param_name}]")) {
                     continue;
                 }
                 hits.push(Hit {
