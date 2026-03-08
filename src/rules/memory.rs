@@ -53,6 +53,20 @@ impl Rule for UntrackedConnection {
                     || line.contains("givetask") || line.contains(":add(") || line.contains("cleanup") {
                     return;
                 }
+                if ctx.func_depth == 1 && is_in_service_init(source, pos) {
+                    return;
+                }
+                let before_window = &source[pos.saturating_sub(500)..pos];
+                if before_window.contains("Instance.new(") {
+                    let prefix = src.split(":Connect").next().unwrap_or("");
+                    let obj = prefix.rsplit('.').nth(1).unwrap_or("").trim();
+                    if !obj.is_empty() {
+                        let assign_pat = format!("{obj} = Instance.new(");
+                        if before_window.contains(&assign_pat) {
+                            return;
+                        }
+                    }
+                }
                 hits.push(Hit {
                     pos,
                     msg: ":Connect() result not stored - track for cleanup to prevent memory leaks".into(),
@@ -121,6 +135,20 @@ fn is_at_module_scope(source: &str, pos: usize) -> bool {
         }
     }
     func_depth <= 0
+}
+
+fn is_in_service_init(source: &str, pos: usize) -> bool {
+    let before = &source[..pos];
+    for line in before.lines().rev().take(80) {
+        let t = line.trim();
+        if t.starts_with("function ") || t.starts_with("local function ") {
+            let tl = t.to_lowercase();
+            return tl.contains(":init(") || tl.contains(":start(") || tl.contains(":initialize(")
+                || tl.contains(".init(") || tl.contains(".start(") || tl.contains(".initialize(")
+                || tl.contains("function init(") || tl.contains("function start(");
+        }
+    }
+    false
 }
 
 fn is_stored_result(source: &str, pos: usize) -> bool {
@@ -192,6 +220,10 @@ impl Rule for MissingPlayerRemoving {
         let has_removing = !visit::find_pattern_positions(source, "PlayerRemoving").is_empty();
 
         if has_added && !has_removing {
+            let src_lower = source.to_lowercase();
+            if src_lower.contains("shutdown") || src_lower.contains("teleport") && src_lower.contains("reserve") {
+                return vec![];
+            }
             let positions = visit::find_pattern_positions(source, "PlayerAdded");
             let pos = positions.first().copied().unwrap_or(0);
             let after = &source[pos..];

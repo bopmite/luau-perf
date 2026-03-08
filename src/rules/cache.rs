@@ -1,6 +1,16 @@
 use crate::lint::{Hit, Rule, Severity};
 use crate::visit;
 
+fn is_in_factory_function(source: &str, pos: usize, type_name: &str) -> bool {
+    let window_end = (pos + 500).min(source.len());
+    let after = &source[pos..window_end];
+    let check_end = after.find("\nfunction ").or_else(|| after.find("\nlocal function ")).unwrap_or(after.len());
+    let body = &after[..check_end];
+    body.contains("return params") || body.contains("return result")
+        || body.contains(&format!("return {}", type_name.to_lowercase()))
+        || body.contains(&format!("return {type_name}"))
+}
+
 fn has_dynamic_args(call: &full_moon::ast::FunctionCall) -> bool {
     if let Some(args) = visit::call_args(call) {
         if let full_moon::ast::FunctionArgs::Parentheses { arguments, .. } = args {
@@ -83,8 +93,12 @@ impl Rule for UncachedGetService {
 
     fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
+        let ret_func = visit::is_return_function_module(ast);
         visit::each_call(ast, |call, ctx| {
             if ctx.in_func && visit::is_method_call(call, "GetService") {
+                if ret_func && ctx.func_depth == 1 {
+                    return;
+                }
                 if let Some(tok) = visit::prefix_token(call) {
                     let name = visit::tok_text(tok);
                     if name == "game" {
@@ -141,12 +155,14 @@ impl Rule for RaycastParamsInFunction {
     fn id(&self) -> &'static str { "cache::raycast_params_in_function" }
     fn severity(&self) -> Severity { Severity::Warn }
 
-    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+    fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
             if ctx.in_func && visit::is_dot_call(call, "RaycastParams", "new") {
+                let pos = visit::call_pos(call);
+                if is_in_factory_function(source, pos, "RaycastParams") { return; }
                 hits.push(Hit {
-                    pos: visit::call_pos(call),
+                    pos,
                     msg: "RaycastParams.new() in function - cache and reuse".into(),
                 });
             }
@@ -239,12 +255,14 @@ impl Rule for OverlapParamsInFunction {
     fn id(&self) -> &'static str { "cache::overlap_params_in_function" }
     fn severity(&self) -> Severity { Severity::Warn }
 
-    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+    fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
             if ctx.in_func && visit::is_dot_call(call, "OverlapParams", "new") {
+                let pos = visit::call_pos(call);
+                if is_in_factory_function(source, pos, "OverlapParams") { return; }
                 hits.push(Hit {
-                    pos: visit::call_pos(call),
+                    pos,
                     msg: "OverlapParams.new() in function - cache at module level and reuse".into(),
                 });
             }
@@ -349,6 +367,9 @@ impl Rule for GetAttributeInLoop {
                 if let Some(wp) = while_pos {
                     let loop_window = &source[wp..(pos + 1000).min(source.len())];
                     if loop_window.contains("task.wait") {
+                        return;
+                    }
+                    if loop_window.contains(".Parent") {
                         return;
                     }
                 }
@@ -694,6 +715,30 @@ mod tests {
 
     fn parse(src: &str) -> full_moon::ast::Ast {
         full_moon::parse(src).unwrap()
+    }
+
+    #[test]
+    fn uncached_get_service_in_func_detected() {
+        let src = "function init()\n  local rs = game:GetService(\"RunService\")\nend";
+        let ast = parse(src);
+        let hits = UncachedGetService.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn uncached_get_service_return_function_ok() {
+        let src = "return function()\n  local rs = game:GetService(\"RunService\")\nend";
+        let ast = parse(src);
+        let hits = UncachedGetService.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn raycast_params_factory_ok() {
+        let src = "function createParams()\n  local params = RaycastParams.new()\n  params.FilterType = Enum.RaycastFilterType.Exclude\n  return params\nend";
+        let ast = parse(src);
+        let hits = RaycastParamsInFunction.check(src, &ast);
+        assert_eq!(hits.len(), 0);
     }
 
     #[test]

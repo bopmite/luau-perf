@@ -1213,9 +1213,21 @@ impl Rule for Color3NewMisuse {
         let mut hits = Vec::new();
         for pos in visit::find_pattern_positions(source, "Color3.new(") {
             let after = &source[pos + "Color3.new(".len()..];
-            let close = match after.find(')') {
-                Some(i) => i,
-                None => continue,
+            let close = {
+                let mut depth = 0usize;
+                let mut found = None;
+                for (i, ch) in after.char_indices() {
+                    match ch {
+                        '(' => depth += 1,
+                        ')' if depth > 0 => { depth -= 1; }
+                        ')' => { found = Some(i); break; }
+                        _ => {}
+                    }
+                }
+                match found {
+                    Some(i) => i,
+                    None => continue,
+                }
             };
             let args = &after[..close];
             let parts: Vec<&str> = args.split(',').collect();
@@ -1867,6 +1879,14 @@ mod tests {
     #[test]
     fn color3_new_valid_ok() {
         let src = "local c = Color3.new(1, 0.5, 0)";
+        let ast = parse(src);
+        let hits = Color3NewMisuse.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn color3_new_nested_parens_ok() {
+        let src = "local c = Color3.new(0, math.random(190,255)/255, math.random(150,255)/255)";
         let ast = parse(src);
         let hits = Color3NewMisuse.check(src, &ast);
         assert_eq!(hits.len(), 0);

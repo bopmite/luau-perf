@@ -7,6 +7,7 @@ pub struct CallCtx {
     pub in_loop: bool,
     pub in_func: bool,
     pub loop_depth: u32,
+    pub func_depth: u32,
     pub in_hot_loop: bool,
     pub in_loop_direct: bool,
 }
@@ -46,6 +47,7 @@ impl<F: FnMut(&FunctionCall, &CallCtx)> Visitor for Walker<F> {
             in_loop: self.loop_depth > 0,
             in_func: self.func_depth > 0,
             loop_depth: self.loop_depth,
+            func_depth: self.func_depth,
             in_hot_loop: self.hot_loop_depth > 0,
             in_loop_direct: self.loop_depth > 0 && self.func_in_loop_depth == 0,
         };
@@ -363,6 +365,19 @@ pub fn floor_char(s: &str, i: usize) -> usize {
         i -= 1;
     }
     i
+}
+
+pub fn is_return_function_module(ast: &Ast) -> bool {
+    if let Some(last) = ast.nodes().last_stmt() {
+        if let LastStmt::Return(ret) = last {
+            let returns: Vec<_> = ret.returns().iter().collect();
+            if returns.len() == 1 {
+                let s = format!("{}", returns[0]);
+                return s.trim_start().starts_with("function(") || s.trim_start().starts_with("function (");
+            }
+        }
+    }
+    false
 }
 
 /// Snap a byte offset up to the nearest valid UTF-8 char boundary.
