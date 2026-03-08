@@ -56,7 +56,7 @@ impl Rule for UntrackedConnection {
                 if ctx.func_depth == 1 && is_in_service_init(source, pos) {
                     return;
                 }
-                let before_window = &source[pos.saturating_sub(500)..pos];
+                let before_window = &source[visit::floor_char_boundary(source, pos.saturating_sub(500))..pos];
                 if before_window.contains("Instance.new(") {
                     let prefix = src.split(":Connect").next().unwrap_or("");
                     let obj = prefix.rsplit('.').nth(1).unwrap_or("").trim();

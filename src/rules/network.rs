@@ -176,10 +176,10 @@ impl Rule for DictKeysInRemoteData {
                     let rest = &source[pos + pat.len()..];
                     if let Some(p) = rest.find('{') { pos + pat.len() + p } else { continue }
                 };
-                let after = &source[open..(open + 500).min(source.len())];
+                let after = &source[open..visit::ceil_char_boundary(source, open + 500)];
                 let has_dict_key = after.lines().next().map(|l| l.contains(" = ")).unwrap_or(false) || after[1..after.len().min(200)].contains(" = ");
                 if has_dict_key {
-                    let callback_check = &source[pos.saturating_sub(200)..pos];
+                    let callback_check = &source[visit::floor_char_boundary(source, pos.saturating_sub(200))..pos];
                     if callback_check.contains("Heartbeat:Connect") || callback_check.contains("RenderStepped:Connect") || callback_check.contains("Stepped:Connect") {
                         hits.push(Hit {
                             pos,
@@ -202,7 +202,7 @@ impl Rule for UnreliableRemotePreferred {
         let patterns = [":FireAllClients(", ":FireClient("];
         for pat in &patterns {
             for pos in visit::find_pattern_positions(source, pat) {
-                let before = &source[pos.saturating_sub(300)..pos];
+                let before = &source[visit::floor_char_boundary(source, pos.saturating_sub(300))..pos];
                 let is_in_heartbeat = before.contains("Heartbeat:Connect") || before.contains("RenderStepped:Connect") || before.contains("Stepped:Connect");
                 if is_in_heartbeat {
                     let line_start = source[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);

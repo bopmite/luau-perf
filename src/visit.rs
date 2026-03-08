@@ -2,6 +2,18 @@ use full_moon::ast::*;
 use full_moon::tokenizer;
 use full_moon::visitors::Visitor;
 
+pub fn floor_char_boundary(s: &str, mut i: usize) -> usize {
+    if i >= s.len() { return s.len(); }
+    while i > 0 && !s.is_char_boundary(i) { i -= 1; }
+    i
+}
+
+pub fn ceil_char_boundary(s: &str, mut i: usize) -> usize {
+    if i >= s.len() { return s.len(); }
+    while i < s.len() && !s.is_char_boundary(i) { i += 1; }
+    i
+}
+
 #[allow(dead_code)]
 pub struct CallCtx {
     pub in_loop: bool,

@@ -311,7 +311,7 @@ impl Rule for MasslessNotSet {
             let line = &source[line_start..source[pos..].find('\n').map(|p| pos + p).unwrap_or(source.len())];
             let trimmed = line.trim();
             if trimmed.contains(".Massless = true") {
-                let around = &source[pos.saturating_sub(200)..source.len().min(pos + 200)];
+                let around = &source[visit::floor_char_boundary(source, pos.saturating_sub(200))..visit::ceil_char_boundary(source, pos + 200)];
                 if !around.contains("Anchored") && around.contains("Weld") {
                     hits.push(Hit {
                         pos,

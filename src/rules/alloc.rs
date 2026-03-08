@@ -2,15 +2,18 @@ use crate::lint::{Hit, Rule, Severity};
 use crate::visit;
 
 fn is_in_error_or_debug_path(source: &str, pos: usize) -> bool {
+    let pos = visit::floor_char_boundary(source, pos);
     let line_start = source[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
-    let line = &source[line_start..(pos + 500).min(source.len())];
+    let end = visit::ceil_char_boundary(source, pos + 500);
+    let line = &source[line_start..end];
     let line_end = line.find('\n').map(|i| &line[..i]).unwrap_or(line);
     let t = line_end.trim();
     if t.starts_with("error(") || t.starts_with("error (") || t.contains("error(Error")
         || t.starts_with("warn(") || t.starts_with("warn (") {
         return true;
     }
-    let before = &source[pos.saturating_sub(300)..pos];
+    let before_start = visit::floor_char_boundary(source, pos.saturating_sub(300));
+    let before = &source[before_start..pos];
     for bl in before.lines().rev().take(10) {
         let bt = bl.trim();
         if bt.starts_with("if __DEBUG__") || bt.starts_with("if __DEV__")
