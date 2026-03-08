@@ -26,6 +26,9 @@ pub struct UDim2PreferFromOffset;
 pub struct UDim2PreferFromScale;
 pub struct TostringMathFloor;
 pub struct DeepParentChain;
+pub struct ErrorNoLevel;
+pub struct MatchForExistence;
+pub struct NestedStringFormat;
 
 impl Rule for ServiceLocatorAntiPattern {
     fn id(&self) -> &'static str { "style::duplicate_get_service" }
@@ -769,6 +772,71 @@ impl Rule for TostringMathFloor {
     }
 }
 
+impl Rule for MatchForExistence {
+    fn id(&self) -> &'static str { "style::match_for_existence" }
+    fn severity(&self) -> Severity { Severity::Allow }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        for pos in visit::find_pattern_positions(source, "string.match(") {
+            let line_start = source[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
+            let line_end = source[pos..].find('\n').map(|i| pos + i).unwrap_or(source.len());
+            let line = &source[line_start..line_end];
+            if line.contains("~= nil") || line.contains("== nil")
+                || line.trim().starts_with("if ") || line.trim().starts_with("elseif ")
+            {
+                if !line.contains("local ") && !line.contains("return string.match") {
+                    hits.push(Hit {
+                        pos,
+                        msg: "string.match() used for existence check - string.find() is faster when you don't need captures".into(),
+                    });
+                }
+            }
+        }
+        hits
+    }
+}
+
+impl Rule for NestedStringFormat {
+    fn id(&self) -> &'static str { "style::nested_string_format" }
+    fn severity(&self) -> Severity { Severity::Allow }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        for pos in visit::find_pattern_positions(source, "string.format(") {
+            let after = &source[pos + "string.format(".len()..];
+            if let Some(inner_offset) = after.find("string.format(") {
+                let between = &after[..inner_offset];
+                if !between.contains('\n') {
+                    hits.push(Hit {
+                        pos,
+                        msg: "nested string.format() calls - combine into a single format string".into(),
+                    });
+                }
+            }
+        }
+        hits
+    }
+}
+
+impl Rule for ErrorNoLevel {
+    fn id(&self) -> &'static str { "style::error_no_level" }
+    fn severity(&self) -> Severity { Severity::Allow }
+
+    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        visit::each_call(ast, |call, _ctx| {
+            if visit::is_bare_call(call, "error") && visit::call_arg_count(call) == 1 {
+                hits.push(Hit {
+                    pos: visit::call_pos(call),
+                    msg: "error() without level argument - use error(msg, 2) to point to the caller in stack traces".into(),
+                });
+            }
+        });
+        hits
+    }
+}
+
 impl Rule for DeepParentChain {
     fn id(&self) -> &'static str { "style::deep_parent_chain" }
     fn severity(&self) -> Severity { Severity::Allow }
@@ -1046,6 +1114,54 @@ mod tests {
         let src = "local root = script.Parent.Parent";
         let ast = parse(src);
         let hits = DeepParentChain.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn error_no_level_detected() {
+        let src = r#"error("something went wrong")"#;
+        let ast = parse(src);
+        let hits = ErrorNoLevel.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn error_with_level_ok() {
+        let src = r#"error("something went wrong", 2)"#;
+        let ast = parse(src);
+        let hits = ErrorNoLevel.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn match_for_existence_detected() {
+        let src = r#"if string.match(text, "pattern") then print("found") end"#;
+        let ast = parse(src);
+        let hits = MatchForExistence.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn match_with_capture_ok() {
+        let src = r#"local name = string.match(text, "(%w+)")"#;
+        let ast = parse(src);
+        let hits = MatchForExistence.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn nested_string_format_detected() {
+        let src = r#"print(string.format("%s | %s", name, string.format("%.2f ms", elapsed)))"#;
+        let ast = parse(src);
+        let hits = NestedStringFormat.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn single_string_format_ok() {
+        let src = r#"print(string.format("%s: %.2f ms", name, elapsed))"#;
+        let ast = parse(src);
+        let hits = NestedStringFormat.check(src, &ast);
         assert_eq!(hits.len(), 0);
     }
 }

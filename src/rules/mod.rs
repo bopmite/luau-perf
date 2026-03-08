@@ -310,6 +310,9 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(style::UDim2PreferFromScale),
         Box::new(style::TostringMathFloor),
         Box::new(style::DeepParentChain),
+        Box::new(style::ErrorNoLevel),
+        Box::new(style::MatchForExistence),
+        Box::new(style::NestedStringFormat),
     ]
 }
 
@@ -951,6 +954,9 @@ fn explain_text(id: &str) -> &'static str {
         "style::udim2_prefer_from_scale" => "UDim2.new(sx, 0, sy, 0) is equivalent to UDim2.fromScale(sx, sy). The fromScale form is shorter, clearer, and communicates intent better.",
         "style::tostring_math_floor" => "tostring(math.floor(x)) nests two function calls. Consider storing the floor result first, or using string.format(\"%d\", x) if you just need a truncated integer string.",
         "style::deep_parent_chain" => "script.Parent.Parent.Parent traverses 3+ levels up the instance hierarchy. This is fragile - any reparenting breaks the reference. Use :FindFirstAncestor(name) or store a reference to the root module at the top of your codebase.",
+        "style::error_no_level" => "error('msg') without a second argument defaults to level 1, pointing to the error() call itself. Use error('msg', 2) to point to the caller, making the error message more useful for debugging.",
+        "style::match_for_existence" => "string.match() allocates captures. When you only check if a pattern exists (in an if condition or ~= nil check), string.find() is faster because it returns indices without allocating.",
+        "style::nested_string_format" => "Nested string.format() calls create an intermediate string that's immediately consumed by the outer format. Combine them into a single string.format() call to avoid the intermediate allocation.",
 
         _ => "No detailed explanation available for this rule. Run --list-rules to see all rules.",
     }

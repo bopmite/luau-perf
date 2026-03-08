@@ -330,6 +330,9 @@ rules marked `[allow]` are off by default - enable them in `luauperf.toml` if yo
 | `udim2_prefer_from_scale` | allow | pedantic | UDim2.new(sx, 0, sy, 0) - use UDim2.fromScale(sx, sy) `--fix` |
 | `tostring_math_floor` | allow | pedantic | tostring(math.floor(x)) - separate or use string.format |
 | `deep_parent_chain` | allow | pedantic | script.Parent.Parent.Parent - fragile, use :FindFirstAncestor() |
+| `error_no_level` | allow | pedantic | error() without level arg - use error(msg, 2) for caller context |
+| `match_for_existence` | allow | pedantic | string.match() for existence check - use string.find() |
+| `nested_string_format` | allow | pedantic | nested string.format() - combine into single format call |
 
 ## table
 
