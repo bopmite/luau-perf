@@ -405,6 +405,13 @@ impl Rule for ShadowedBuiltin {
                     || value.starts_with(builtin) && value.contains(" or ") {
                     continue;
                 }
+                if value == "(" {
+                    continue;
+                }
+                let stripped = value.trim_start_matches('(');
+                if stripped.starts_with(builtin) && !stripped[builtin.len()..].starts_with(|c: char| c.is_alphanumeric() || c == '_') {
+                    continue;
+                }
                 hits.push(Hit {
                     pos,
                     msg: format!("shadowing builtin '{builtin}' - breaks FASTCALL/GETIMPORT optimizations for '{builtin}' in this scope"),
