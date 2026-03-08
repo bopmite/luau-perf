@@ -162,7 +162,7 @@ impl Rule for RepeatedGsub {
             if prev_line != usize::MAX && (line == prev_line || line == prev_line + 1) {
                 hits.push(Hit {
                     pos,
-                    msg: "chained :gsub() calls - each allocates a new string, consider string.gsub with pattern alternation or buffer".into(),
+                    msg: "chained :gsub() calls - each allocates a new string, consider combining with a lookup table or buffer".into(),
                 });
             }
             prev_line = line;

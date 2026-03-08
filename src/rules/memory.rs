@@ -291,8 +291,15 @@ impl Rule for ConnectInConnect {
                 if between.contains(":Disconnect()") {
                     break;
                 }
+                let inner_line_start = source[..inner_pos].rfind('\n').map(|p| p + 1).unwrap_or(0);
+                let inner_line_end = source[inner_pos..].find('\n').map(|i| inner_pos + i).unwrap_or(source.len());
+                let inner_line = &source[inner_line_start..inner_line_end].to_lowercase();
+                if inner_line.contains("maid") || inner_line.contains("janitor")
+                    || inner_line.contains("trove") || inner_line.contains("givetask")
+                    || inner_line.contains("cleanup(") || inner_line.contains(":add(") {
+                    break;
+                }
                 if is_instance_added {
-                    let inner_line_start = source[..inner_pos].rfind('\n').map(|p| p + 1).unwrap_or(0);
                     let inner_prefix = source[inner_line_start..inner_pos].trim();
                     let inner_obj = inner_prefix.split(|c: char| c == '.' || c == ':').next().unwrap_or("");
                     let outer_obj = outer_line.trim().split(|c: char| c == '.' || c == ':').next().unwrap_or("");
