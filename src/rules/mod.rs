@@ -83,6 +83,7 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(memory::UnboundedTableGrowth),
         Box::new(memory::DebrisNegativeDuration),
         Box::new(memory::CollectionTagNoCleanup),
+        Box::new(memory::AttributeChangedInLoop),
         // roblox
         Box::new(roblox::DeprecatedWait),
         Box::new(roblox::DeprecatedSpawn),
@@ -126,6 +127,9 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(roblox::YieldInConnectCallback),
         Box::new(roblox::DeprecatedUdim),
         Box::new(roblox::TeleportServiceRace),
+        Box::new(roblox::Color3NewMisuse),
+        Box::new(roblox::RaycastFilterDeprecated),
+        Box::new(roblox::PlayerAddedRace),
         // alloc
         Box::new(alloc::StringConcatInLoop),
         Box::new(alloc::StringFormatInLoop),
@@ -430,6 +434,8 @@ pub fn rule_level(id: &str) -> crate::lint::Level {
         // correctness
         | "roblox::render_stepped_on_server"
         | "memory::debris_negative_duration"
+        | "roblox::color3_new_misuse"
+        | "roblox::raycast_filter_deprecated"
         => Level::Default,
 
         // === STRICT: Optimization suggestions worth fixing ===
@@ -490,6 +496,7 @@ pub fn rule_level(id: &str) -> crate::lint::Level {
         | "memory::sound_not_destroyed"
         | "memory::unbounded_table_growth"
         | "memory::collection_tag_no_cleanup"
+        | "memory::attribute_changed_in_loop"
 
         // network
         // network (important)
@@ -547,6 +554,7 @@ pub fn rule_level(id: &str) -> crate::lint::Level {
         | "roblox::clone_set_parent"
         | "roblox::yield_in_connect_callback"
         | "roblox::teleport_service_race"
+        | "roblox::player_added_race"
 
         // native
         | "native::dynamic_require"
@@ -636,6 +644,7 @@ fn explain_text(id: &str) -> &'static str {
         "complexity::nested_table_find" => "table.find() in a nested loop creates O(n*m*k) complexity. Convert the inner collection to a hashset: local set = {}; for _,v in t do set[v] = true end.",
         "memory::debris_negative_duration" => "Debris:AddItem with zero or negative duration destroys the instance on the same frame - likely a bug. Use a positive duration for timed cleanup.",
         "memory::collection_tag_no_cleanup" => "GetInstanceAddedSignal without GetInstanceRemovedSignal means tagged instances that are destroyed or reparented leave behind stale connections and data.",
+        "memory::attribute_changed_in_loop" => "GetAttributeChangedSignal() inside a loop creates a new signal connection per iteration. Each connection lives until the instance is destroyed, leading to N duplicate handlers. Connect outside the loop or use a single Changed event.",
         "roblox::render_stepped_on_server" => "RenderStepped only fires on the client (it's tied to the rendering pipeline). On the server, use Heartbeat or Stepped instead.",
         "roblox::task_wait_no_arg" => "task.wait() with no argument waits exactly one frame (~16ms at 60fps). If you need a specific delay, pass a duration. If one frame is intentional, consider adding a comment.",
         "roblox::deprecated_delay" => "delay() is a legacy global with inconsistent timing behavior. task.delay() uses the modern task scheduler with better error handling and deterministic timing.",
@@ -663,6 +672,9 @@ fn explain_text(id: &str) -> &'static str {
         "roblox::yield_in_connect_callback" => "Yielding (task.wait, WaitForChild) inside :Connect callbacks blocks the signal handler. Use task.spawn to run async work from within a connection callback.",
         "roblox::deprecated_udim" => "UDim2.new(0, px, 0, py) can be UDim2.fromOffset(px, py). UDim2.new(sx, 0, sy, 0) can be UDim2.fromScale(sx, sy). Cleaner and more readable.",
         "roblox::teleport_service_race" => "TeleportAsync can fail from rate limits, network errors, or invalid place IDs. Without pcall, the error kills the script. Always wrap in pcall with retry logic.",
+        "roblox::color3_new_misuse" => "Color3.new() takes values in the 0-1 range. Passing values like 255 means you probably intended Color3.fromRGB() which takes 0-255. Color3.new(255, 0, 0) produces white, not red.",
+        "roblox::raycast_filter_deprecated" => "Enum.RaycastFilterType.Blacklist and Whitelist are deprecated. Use Exclude and Include respectively. The old names will be removed in a future engine update.",
+        "roblox::player_added_race" => "Players.PlayerAdded only fires for players who join AFTER the event is connected. If a player joins before the script runs (common with deferred loading), they are silently missed. Always loop through Players:GetPlayers() after connecting PlayerAdded.",
         "complexity::string_match_in_loop" => "string.match() compiles the pattern each call. In a loop, the same pattern is compiled N times. Use gmatch for iteration or cache results outside the loop.",
         "complexity::promise_chain_in_loop" => "Promise chaining (:andThen, :catch) in a loop creates N promise objects per iteration. Collect items and use Promise.all() for batch processing.",
 

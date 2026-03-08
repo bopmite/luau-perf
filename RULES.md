@@ -6,7 +6,7 @@ rules marked `[allow]` are off by default - enable them in `luauperf.toml` if yo
 
 ---
 
-## alloc (20)
+## alloc
 
 | rule | severity | level | what |
 |------|----------|-------|------|
@@ -31,7 +31,7 @@ rules marked `[allow]` are off by default - enable them in `luauperf.toml` if yo
 | `typeof_in_loop` | allow | pedantic | typeof() in loop crosses Lua-C++ bridge - cache outside |
 | `setmetatable_in_loop` | warn | strict | setmetatable() in loop - consider object pooling |
 
-## cache (24)
+## cache
 
 | rule | severity | level | what |
 |------|----------|-------|------|
@@ -60,7 +60,7 @@ rules marked `[allow]` are off by default - enable them in `luauperf.toml` if yo
 | `brick_color_new_in_loop` | allow | pedantic | BrickColor.new() in loop - cache if constant |
 | `region_new_in_loop` | warn | strict | Region3.new() in loop - cache if bounds are loop-invariant |
 
-## complexity (21)
+## complexity
 
 | rule | severity | level | what |
 |------|----------|-------|------|
@@ -86,7 +86,7 @@ rules marked `[allow]` are off by default - enable them in `luauperf.toml` if yo
 | `string_match_in_loop` | warn | strict | string.match() compiles pattern each call in loop |
 | `promise_chain_in_loop` | warn | strict | Promise chaining (:andThen) in loop - use Promise.all() |
 
-## instance (12)
+## instance
 
 | rule | severity | level | what |
 |------|----------|-------|------|
@@ -103,7 +103,7 @@ rules marked `[allow]` are off by default - enable them in `luauperf.toml` if yo
 | `destroy_in_loop` | warn | strict | :Destroy() in loop fires events per call - use :ClearAllChildren() |
 | `get_children_in_loop` | warn | strict | :GetChildren/:GetDescendants in loop - cache outside |
 
-## math (16)
+## math
 
 | rule | severity | level | what |
 |------|----------|-------|------|
@@ -124,7 +124,7 @@ rules marked `[allow]` are off by default - enable them in `luauperf.toml` if yo
 | `huge_comparison` | allow | pedantic | math.huge in loop - cache in local |
 | `exp_over_pow` | allow | pedantic | math.exp() in loop with constant exponent - cache outside |
 
-## memory (18)
+## memory
 
 | rule | severity | level | what |
 |------|----------|-------|------|
@@ -146,8 +146,9 @@ rules marked `[allow]` are off by default - enable them in `luauperf.toml` if yo
 | `unbounded_table_growth` | warn | strict | table.insert in per-frame callback without cleanup |
 | `debris_negative_duration` | error | default | Debris:AddItem with ≤0 duration - likely a bug |
 | `collection_tag_no_cleanup` | warn | strict | GetInstanceAddedSignal without GetInstanceRemovedSignal - stale data |
+| `attribute_changed_in_loop` | warn | strict | GetAttributeChangedSignal() in loop - creates N connections |
 
-## native (19)
+## native
 
 | rule | severity | level | what |
 |------|----------|-------|------|
@@ -171,7 +172,7 @@ rules marked `[allow]` are off by default - enable them in `luauperf.toml` if yo
 | `pcall_in_native` | warn | strict | pcall/xpcall in --!native forces interpreter fallback |
 | `dynamic_table_key_in_native` | allow | pedantic | t[variable] in --!native can't be inline-cached |
 
-## network (11)
+## network
 
 | rule | severity | level | what |
 |------|----------|-------|------|
@@ -187,7 +188,7 @@ rules marked `[allow]` are off by default - enable them in `luauperf.toml` if yo
 | `http_service_in_loop` | error | strict | HTTP requests in loop - sends N network requests |
 | `marketplace_info_in_loop` | error | strict | GetProductInfo() in loop - HTTP request per iteration |
 
-## physics (13)
+## physics
 
 | rule | severity | level | what |
 |------|----------|-------|------|
@@ -205,7 +206,7 @@ rules marked `[allow]` are off by default - enable them in `luauperf.toml` if yo
 | `massless_not_set` | allow | pedantic | Massless only works on welded non-root parts |
 | `assembly_velocity_in_loop` | warn | strict | AssemblyLinearVelocity in loop - use constraint-based movers |
 
-## render (10)
+## render
 
 | rule | severity | level | what |
 |------|----------|-------|------|
@@ -220,7 +221,7 @@ rules marked `[allow]` are off by default - enable them in `luauperf.toml` if yo
 | `image_label_in_loop` | warn | strict | ImageLabel/ImageButton in loop - loads image asset per instance |
 | `scrolling_frame_in_loop` | warn | strict | ScrollingFrame in loop - triggers expensive layout computation |
 
-## roblox (42)
+## roblox
 
 | rule | severity | level | what |
 |------|----------|-------|------|
@@ -266,8 +267,11 @@ rules marked `[allow]` are off by default - enable them in `luauperf.toml` if yo
 | `yield_in_connect_callback` | warn | strict | task.wait/WaitForChild in :Connect - use task.spawn |
 | `deprecated_udim` | allow | pedantic | UDim2.new with zeros - use fromOffset/fromScale |
 | `teleport_service_race` | warn | strict | TeleportAsync without pcall - can fail |
+| `color3_new_misuse` | error | default | Color3.new() with values > 1 - probably meant Color3.fromRGB() |
+| `raycast_filter_deprecated` | warn | default | RaycastFilterType.Blacklist/Whitelist - use Exclude/Include |
+| `player_added_race` | warn | strict | PlayerAdded without :GetPlayers() - misses existing players |
 
-## string (15)
+## string
 
 | rule | severity | level | what |
 |------|----------|-------|------|
@@ -287,7 +291,7 @@ rules marked `[allow]` are off by default - enable them in `luauperf.toml` if yo
 | `reverse_in_loop` | warn | strict | string.reverse() in loop - cache outside if input unchanged |
 | `format_known_types` | allow | pedantic | string.format("%s", x) is just tostring(x) with overhead |
 
-## style (21)
+## style
 
 | rule | severity | level | what |
 |------|----------|-------|------|
@@ -313,7 +317,7 @@ rules marked `[allow]` are off by default - enable them in `luauperf.toml` if yo
 | `udim2_prefer_from_offset` | allow | pedantic | UDim2.new(0, x, 0, y) - use UDim2.fromOffset(x, y) `--fix` |
 | `udim2_prefer_from_scale` | allow | pedantic | UDim2.new(sx, 0, sy, 0) - use UDim2.fromScale(sx, sy) `--fix` |
 
-## table (19)
+## table
 
 | rule | severity | level | what |
 |------|----------|-------|------|

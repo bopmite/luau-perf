@@ -43,6 +43,9 @@ pub struct CloneSetParent;
 pub struct YieldInConnectCallback;
 pub struct DeprecatedUdim;
 pub struct TeleportServiceRace;
+pub struct Color3NewMisuse;
+pub struct RaycastFilterDeprecated;
+pub struct PlayerAddedRace;
 
 impl Rule for DeprecatedWait {
     fn id(&self) -> &'static str { "roblox::deprecated_wait" }
@@ -1148,6 +1151,92 @@ impl Rule for TeleportServiceRace {
     }
 }
 
+impl Rule for Color3NewMisuse {
+    fn id(&self) -> &'static str { "roblox::color3_new_misuse" }
+    fn severity(&self) -> Severity { Severity::Error }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        for pos in visit::find_pattern_positions(source, "Color3.new(") {
+            let after = &source[pos + "Color3.new(".len()..];
+            let close = match after.find(')') {
+                Some(i) => i,
+                None => continue,
+            };
+            let args = &after[..close];
+            let parts: Vec<&str> = args.split(',').collect();
+            if parts.len() != 3 { continue; }
+            let any_over_1 = parts.iter().any(|p| {
+                let t = p.trim();
+                t.parse::<f64>().map(|v| v > 1.0).unwrap_or(false)
+            });
+            if any_over_1 {
+                hits.push(Hit {
+                    pos,
+                    msg: "Color3.new() takes values 0-1, not 0-255 - did you mean Color3.fromRGB()?".into(),
+                });
+            }
+        }
+        hits
+    }
+}
+
+impl Rule for RaycastFilterDeprecated {
+    fn id(&self) -> &'static str { "roblox::raycast_filter_deprecated" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        for pos in visit::find_pattern_positions(source, "RaycastFilterType.Blacklist") {
+            hits.push(Hit {
+                pos,
+                msg: "Enum.RaycastFilterType.Blacklist is deprecated - use Enum.RaycastFilterType.Exclude".into(),
+            });
+        }
+        for pos in visit::find_pattern_positions(source, "RaycastFilterType.Whitelist") {
+            hits.push(Hit {
+                pos,
+                msg: "Enum.RaycastFilterType.Whitelist is deprecated - use Enum.RaycastFilterType.Include".into(),
+            });
+        }
+        hits
+    }
+}
+
+impl Rule for PlayerAddedRace {
+    fn id(&self) -> &'static str { "roblox::player_added_race" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        let has_player_added = source.contains("PlayerAdded:Connect") || source.contains("PlayerAdded:Once");
+        if !has_player_added { return hits; }
+
+        let has_existing_check = source.contains(":GetPlayers()")
+            || source.contains("Players:GetChildren()");
+
+        if !has_existing_check {
+            for pos in visit::find_pattern_positions(source, "PlayerAdded:Connect") {
+                hits.push(Hit {
+                    pos,
+                    msg: "PlayerAdded without :GetPlayers() loop - players who joined before this script runs will be missed".into(),
+                });
+                break;
+            }
+            if hits.is_empty() {
+                for pos in visit::find_pattern_positions(source, "PlayerAdded:Once") {
+                    hits.push(Hit {
+                        pos,
+                        msg: "PlayerAdded without :GetPlayers() check - the event may have already fired before this script runs".into(),
+                    });
+                    break;
+                }
+            }
+        }
+        hits
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1516,5 +1605,61 @@ mod tests {
         let ast = parse(src);
         let hits = TeleportServiceRace.check(src, &ast);
         assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn color3_new_misuse_detected() {
+        let src = "local c = Color3.new(255, 0, 0)";
+        let ast = parse(src);
+        let hits = Color3NewMisuse.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn color3_new_valid_ok() {
+        let src = "local c = Color3.new(1, 0.5, 0)";
+        let ast = parse(src);
+        let hits = Color3NewMisuse.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn color3_new_variables_ok() {
+        let src = "local c = Color3.new(r, g, b)";
+        let ast = parse(src);
+        let hits = Color3NewMisuse.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn raycast_filter_blacklist_detected() {
+        let src = "params.FilterType = Enum.RaycastFilterType.Blacklist";
+        let ast = parse(src);
+        let hits = RaycastFilterDeprecated.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn raycast_filter_exclude_ok() {
+        let src = "params.FilterType = Enum.RaycastFilterType.Exclude";
+        let ast = parse(src);
+        let hits = RaycastFilterDeprecated.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn player_added_without_getplayers() {
+        let src = "Players.PlayerAdded:Connect(function(player)\n  onPlayerAdded(player)\nend)";
+        let ast = parse(src);
+        let hits = PlayerAddedRace.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn player_added_with_getplayers_ok() {
+        let src = "Players.PlayerAdded:Connect(function(player)\n  onPlayerAdded(player)\nend)\nfor _, p in Players:GetPlayers() do\n  onPlayerAdded(p)\nend";
+        let ast = parse(src);
+        let hits = PlayerAddedRace.check(src, &ast);
+        assert_eq!(hits.len(), 0);
     }
 }

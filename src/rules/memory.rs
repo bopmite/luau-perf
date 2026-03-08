@@ -20,6 +20,7 @@ pub struct SoundNotDestroyed;
 pub struct UnboundedTableGrowth;
 pub struct DebrisNegativeDuration;
 pub struct CollectionTagNoCleanup;
+pub struct AttributeChangedInLoop;
 
 impl Rule for UntrackedConnection {
     fn id(&self) -> &'static str { "memory::untracked_connection" }
@@ -672,6 +673,24 @@ impl Rule for CollectionTagNoCleanup {
     }
 }
 
+impl Rule for AttributeChangedInLoop {
+    fn id(&self) -> &'static str { "memory::attribute_changed_in_loop" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        visit::each_call(ast, |call, ctx| {
+            if ctx.in_loop && visit::is_method_call(call, "GetAttributeChangedSignal") {
+                hits.push(Hit {
+                    pos: visit::call_pos(call),
+                    msg: "GetAttributeChangedSignal() in loop - creates a new connection per iteration, potential memory leak".into(),
+                });
+            }
+        });
+        hits
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -902,6 +921,22 @@ mod tests {
         let src = "CollectionService:GetInstanceAddedSignal(\"Enemy\"):Connect(function(inst) end)\nCollectionService:GetInstanceRemovedSignal(\"Enemy\"):Connect(function(inst) end)";
         let ast = parse(src);
         let hits = CollectionTagNoCleanup.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn attribute_changed_in_loop_detected() {
+        let src = "for _, item in items do\n  item:GetAttributeChangedSignal(\"Health\"):Connect(function() end)\nend";
+        let ast = parse(src);
+        let hits = AttributeChangedInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn attribute_changed_outside_loop_ok() {
+        let src = "part:GetAttributeChangedSignal(\"Health\"):Connect(function() end)";
+        let ast = parse(src);
+        let hits = AttributeChangedInLoop.check(src, &ast);
         assert_eq!(hits.len(), 0);
     }
 }
