@@ -63,9 +63,26 @@ pub fn tok_text(tok: &tokenizer::TokenReference) -> String {
 }
 
 pub fn call_pos(call: &FunctionCall) -> usize {
-    prefix_token(call)
-        .map(|t| t.start_position().bytes())
-        .unwrap_or(0)
+    if let Some(t) = prefix_token(call) {
+        return t.start_position().bytes();
+    }
+    for suffix in call.suffixes() {
+        match suffix {
+            Suffix::Call(Call::MethodCall(mc)) => {
+                return mc.name().start_position().bytes();
+            }
+            Suffix::Index(Index::Dot { name, .. }) => {
+                return name.start_position().bytes();
+            }
+            Suffix::Call(Call::AnonymousCall(args)) => {
+                if let FunctionArgs::Parentheses { parentheses, .. } = args {
+                    return parentheses.tokens().0.start_position().bytes();
+                }
+            }
+            _ => {}
+        }
+    }
+    0
 }
 
 pub fn is_dot_call(call: &FunctionCall, prefix: &str, field: &str) -> bool {
