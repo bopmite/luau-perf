@@ -23,6 +23,11 @@ pub fn compute_fix(rule_id: &str, source: &str, pos: usize) -> Option<Fix> {
         "roblox::missing_optimize" => fix_missing_optimize(source),
         "table::foreach_deprecated" => fix_foreach_deprecated(source, pos),
         "table::maxn_deprecated" => fix_maxn_deprecated(source, pos),
+        "style::udim2_prefer_from_offset" => fix_udim2_from_offset(source, pos),
+        "style::udim2_prefer_from_scale" => fix_udim2_from_scale(source, pos),
+        "math::vector3_zero_constant" => fix_vector3_zero_constant(source, pos),
+        "math::vector2_zero_constant" => fix_vector2_zero_constant(source, pos),
+        "math::cframe_identity_constant" => fix_cframe_identity(source, pos),
         _ => None,
     }
 }
@@ -288,6 +293,107 @@ fn fix_maxn_deprecated(source: &str, pos: usize) -> Option<Fix> {
         end: close + 1,
         replacement: format!("#{arg}"),
     })
+}
+
+fn fix_udim2_from_offset(source: &str, pos: usize) -> Option<Fix> {
+    let prefix = "UDim2.new(0,";
+    let slice = source.get(pos..pos + prefix.len())?;
+    if slice != prefix {
+        return None;
+    }
+    let args_start = pos + prefix.len();
+    let close = find_matching_paren(source, pos + "UDim2.new(".len())?;
+    let args = source.get(args_start..close)?;
+    let parts: Vec<&str> = args.split(',').collect();
+    if parts.len() != 3 {
+        return None;
+    }
+    let offset_x = parts[0].trim();
+    let scale_y = parts[1].trim();
+    let offset_y = parts[2].trim();
+    if scale_y != "0" {
+        return None;
+    }
+    Some(Fix {
+        start: pos,
+        end: close + 1,
+        replacement: format!("UDim2.fromOffset({offset_x}, {offset_y})"),
+    })
+}
+
+fn fix_udim2_from_scale(source: &str, pos: usize) -> Option<Fix> {
+    let prefix = "UDim2.new(";
+    let slice = source.get(pos..pos + prefix.len())?;
+    if slice != prefix {
+        return None;
+    }
+    let args_start = pos + prefix.len();
+    let close = find_matching_paren(source, args_start)?;
+    let args = source.get(args_start..close)?;
+    let parts: Vec<&str> = args.split(',').collect();
+    if parts.len() != 4 {
+        return None;
+    }
+    let scale_x = parts[0].trim();
+    let offset_x = parts[1].trim();
+    let scale_y = parts[2].trim();
+    let offset_y = parts[3].trim();
+    if offset_x != "0" || offset_y != "0" {
+        return None;
+    }
+    if scale_x == "0" && scale_y == "0" {
+        return None;
+    }
+    Some(Fix {
+        start: pos,
+        end: close + 1,
+        replacement: format!("UDim2.fromScale({scale_x}, {scale_y})"),
+    })
+}
+
+fn fix_vector3_zero_constant(source: &str, pos: usize) -> Option<Fix> {
+    let prefix = "Vector3.new(";
+    let slice = source.get(pos..pos + prefix.len())?;
+    if slice != prefix {
+        return None;
+    }
+    let args_start = pos + prefix.len();
+    let close = find_matching_paren(source, args_start)?;
+    let args = source.get(args_start..close)?.replace(' ', "");
+    if args == "0,0,0" {
+        Some(Fix { start: pos, end: close + 1, replacement: "Vector3.zero".into() })
+    } else if args == "1,1,1" {
+        Some(Fix { start: pos, end: close + 1, replacement: "Vector3.one".into() })
+    } else {
+        None
+    }
+}
+
+fn fix_vector2_zero_constant(source: &str, pos: usize) -> Option<Fix> {
+    let prefix = "Vector2.new(";
+    let slice = source.get(pos..pos + prefix.len())?;
+    if slice != prefix {
+        return None;
+    }
+    let args_start = pos + prefix.len();
+    let close = find_matching_paren(source, args_start)?;
+    let args = source.get(args_start..close)?.replace(' ', "");
+    if args == "0,0" {
+        Some(Fix { start: pos, end: close + 1, replacement: "Vector2.zero".into() })
+    } else if args == "1,1" {
+        Some(Fix { start: pos, end: close + 1, replacement: "Vector2.one".into() })
+    } else {
+        None
+    }
+}
+
+fn fix_cframe_identity(source: &str, pos: usize) -> Option<Fix> {
+    let pattern = "CFrame.new()";
+    let slice = source.get(pos..pos + pattern.len())?;
+    if slice != pattern {
+        return None;
+    }
+    Some(Fix { start: pos, end: pos + pattern.len(), replacement: "CFrame.identity".into() })
 }
 
 /// Find the matching closing ')' for an opening '(' at `after` (the position right after '(').
@@ -630,5 +736,23 @@ mod tests {
         let mut result = src.to_string();
         result.replace_range(fix.start..fix.end, &fix.replacement);
         assert_eq!(result, "#myTable");
+    }
+
+    #[test]
+    fn test_fix_udim2_from_offset() {
+        let src = "local a = UDim2.new(0, 10, 0, 20)";
+        let fix = compute_fix("style::udim2_prefer_from_offset", src, 10).unwrap();
+        let mut result = src.to_string();
+        result.replace_range(fix.start..fix.end, &fix.replacement);
+        assert_eq!(result, "local a = UDim2.fromOffset(10, 20)");
+    }
+
+    #[test]
+    fn test_fix_udim2_from_scale() {
+        let src = "local b = UDim2.new(0.5, 0, 1, 0)";
+        let fix = compute_fix("style::udim2_prefer_from_scale", src, 10).unwrap();
+        let mut result = src.to_string();
+        result.replace_range(fix.start..fix.end, &fix.replacement);
+        assert_eq!(result, "local b = UDim2.fromScale(0.5, 1)");
     }
 }

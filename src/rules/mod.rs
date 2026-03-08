@@ -290,6 +290,8 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(style::NestedTernary),
         Box::new(style::UnusedVariable),
         Box::new(style::MultipleReturns),
+        Box::new(style::UDim2PreferFromOffset),
+        Box::new(style::UDim2PreferFromScale),
     ]
 }
 
@@ -597,7 +599,10 @@ fn is_fixable(id: &str) -> bool {
         "math::floor_division" | "string::len_over_hash" |
         "table::getn_deprecated" | "math::fmod_over_modulo" |
         "roblox::missing_optimize" | "table::foreach_deprecated" |
-        "table::maxn_deprecated"
+        "table::maxn_deprecated" |
+        "style::udim2_prefer_from_offset" | "style::udim2_prefer_from_scale" |
+        "math::vector3_zero_constant" | "math::vector2_zero_constant" |
+        "math::cframe_identity_constant"
     )
 }
 
@@ -895,6 +900,9 @@ fn explain_text(id: &str) -> &'static str {
         "native::import_chain_too_deep" => "GETIMPORT caches at most 3 levels of property access (global.a.b). Deeper chains fall back to individual GETTABLEKS instructions. Cache intermediate results in locals.",
         "string::sub_for_prefix_check" => "string.sub(s, 1, n) == prefix allocates a new substring for comparison. string.find(s, prefix, 1, true) == 1 returns a number, avoiding the allocation entirely.",
         "string::pattern_backtracking" => "Patterns with multiple greedy quantifiers (.*/.+) can cause exponential backtracking on non-matching inputs. Simplify patterns or use string.find with plain flag for literal searches.",
+
+        "style::udim2_prefer_from_offset" => "UDim2.new(0, x, 0, y) is equivalent to UDim2.fromOffset(x, y). The fromOffset form is shorter, clearer, and communicates intent better.",
+        "style::udim2_prefer_from_scale" => "UDim2.new(sx, 0, sy, 0) is equivalent to UDim2.fromScale(sx, sy). The fromScale form is shorter, clearer, and communicates intent better.",
 
         _ => "No detailed explanation available for this rule. Run --list-rules to see all rules.",
     }

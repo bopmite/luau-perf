@@ -22,6 +22,8 @@ pub struct TypeOverTypeof;
 pub struct NestedTernary;
 pub struct UnusedVariable;
 pub struct MultipleReturns;
+pub struct UDim2PreferFromOffset;
+pub struct UDim2PreferFromScale;
 
 impl Rule for ServiceLocatorAntiPattern {
     fn id(&self) -> &'static str { "style::duplicate_get_service" }
@@ -678,6 +680,71 @@ fn build_hot_loop_depth_map(source: &str) -> Vec<i32> {
     depth
 }
 
+impl Rule for UDim2PreferFromOffset {
+    fn id(&self) -> &'static str { "style::udim2_prefer_from_offset" }
+    fn severity(&self) -> Severity { Severity::Allow }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        let mut start = 0;
+        while let Some(idx) = source[start..].find("UDim2.new(0,") {
+            let abs = start + idx;
+            let after = &source[abs + "UDim2.new(0,".len()..];
+            if let Some(close) = after.find(')') {
+                let args = &after[..close];
+                let parts: Vec<&str> = args.split(',').collect();
+                if parts.len() == 3 {
+                    let scale_y = parts[1].trim();
+                    let offset_x = parts[0].trim();
+                    let offset_y = parts[2].trim();
+                    if scale_y == "0" && !(offset_x == "0" && offset_y == "0") {
+                        hits.push(Hit {
+                            pos: abs,
+                            msg: "UDim2.new(0, x, 0, y) - use UDim2.fromOffset(x, y) for cleaner offset-only positioning".into(),
+                        });
+                    }
+                }
+            }
+            start = abs + 1;
+        }
+        hits
+    }
+}
+
+impl Rule for UDim2PreferFromScale {
+    fn id(&self) -> &'static str { "style::udim2_prefer_from_scale" }
+    fn severity(&self) -> Severity { Severity::Allow }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        let mut start = 0;
+        while let Some(idx) = source[start..].find("UDim2.new(") {
+            let abs = start + idx;
+            let after = &source[abs + "UDim2.new(".len()..];
+            if let Some(close) = after.find(')') {
+                let args = &after[..close];
+                let parts: Vec<&str> = args.split(',').collect();
+                if parts.len() == 4 {
+                    let offset_x = parts[1].trim();
+                    let offset_y = parts[3].trim();
+                    if offset_x == "0" && offset_y == "0" {
+                        let scale_x = parts[0].trim();
+                        let scale_y = parts[2].trim();
+                        if scale_x != "0" || scale_y != "0" {
+                            hits.push(Hit {
+                                pos: abs,
+                                msg: "UDim2.new(sx, 0, sy, 0) - use UDim2.fromScale(sx, sy) for cleaner scale-only positioning".into(),
+                            });
+                        }
+                    }
+                }
+            }
+            start = abs + 1;
+        }
+        hits
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -862,6 +929,48 @@ mod tests {
         let src = "local a = \"hello\"\nlocal b = \"hello\"";
         let ast = parse(src);
         let hits = DuplicateStringLiteral.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn udim2_from_offset_detected() {
+        let src = "local a = UDim2.new(0, 10, 0, 20)";
+        let ast = parse(src);
+        let hits = UDim2PreferFromOffset.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn udim2_from_offset_skips_zeros() {
+        let src = "local a = UDim2.new(0, 0, 0, 0)";
+        let ast = parse(src);
+        let hits = UDim2PreferFromOffset.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn udim2_from_scale_detected() {
+        let src = "local a = UDim2.new(0.5, 0, 1, 0)";
+        let ast = parse(src);
+        let hits = UDim2PreferFromScale.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn udim2_mixed_not_flagged() {
+        let src = "local a = UDim2.new(0.5, 10, 0.5, 20)";
+        let ast = parse(src);
+        let hits_offset = UDim2PreferFromOffset.check(src, &ast);
+        let hits_scale = UDim2PreferFromScale.check(src, &ast);
+        assert_eq!(hits_offset.len(), 0);
+        assert_eq!(hits_scale.len(), 0);
+    }
+
+    #[test]
+    fn index_function_proxy_not_flagged() {
+        let src = "setmetatable({}, {\n\t__index = function(_, key)\n\t\treturn cache[key]\n\tend,\n})";
+        let ast = parse(src);
+        let hits = IndexFunctionMetatable.check(src, &ast);
         assert_eq!(hits.len(), 0);
     }
 }

@@ -118,9 +118,9 @@ rules marked `[allow]` are off by default - enable them in `luauperf.toml` if yo
 | `unnecessary_tonumber` | warn | strict | tonumber() on numeric literal - value is already a number |
 | `lerp_manual` | allow | pedantic | a + (b - a) * t - use :Lerp() method |
 | `abs_for_sign_check` | allow | pedantic | math.abs(x) > 0 is x ~= 0 - avoid function call |
-| `vector3_zero_constant` | warn | pedantic | Vector3.new(0,0,0) - use Vector3.zero (pre-allocated) |
-| `vector2_zero_constant` | warn | pedantic | Vector2.new(0,0) - use Vector2.zero (pre-allocated) |
-| `cframe_identity_constant` | warn | pedantic | CFrame.new() - use CFrame.identity (pre-allocated) |
+| `vector3_zero_constant` | warn | pedantic | Vector3.new(0,0,0) - use Vector3.zero (pre-allocated) `--fix` |
+| `vector2_zero_constant` | warn | pedantic | Vector2.new(0,0) - use Vector2.zero (pre-allocated) `--fix` |
+| `cframe_identity_constant` | warn | pedantic | CFrame.new() - use CFrame.identity (pre-allocated) `--fix` |
 | `huge_comparison` | allow | pedantic | math.huge in loop - cache in local |
 | `exp_over_pow` | allow | pedantic | math.exp() in loop with constant exponent - cache outside |
 
@@ -287,7 +287,7 @@ rules marked `[allow]` are off by default - enable them in `luauperf.toml` if yo
 | `reverse_in_loop` | warn | strict | string.reverse() in loop - cache outside if input unchanged |
 | `format_known_types` | allow | pedantic | string.format("%s", x) is just tostring(x) with overhead |
 
-## style (19)
+## style (21)
 
 | rule | severity | level | what |
 |------|----------|-------|------|
@@ -310,6 +310,8 @@ rules marked `[allow]` are off by default - enable them in `luauperf.toml` if yo
 | `nested_ternary` | allow | pedantic | deeply nested if/then/else expression - extract to helper |
 | `unused_variable_in_loop` | allow | pedantic | Instance.new/:Clone in loop body never used |
 | `multiple_returns_hot_path` | allow | pedantic | returning many values from hot-path function |
+| `udim2_prefer_from_offset` | allow | pedantic | UDim2.new(0, x, 0, y) - use UDim2.fromOffset(x, y) `--fix` |
+| `udim2_prefer_from_scale` | allow | pedantic | UDim2.new(sx, 0, sy, 0) - use UDim2.fromScale(sx, sy) `--fix` |
 
 ## table (19)
 
