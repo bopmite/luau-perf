@@ -556,11 +556,25 @@ impl Rule for TaskSpawnInLoop {
     fn id(&self) -> &'static str { "alloc::task_spawn_in_loop" }
     fn severity(&self) -> Severity { Severity::Warn }
 
-    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+    fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
             if !ctx.in_hot_loop { return; }
             if visit::is_dot_call(call, "task", "spawn") || visit::is_dot_call(call, "task", "defer") {
+                if let Some(arg) = visit::nth_arg(call, 0) {
+                    let arg_str = format!("{arg}").trim().to_string();
+                    if !arg_str.starts_with("function") {
+                        let pos = visit::call_pos(call);
+                        let line_start = source[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
+                        let line_end = source[pos..].find('\n').map(|i| pos + i).unwrap_or(source.len());
+                        let line = &source[line_start..line_end];
+                        if line.contains("thread") || line.contains("Thread")
+                            || line.contains("runner") || line.contains("Runner")
+                            || line.contains("coroutine") {
+                            return;
+                        }
+                    }
+                }
                 hits.push(Hit {
                     pos: visit::call_pos(call),
                     msg: "task.spawn/defer in loop creates a new coroutine per iteration (~247x overhead vs direct call) - call the function directly if it doesn't need to yield".into(),

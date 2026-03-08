@@ -1385,9 +1385,10 @@ impl Rule for FindFirstChildNoCheck {
                 if line.contains("require") || line.contains("loader") || line.contains("bootstrap") { continue; }
                 let call_args = &source[pos + ":FindFirstChild(".len()..pos + ":FindFirstChild(".len() + close];
                 if call_args.contains("Loader") || call_args.contains("loader") { continue; }
+                let accessor = if next == ':' { ":" } else { "." };
                 hits.push(Hit {
                     pos,
-                    msg: format!(":FindFirstChild() result accessed directly (.{prop}) without nil check - will error if child doesn't exist"),
+                    msg: format!(":FindFirstChild() result used directly ({accessor}{prop}) without nil check - will error if child doesn't exist"),
                 });
             }
         }
