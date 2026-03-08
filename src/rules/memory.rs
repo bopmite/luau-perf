@@ -569,6 +569,12 @@ impl Rule for RunServiceNoDisconnect {
         for event in &events {
             let pattern = format!("{event}:Connect(");
             for pos in visit::find_pattern_positions(source, &pattern) {
+                if pos > 0 {
+                    let prev = source.as_bytes()[pos - 1];
+                    if prev.is_ascii_alphanumeric() || prev == b'_' {
+                        continue;
+                    }
+                }
                 let before_start = visit::floor_char(source, pos.saturating_sub(80));
                 let before = &source[before_start..pos];
                 let line_start = before.rfind('\n').map(|i| i + 1).unwrap_or(0);
