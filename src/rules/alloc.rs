@@ -47,6 +47,7 @@ pub struct TaskSpawnInLoop;
 pub struct GsubFunctionInLoop;
 pub struct TypeofInLoop;
 pub struct SetmetatableInLoop;
+pub struct TableCloneInLoop;
 
 impl Rule for ClosureInLoop {
     fn id(&self) -> &'static str { "alloc::closure_in_loop" }
@@ -751,6 +752,24 @@ impl Rule for SetmetatableInLoop {
     }
 }
 
+impl Rule for TableCloneInLoop {
+    fn id(&self) -> &'static str { "alloc::table_clone_in_loop" }
+    fn severity(&self) -> Severity { Severity::Allow }
+
+    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        visit::each_call(ast, |call, ctx| {
+            if ctx.in_hot_loop && visit::is_dot_call(call, "table", "clone") {
+                hits.push(Hit {
+                    pos: visit::call_pos(call),
+                    msg: "table.clone() in loop - shallow-copies the entire table each iteration".into(),
+                });
+            }
+        });
+        hits
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -998,6 +1017,22 @@ mod tests {
         let src = "local obj = setmetatable({}, MT)";
         let ast = parse(src);
         let hits = SetmetatableInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn table_clone_in_loop_detected() {
+        let src = "for i = 1, 10 do\n  local copy = table.clone(template)\nend";
+        let ast = parse(src);
+        let hits = TableCloneInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn table_clone_outside_loop_ok() {
+        let src = "local copy = table.clone(template)";
+        let ast = parse(src);
+        let hits = TableCloneInLoop.check(src, &ast);
         assert_eq!(hits.len(), 0);
     }
 }

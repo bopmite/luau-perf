@@ -166,6 +166,7 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(alloc::GsubFunctionInLoop),
         Box::new(alloc::TypeofInLoop),
         Box::new(alloc::SetmetatableInLoop),
+        Box::new(alloc::TableCloneInLoop),
         // network
         Box::new(network::FireInLoop),
         Box::new(network::InvokeServerInLoop),
@@ -722,6 +723,7 @@ fn explain_text(id: &str) -> &'static str {
         "math::exp_over_pow" => "math.exp() in a loop with constant exponent recomputes the same value each iteration. Cache outside: local e = math.exp(k).",
         "alloc::typeof_in_loop" => "typeof() in a loop crosses the Lua-C++ bridge each call to determine the type. Cache outside if checking the same value repeatedly.",
         "alloc::setmetatable_in_loop" => "setmetatable() in a loop creates a new metatable-linked table per iteration. Consider object pooling or a constructor pattern to reuse metatables.",
+        "alloc::table_clone_in_loop" => "table.clone() in a loop shallow-copies the entire table each iteration. If the template doesn't change, restructure to avoid repeated cloning.",
         "roblox::yield_in_connect_callback" => "Yielding (task.wait, WaitForChild) inside :Connect callbacks blocks the signal handler. Use task.spawn to run async work from within a connection callback.",
         "roblox::deprecated_udim" => "UDim2.new(0, px, 0, py) can be UDim2.fromOffset(px, py). UDim2.new(sx, 0, sy, 0) can be UDim2.fromScale(sx, sy). Cleaner and more readable.",
         "roblox::teleport_service_race" => "TeleportAsync can fail from rate limits, network errors, or invalid place IDs. Without pcall, the error kills the script. Always wrap in pcall with retry logic.",
