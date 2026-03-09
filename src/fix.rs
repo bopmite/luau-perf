@@ -44,6 +44,8 @@ pub fn compute_fix(rule_id: &str, source: &str, pos: usize) -> Option<Fix> {
         "roblox::deprecated_ypcall" => fix_ypcall(source, pos),
         "string::tostring_in_interpolation" => fix_tostring_in_interpolation(source, pos),
         "roblox::deprecated_elapsed_time" => fix_deprecated_elapsed_time(source, pos),
+        "memory::parent_nil_over_destroy" => fix_parent_nil_over_destroy(source, pos),
+        "alloc::unnecessary_closure" => fix_unnecessary_closure(source, pos),
         _ => None,
     }
 }
@@ -765,6 +767,132 @@ fn fix_deprecated_elapsed_time(source: &str, pos: usize) -> Option<Fix> {
     None
 }
 
+fn fix_parent_nil_over_destroy(source: &str, pos: usize) -> Option<Fix> {
+    let pattern = ".Parent = nil";
+    if source.get(pos..pos + pattern.len())? != pattern { return None; }
+    let before = &source[..pos];
+    let var_start = before.rfind(|c: char| !c.is_alphanumeric() && c != '_' && c != '.')
+        .map(|i| i + 1)
+        .unwrap_or(0);
+    let varname = source.get(var_start..pos)?.trim();
+    if varname.is_empty() { return None; }
+    Some(Fix {
+        start: var_start,
+        end: pos + pattern.len(),
+        replacement: format!("{varname}:Destroy()"),
+    })
+}
+
+fn fix_unnecessary_closure(source: &str, pos: usize) -> Option<Fix> {
+    let line_end = source[pos..].find('\n').map(|i| pos + i)?;
+    let full_line = &source[pos..line_end];
+    let line = full_line.trim_start();
+    let leading_ws = full_line.len() - line.len();
+
+    let (wrapper, match_offset) = if let Some(idx) = line.find("task.delay(") {
+        let after_delay = &line[idx + 11..];
+        after_delay.find(", function()")?;
+        ("task.delay", idx)
+    } else if let Some(idx) = line.find("pcall(function()") {
+        ("pcall", idx)
+    } else if let Some(idx) = line.find("xpcall(function()") {
+        ("xpcall", idx)
+    } else if let Some(idx) = line.find("task.spawn(function()") {
+        ("task.spawn", idx)
+    } else if let Some(idx) = line.find("task.defer(function()") {
+        ("task.defer", idx)
+    } else {
+        return None;
+    };
+
+    let fix_start = pos + leading_ws + match_offset;
+
+    let after_first_line = line_end + 1;
+    if after_first_line >= source.len() { return None; }
+
+    let mut body_line_start = after_first_line;
+    loop {
+        if body_line_start >= source.len() { return None; }
+        let rest = source[body_line_start..].trim_start();
+        if rest.is_empty() { return None; }
+        if rest.starts_with('\n') { body_line_start += 1; continue; }
+        if rest.starts_with("--") {
+            body_line_start = source[body_line_start..].find('\n').map(|i| body_line_start + i + 1)?;
+            continue;
+        }
+        break;
+    }
+
+    let body_line_end = source[body_line_start..].find('\n').map(|i| body_line_start + i).unwrap_or(source.len());
+    let body = source[body_line_start..body_line_end].trim();
+
+    let mut closer_line_start = body_line_end + 1;
+    loop {
+        if closer_line_start >= source.len() { return None; }
+        let rest = source[closer_line_start..].trim_start();
+        if rest.is_empty() { return None; }
+        if rest.starts_with('\n') { closer_line_start += 1; continue; }
+        if rest.starts_with("--") {
+            closer_line_start = source[closer_line_start..].find('\n').map(|i| closer_line_start + i + 1)?;
+            continue;
+        }
+        break;
+    }
+    let closer_trimmed = source[closer_line_start..].trim_start();
+    if !closer_trimmed.starts_with("end)") { return None; }
+    let closer_content_start = closer_line_start + (source[closer_line_start..].len() - closer_trimmed.len());
+    let fix_end = if closer_trimmed.starts_with("end))") {
+        closer_content_start + 5
+    } else {
+        closer_content_start + 4
+    };
+
+    let call_str = if body.starts_with("return ") { &body[7..] } else { body };
+    let paren = call_str.find('(')?;
+    let fn_name = &call_str[..paren];
+    if fn_name.is_empty() { return None; }
+    if fn_name.contains(':') { return None; }
+    for ch in fn_name.chars() {
+        if !ch.is_alphanumeric() && ch != '_' && ch != '.' { return None; }
+    }
+
+    let args_start = paren + 1;
+    let mut depth = 1i32;
+    let mut args_end = None;
+    for (i, b) in call_str[args_start..].bytes().enumerate() {
+        match b {
+            b'(' => depth += 1,
+            b')' => {
+                depth -= 1;
+                if depth == 0 { args_end = Some(args_start + i); break; }
+            }
+            _ => {}
+        }
+    }
+    let args = call_str[args_start..args_end?].trim();
+
+    let replacement = if wrapper == "task.delay" {
+        let delay_part = &line[match_offset + 11..];
+        let comma = delay_part.find(", function()")?;
+        let time_arg = delay_part[..comma].trim();
+        if args.is_empty() {
+            format!("task.delay({time_arg}, {fn_name})")
+        } else {
+            format!("task.delay({time_arg}, {fn_name}, {args})")
+        }
+    } else if args.is_empty() {
+        format!("{wrapper}({fn_name})")
+    } else {
+        format!("{wrapper}({fn_name}, {args})")
+    };
+
+    Some(Fix {
+        start: fix_start,
+        end: fix_end,
+        replacement,
+    })
+}
+
 fn fix_ypcall(source: &str, pos: usize) -> Option<Fix> {
     let slice = source.get(pos..pos + 6)?;
     if slice != "ypcall" { return None; }
@@ -1171,5 +1299,83 @@ mod tests {
         let mut result = src.to_string();
         result.replace_range(fix.start..fix.end, &fix.replacement);
         assert_eq!(result, "-- 日本語\ntask.wait()");
+    }
+
+    #[test]
+    fn test_fix_parent_nil_over_destroy() {
+        let src = "part.Parent = nil";
+        let fix = compute_fix("memory::parent_nil_over_destroy", src, 4).unwrap();
+        let mut result = src.to_string();
+        result.replace_range(fix.start..fix.end, &fix.replacement);
+        assert_eq!(result, "part:Destroy()");
+    }
+
+    #[test]
+    fn test_fix_parent_nil_over_destroy_dotted() {
+        let src = "workspace.Part.Parent = nil";
+        let fix = compute_fix("memory::parent_nil_over_destroy", src, 14).unwrap();
+        let mut result = src.to_string();
+        result.replace_range(fix.start..fix.end, &fix.replacement);
+        assert_eq!(result, "workspace.Part:Destroy()");
+    }
+
+    #[test]
+    fn test_fix_parent_nil_over_destroy_indented() {
+        let src = "\tself.effect.Parent = nil";
+        let fix = compute_fix("memory::parent_nil_over_destroy", src, 12).unwrap();
+        let mut result = src.to_string();
+        result.replace_range(fix.start..fix.end, &fix.replacement);
+        assert_eq!(result, "\tself.effect:Destroy()");
+    }
+
+    #[test]
+    fn test_fix_unnecessary_closure_pcall() {
+        let src = "local ok, val = pcall(function()\n    return require(module)\nend)";
+        let fix = compute_fix("alloc::unnecessary_closure", src, 0).unwrap();
+        let mut result = src.to_string();
+        result.replace_range(fix.start..fix.end, &fix.replacement);
+        assert_eq!(result, "local ok, val = pcall(require, module)");
+    }
+
+    #[test]
+    fn test_fix_unnecessary_closure_task_spawn() {
+        let src = "task.spawn(function()\n    doWork()\nend)";
+        let fix = compute_fix("alloc::unnecessary_closure", src, 0).unwrap();
+        let mut result = src.to_string();
+        result.replace_range(fix.start..fix.end, &fix.replacement);
+        assert_eq!(result, "task.spawn(doWork)");
+    }
+
+    #[test]
+    fn test_fix_unnecessary_closure_task_defer() {
+        let src = "task.defer(function()\n    cleanup(a, b)\nend)";
+        let fix = compute_fix("alloc::unnecessary_closure", src, 0).unwrap();
+        let mut result = src.to_string();
+        result.replace_range(fix.start..fix.end, &fix.replacement);
+        assert_eq!(result, "task.defer(cleanup, a, b)");
+    }
+
+    #[test]
+    fn test_fix_unnecessary_closure_method_rejected() {
+        let src = "pcall(function()\n    return obj:Method()\nend)";
+        assert!(compute_fix("alloc::unnecessary_closure", src, 0).is_none());
+    }
+
+    #[test]
+    fn test_fix_unnecessary_closure_task_delay() {
+        let src = "task.delay(5, function()\n    cleanup()\nend)";
+        let fix = compute_fix("alloc::unnecessary_closure", src, 0).unwrap();
+        let mut result = src.to_string();
+        result.replace_range(fix.start..fix.end, &fix.replacement);
+        assert_eq!(result, "task.delay(5, cleanup)");
+    }
+
+    #[test]
+    fn test_fix_unnecessary_closure_with_assignment() {
+        let src = "local ok = pcall(function()\n    return doThing(x)\nend)";
+        let fix = compute_fix("alloc::unnecessary_closure", src, 0).unwrap();
+        let mut result = src.to_string();
+        result.replace_range(fix.start..fix.end, &fix.replacement);
+        assert_eq!(result, "local ok = pcall(doThing, x)");
     }
 }

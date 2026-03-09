@@ -682,7 +682,9 @@ pub fn is_fixable(id: &str) -> bool {
         "roblox::deprecated_delay" |
         "roblox::deprecated_ypcall" |
         "string::tostring_in_interpolation" |
-        "roblox::deprecated_elapsed_time"
+        "roblox::deprecated_elapsed_time" |
+        "memory::parent_nil_over_destroy" |
+        "alloc::unnecessary_closure"
     )
 }
 
