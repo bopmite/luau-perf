@@ -1497,7 +1497,7 @@ impl Rule for FindFirstChildNoCheck {
                 let line_start = source[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
                 let line = &source[line_start..source[line_start..].find('\n').map(|i| line_start + i).unwrap_or(source.len())];
                 if line.contains("if ") || line.contains("and ") || line.contains("or ") { continue; }
-                if line.contains("require") || line.contains("loader") || line.contains("bootstrap") { continue; }
+                if line.contains("require") || line.contains("loader") || line.contains("bootstrap") || line.contains("expect(") || line.contains("assert(") { continue; }
                 let call_args = &source[pos + ":FindFirstChild(".len()..pos + ":FindFirstChild(".len() + close];
                 if call_args.contains("Loader") || call_args.contains("loader") { continue; }
                 let accessor = if next == ':' { ":" } else { "." };

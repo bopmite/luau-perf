@@ -579,6 +579,10 @@ impl Rule for SelectInLoop {
                     }
                 }
                 let pos = visit::call_pos(call);
+                let call_src = format!("{call}");
+                if call_src.contains("...") {
+                    return;
+                }
                 let before = &source[..pos];
                 let line_start = before.rfind('\n').map(|i| i + 1).unwrap_or(0);
                 let line_prefix = &source[line_start..pos].trim_start();
@@ -910,10 +914,18 @@ mod tests {
 
     #[test]
     fn select_in_loop_detected() {
-        let src = "for i = 1, n do\n  local v = select(i, ...)\nend";
+        let src = "for i = 1, n do\n  local v = select(i, items)\nend";
         let ast = parse(src);
         let hits = SelectInLoop.check(src, &ast);
         assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn select_varargs_in_loop_ok() {
+        let src = "for i = 1, n do\n  local v = select(i, ...)\nend";
+        let ast = parse(src);
+        let hits = SelectInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 0);
     }
 
     #[test]
