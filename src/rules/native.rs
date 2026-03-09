@@ -22,6 +22,7 @@ pub struct SharedGlobalMutation;
 pub struct ImportChainTooDeep;
 pub struct PcallInNative;
 pub struct DynamicTableKeyInNative;
+pub struct NonFastcallInHotLoop;
 
 impl Rule for GetfenvSetfenv {
     fn id(&self) -> &'static str { "native::getfenv_setfenv" }
@@ -600,6 +601,8 @@ fn build_hot_loop_depth_map(source: &str) -> Vec<i32> {
         }
         if t.starts_with("while ") || t == "while" || t.starts_with("repeat") || t == "repeat" {
             current += 1;
+        } else if t.starts_with("for ") && !t.contains(" in ") {
+            current += 1;
         }
         depth[i] = current;
         if (t == "end" || t.starts_with("end ") || t.starts_with("end)") || t.starts_with("end,")) && current > 0 {
@@ -667,6 +670,41 @@ impl Rule for DynamicTableKeyInNative {
                             msg: "dynamic table key t[var] in loop in --!native defeats inline caching - GETTABLEKS (constant key) is much faster".into(),
                         });
                     }
+                }
+            }
+        }
+        hits
+    }
+}
+
+impl Rule for NonFastcallInHotLoop {
+    fn id(&self) -> &'static str { "native::non_fastcall_in_hot_loop" }
+    fn severity(&self) -> Severity { Severity::Allow }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        if !source.contains("--!native") {
+            return vec![];
+        }
+        let slow_funcs = [
+            "string.find(", "string.format(", "string.gsub(", "string.gmatch(",
+            "string.match(", "string.rep(", "string.reverse(", "string.lower(",
+            "string.upper(", "string.split(",
+            "table.find(", "table.sort(", "table.concat(", "table.remove(",
+            "table.move(", "table.clear(", "table.clone(", "table.freeze(",
+            "math.noise(", "math.random(",
+        ];
+        let loop_depth = build_hot_loop_depth_map(source);
+        let line_starts = line_start_offsets(source);
+        let mut hits = Vec::new();
+        for func in &slow_funcs {
+            for pos in visit::find_pattern_positions(source, func) {
+                let line = line_starts.partition_point(|&s| s <= pos).saturating_sub(1);
+                if line < loop_depth.len() && loop_depth[line] > 0 {
+                    let name = func.trim_end_matches('(');
+                    hits.push(Hit {
+                        pos,
+                        msg: format!("{name}() is not a VM fastcall builtin - falls back to interpreter in --!native, consider alternatives or hoist out of loop"),
+                    });
                 }
             }
         }
@@ -889,6 +927,30 @@ mod tests {
         let src = "for i = 1, 10 do\n  pcall(doWork)\nend";
         let ast = parse(src);
         let hits = PcallInNative.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn non_fastcall_in_native_loop() {
+        let src = "--!native\nfor i = 1, 1000 do\n  local idx = table.find(list, i)\nend";
+        let ast = parse(src);
+        let hits = NonFastcallInHotLoop.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn non_fastcall_outside_loop_ok() {
+        let src = "--!native\nlocal idx = table.find(list, x)";
+        let ast = parse(src);
+        let hits = NonFastcallInHotLoop.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn non_fastcall_no_native_ok() {
+        let src = "for i = 1, 1000 do\n  local idx = table.find(list, i)\nend";
+        let ast = parse(src);
+        let hits = NonFastcallInHotLoop.check(src, &ast);
         assert_eq!(hits.len(), 0);
     }
 }

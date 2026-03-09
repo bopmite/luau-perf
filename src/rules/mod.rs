@@ -39,6 +39,7 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(complexity::NestedTableFind),
         Box::new(complexity::StringMatchInLoop),
         Box::new(complexity::PromiseChainInLoop),
+        Box::new(complexity::RepeatedTypeof),
         // cache
         Box::new(cache::MagnitudeOverSquared),
         Box::new(cache::UncachedGetService),
@@ -208,6 +209,7 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(string::FormatKnownTypes),
         Box::new(string::FormatNoArgs),
         Box::new(string::FormatRedundantTostring),
+        Box::new(string::FormatSimpleConcat),
         // table
         Box::new(table::ForeachDeprecated),
         Box::new(table::GetnDeprecated),
@@ -248,6 +250,7 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(native::ImportChainTooDeep),
         Box::new(native::PcallInNative),
         Box::new(native::DynamicTableKeyInNative),
+        Box::new(native::NonFastcallInHotLoop),
         // physics
         Box::new(physics::SpatialQueryInLoop),
         Box::new(physics::MoveToInLoop),
@@ -676,6 +679,7 @@ fn explain_text(id: &str) -> &'static str {
         "roblox::clone_set_parent" => "Setting .Parent immediately after :Clone() before setting other properties triggers a replication packet per subsequent property change. Set all properties first, then .Parent last.",
         "native::pcall_in_native" => "pcall/xpcall in --!native scripts forces interpreter fallback for the protected call. The native compiler can't generate code across pcall boundaries. Restructure to minimize pcall usage in hot loops.",
         "native::dynamic_table_key_in_native" => "Dynamic table access t[variable] in --!native uses GETTABLE which can't be inline-cached. GETTABLEKS (constant string key, t.field) uses inline caching for fast property access.",
+        "native::non_fastcall_in_hot_loop" => "These functions are NOT fastcall builtins in the Luau VM. In --!native code they fall back to the interpreter. Fastcall builtins: math.* (except noise/random), string.byte/char/len/sub, table.insert(2-arg)/unpack, buffer.*, bit32.*, vector.*, type/typeof, select.",
         "string::reverse_in_loop" => "string.reverse() allocates a new reversed string each call. In a loop, cache the result outside if the input string doesn't change between iterations.",
         "string::format_known_types" => "string.format(\"%s\", x) is just tostring(x) with extra format-string parsing overhead. Use tostring() directly for simple type conversion.",
         "physics::massless_not_set" => "The Massless property only has effect on parts that are welded to an assembly with a non-massless root part. On unanchored, unwelded parts, Massless does nothing.",
@@ -708,12 +712,14 @@ fn explain_text(id: &str) -> &'static str {
         "math::max_min_single_arg" => "math.max(x) and math.min(x) with a single argument just return that argument unchanged. This is likely a bug - you probably meant to compare against another value like math.max(x, 0) or math.min(x, limit).",
         "string::format_no_args" => "string.format(\"literal\") with no format arguments returns the string unchanged. Just use the string directly instead of wrapping it in string.format().",
         "string::format_redundant_tostring" => "string.format's %s specifier already calls tostring() internally. Wrapping the argument in tostring() is redundant and adds unnecessary overhead.",
+        "string::format_simple_concat" => "string.format() with only %s specifiers is doing simple concatenation with function call overhead. string.format is NOT a VM fastcall builtin. Use the .. operator instead — it compiles to a single CONCAT opcode that batches all operands efficiently.",
         "roblox::find_first_child_no_check" => "FindFirstChild returns nil if the child doesn't exist. Accessing a property on the result without checking for nil will throw 'attempt to index nil' at runtime. Store in a local and check before accessing.",
         "roblox::get_full_name_in_loop" => "GetFullName() builds the full ancestry path string each call. In a loop, this allocates N strings. Cache the result outside the loop if the instance doesn't change.",
         "roblox::bind_to_render_step_no_cleanup" => "BindToRenderStep registers a named callback to run every frame. Without a matching UnbindFromRenderStep, the binding persists indefinitely, leaking if the script is reused or the feature is toggled off.",
         "roblox::cframe_old_constructor" => "CFrame.new() with 12 positional number args (position + rotation matrix) is deprecated and harder to read. Use CFrame.fromMatrix(pos, rightVector, upVector, lookVector) or CFrame.new(pos) * CFrame.fromEulerAngles() instead.",
         "complexity::string_match_in_loop" => "string.match() compiles the pattern each call. In a loop, the same pattern is compiled N times. Use gmatch for iteration or cache results outside the loop.",
         "complexity::promise_chain_in_loop" => "Promise chaining (:andThen, :catch) in a loop creates N promise objects per iteration. Collect items and use Promise.all() for batch processing.",
+        "complexity::repeated_typeof" => "typeof() or type() called 3+ times on the same expression. Cache the result in a local: `local xType = typeof(x)` then compare against the local.",
 
         // cache
         "cache::magnitude_over_squared" => ".Magnitude computes sqrt internally. When comparing distances (if a.Magnitude < b), compare squared values instead: a.Magnitude * a.Magnitude < b * b, avoiding the sqrt cost.",

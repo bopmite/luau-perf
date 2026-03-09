@@ -18,6 +18,7 @@ pub struct ReverseInLoop;
 pub struct FormatKnownTypes;
 pub struct FormatNoArgs;
 pub struct FormatRedundantTostring;
+pub struct FormatSimpleConcat;
 
 impl Rule for LenOverHash {
     fn id(&self) -> &'static str { "string::len_over_hash" }
@@ -519,6 +520,35 @@ impl Rule for FormatRedundantTostring {
     }
 }
 
+impl Rule for FormatSimpleConcat {
+    fn id(&self) -> &'static str { "string::format_simple_concat" }
+    fn severity(&self) -> Severity { Severity::Allow }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        for pos in visit::find_pattern_positions(source, "string.format(\"") {
+            let after = &source[pos + "string.format(\"".len()..];
+            let close_quote = match after.find('"') {
+                Some(i) => i,
+                None => continue,
+            };
+            let fmt = &after[..close_quote];
+            if fmt.is_empty() { continue; }
+            let only_s = fmt.replace("%s", "").chars().all(|c| !c.is_alphanumeric() || c == ' ');
+            let s_count = fmt.matches("%s").count();
+            if only_s && s_count >= 2 && !fmt.contains('%') || (s_count > 0 && fmt.replace("%s", "").find('%').is_none()) {
+                if s_count >= 2 && fmt.replace("%s", "").find('%').is_none() {
+                    hits.push(Hit {
+                        pos,
+                        msg: "string.format with only %s specifiers - use .. concatenation instead (concat is a single VM opcode, format is not a fastcall)".into(),
+                    });
+                }
+            }
+        }
+        hits
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -773,6 +803,30 @@ mod tests {
         let src = "local s = string.format(\"%d\", tostring(x))";
         let ast = parse(src);
         let hits = FormatRedundantTostring.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn format_simple_concat_detected() {
+        let src = "local s = string.format(\"%s/%s\", a, b)";
+        let ast = parse(src);
+        let hits = FormatSimpleConcat.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn format_with_number_spec_ok() {
+        let src = "local s = string.format(\"%s: %d\", name, count)";
+        let ast = parse(src);
+        let hits = FormatSimpleConcat.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn format_single_s_ok() {
+        let src = "local s = string.format(\"%s\", x)";
+        let ast = parse(src);
+        let hits = FormatSimpleConcat.check(src, &ast);
         assert_eq!(hits.len(), 0);
     }
 }

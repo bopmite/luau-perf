@@ -52,6 +52,7 @@ pub struct FilterThenFirst;
 pub struct NestedTableFind;
 pub struct StringMatchInLoop;
 pub struct PromiseChainInLoop;
+pub struct RepeatedTypeof;
 
 impl Rule for TableFindInLoop {
     fn id(&self) -> &'static str { "complexity::table_find_in_loop" }
@@ -617,6 +618,46 @@ impl Rule for PromiseChainInLoop {
     }
 }
 
+impl Rule for RepeatedTypeof {
+    fn id(&self) -> &'static str { "complexity::repeated_typeof" }
+    fn severity(&self) -> Severity { Severity::Allow }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        let patterns = ["typeof(", "type("];
+        for pat in &patterns {
+            let positions = visit::find_pattern_positions(source, pat);
+            if positions.len() < 3 { continue; }
+            let mut calls: Vec<(usize, String)> = Vec::new();
+            for &pos in &positions {
+                let after = &source[pos + pat.len()..];
+                if let Some(close) = after.find(')') {
+                    let arg = after[..close].trim().to_string();
+                    if !arg.is_empty() && !arg.contains('(') {
+                        calls.push((pos, arg));
+                    }
+                }
+            }
+            let mut counts: std::collections::HashMap<&str, Vec<usize>> = std::collections::HashMap::new();
+            for (pos, arg) in &calls {
+                counts.entry(arg.as_str()).or_default().push(*pos);
+            }
+            let func = pat.trim_end_matches('(');
+            for (arg, positions) in &counts {
+                if positions.len() >= 3 {
+                    if let Some(&pos) = positions.get(2) {
+                        hits.push(Hit {
+                            pos,
+                            msg: format!("{func}({arg}) called {} times - cache in a local variable", positions.len()),
+                        });
+                    }
+                }
+            }
+        }
+        hits
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -855,6 +896,22 @@ mod tests {
         let src = "local num = line:match(\"(%d+)\")";
         let ast = parse(src);
         let hits = StringMatchInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn repeated_typeof_detected() {
+        let src = "if typeof(x) == \"Instance\" then\nelseif typeof(x) == \"string\" then\nelseif typeof(x) == \"number\" then\nend";
+        let ast = parse(src);
+        let hits = RepeatedTypeof.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn typeof_twice_ok() {
+        let src = "if typeof(x) == \"Instance\" then\nelseif typeof(x) == \"string\" then\nend";
+        let ast = parse(src);
+        let hits = RepeatedTypeof.check(src, &ast);
         assert_eq!(hits.len(), 0);
     }
 }
