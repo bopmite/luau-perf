@@ -272,6 +272,7 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(physics::MasslessNotSet),
         Box::new(physics::AssemblyVelocityInLoop),
         Box::new(physics::SpatialQueryPerFrame),
+        Box::new(physics::TerrainWriteInLoop),
         // render
         Box::new(render::GuiCreationInLoop),
         Box::new(render::BeamTrailInLoop),
@@ -558,6 +559,7 @@ pub fn rule_level(id: &str) -> crate::lint::Level {
         | "physics::weld_constraint_in_loop"
         | "physics::assembly_velocity_in_loop"
         | "physics::spatial_query_per_frame"
+        | "physics::terrain_write_in_loop"
 
         // render
         | "render::gui_creation_in_loop"
@@ -831,6 +833,7 @@ fn explain_text(id: &str) -> &'static str {
         "physics::spatial_query_in_loop" => "Physics queries (Raycast, GetPartBoundsInBox, GetPartsInPart, etc.) are expensive C++ operations. In a loop, consider spatial indexing or batching queries.",
         "physics::move_to_in_loop" => ":MoveTo() sets CFrame and fires events for each call. workspace:BulkMoveTo() batches multiple moves into a single operation with less overhead.",
         "physics::spatial_query_per_frame" => "Spatial queries (Raycast, GetPartBoundsInBox, etc.) inside RunService callbacks run every frame at 60Hz. Each call traverses the physics spatial hash. Throttle with a counter, cache results across frames, or use CollectionService tags for entity tracking.",
+        "physics::terrain_write_in_loop" => "Terrain operations (FillBlock, WriteVoxels, etc.) are extremely expensive — each call modifies the voxel grid, triggers physics recalculation, and replicates changes. Batch terrain operations or pre-compute outside loops.",
 
         // render
         "render::gui_creation_in_loop" => "Creating GUI instances (Frame, TextLabel, etc.) in a loop is expensive. Pre-create templates and use :Clone(), or pool GUI elements for reuse.",

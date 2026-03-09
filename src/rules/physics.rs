@@ -15,6 +15,7 @@ pub struct WeldConstraintInLoop;
 pub struct MasslessNotSet;
 pub struct AssemblyVelocityInLoop;
 pub struct SpatialQueryPerFrame;
+pub struct TerrainWriteInLoop;
 
 impl Rule for SpatialQueryInLoop {
     fn id(&self) -> &'static str { "physics::spatial_query_in_loop" }
@@ -595,6 +596,32 @@ mod tests {
         assert_eq!(hits.len(), 0);
     }
 
+impl Rule for TerrainWriteInLoop {
+    fn id(&self) -> &'static str { "physics::terrain_write_in_loop" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let terrain_methods = [
+            "FillBlock", "FillRegion", "FillBall", "FillCylinder", "FillWedge",
+            "WriteVoxels", "ReplaceMaterial",
+        ];
+        let mut hits = Vec::new();
+        visit::each_call(ast, |call, ctx| {
+            if !ctx.in_hot_loop { return; }
+            for method in &terrain_methods {
+                if visit::is_method_call(call, method) {
+                    hits.push(Hit {
+                        pos: visit::call_pos(call),
+                        msg: format!(":{method}() in loop - terrain operations are extremely expensive, batch outside the loop"),
+                    });
+                    return;
+                }
+            }
+        });
+        hits
+    }
+}
+
     #[test]
     fn spatial_query_per_frame_detected() {
         let src = "RunService.Heartbeat:Connect(function()\n  local result = workspace:Raycast(origin, dir)\nend)";
@@ -608,6 +635,22 @@ mod tests {
         let src = "local result = workspace:Raycast(origin, dir)";
         let ast = parse(src);
         let hits = SpatialQueryPerFrame.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn terrain_write_in_loop_detected() {
+        let src = "for i = 1, 100 do\n  terrain:FillBlock(cframe, size, material)\nend";
+        let ast = parse(src);
+        let hits = TerrainWriteInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn terrain_write_outside_loop_ok() {
+        let src = "terrain:FillBlock(cframe, size, material)";
+        let ast = parse(src);
+        let hits = TerrainWriteInLoop.check(src, &ast);
         assert_eq!(hits.len(), 0);
     }
 
