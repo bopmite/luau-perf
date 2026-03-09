@@ -437,6 +437,70 @@ mod tests {
         let hits = GuiPropertyInHeartbeat.check(src, &ast);
         assert_eq!(hits.len(), 0);
     }
+
+    #[test]
+    fn beam_trail_in_loop_detected() {
+        let src = "for i = 1, 10 do\n  local b = Instance.new(\"Beam\")\nend";
+        let ast = parse(src);
+        let hits = BeamTrailInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn beam_trail_outside_loop_ok() {
+        let src = "local b = Instance.new(\"Beam\")";
+        let ast = parse(src);
+        let hits = BeamTrailInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn particle_emitter_in_loop_detected() {
+        let src = "for i = 1, 10 do\n  local pe = Instance.new(\"ParticleEmitter\")\nend";
+        let ast = parse(src);
+        let hits = ParticleEmitterInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn particle_emitter_outside_loop_ok() {
+        let src = "local pe = Instance.new(\"ParticleEmitter\")";
+        let ast = parse(src);
+        let hits = ParticleEmitterInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn billboard_gui_in_loop_detected() {
+        let src = "for i = 1, 10 do\n  local bg = Instance.new(\"BillboardGui\")\nend";
+        let ast = parse(src);
+        let hits = BillboardGuiInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn billboard_gui_outside_loop_ok() {
+        let src = "local bg = Instance.new(\"BillboardGui\")";
+        let ast = parse(src);
+        let hits = BillboardGuiInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn scrolling_frame_in_loop_detected() {
+        let src = "for i = 1, 10 do\n  local sf = Instance.new(\"ScrollingFrame\")\nend";
+        let ast = parse(src);
+        let hits = ScrollingFrameInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn scrolling_frame_outside_loop_ok() {
+        let src = "local sf = Instance.new(\"ScrollingFrame\")";
+        let ast = parse(src);
+        let hits = ScrollingFrameInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
 }
 
 fn line_start_offsets(source: &str) -> Vec<usize> {
