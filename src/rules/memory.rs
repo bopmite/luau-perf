@@ -21,6 +21,7 @@ pub struct UnboundedTableGrowth;
 pub struct DebrisNegativeDuration;
 pub struct CollectionTagNoCleanup;
 pub struct AttributeChangedInLoop;
+pub struct TaskDelayInLoop;
 
 impl Rule for UntrackedConnection {
     fn id(&self) -> &'static str { "memory::untracked_connection" }
@@ -948,6 +949,26 @@ impl Rule for AttributeChangedInLoop {
     }
 }
 
+impl Rule for TaskDelayInLoop {
+    fn id(&self) -> &'static str { "memory::task_delay_in_loop" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        visit::each_call(ast, |call, ctx| {
+            if !ctx.in_hot_loop { return; }
+            if visit::is_dot_call(call, "task", "delay") || visit::is_dot_call(call, "task", "defer") {
+                let method = if visit::is_dot_call(call, "task", "delay") { "task.delay" } else { "task.defer" };
+                hits.push(Hit {
+                    pos: visit::call_pos(call),
+                    msg: format!("{method}() in loop — spawns an untracked thread per iteration, potential memory leak and scheduling overhead"),
+                });
+            }
+        });
+        hits
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1218,6 +1239,30 @@ mod tests {
         let src = "while true do\n  task.wait(1)\n  process()\nend";
         let ast = parse(src);
         let hits = WhileTrueNoYield.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn task_delay_in_loop_detected() {
+        let src = "while true do\n  task.delay(1, function() end)\n  task.wait(1)\nend";
+        let ast = parse(src);
+        let hits = TaskDelayInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn task_defer_in_loop_detected() {
+        let src = "for i = 1, 10 do\n  task.defer(callback)\nend";
+        let ast = parse(src);
+        let hits = TaskDelayInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn task_delay_outside_loop_ok() {
+        let src = "task.delay(1, function() print('hi') end)";
+        let ast = parse(src);
+        let hits = TaskDelayInLoop.check(src, &ast);
         assert_eq!(hits.len(), 0);
     }
 }

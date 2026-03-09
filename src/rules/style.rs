@@ -29,6 +29,7 @@ pub struct DeepParentChain;
 pub struct ErrorNoLevel;
 pub struct MatchForExistence;
 pub struct NestedStringFormat;
+pub struct CoroutineCreateOverTaskSpawn;
 
 impl Rule for ServiceLocatorAntiPattern {
     fn id(&self) -> &'static str { "style::duplicate_get_service" }
@@ -893,6 +894,24 @@ impl Rule for DeepParentChain {
     }
 }
 
+impl Rule for CoroutineCreateOverTaskSpawn {
+    fn id(&self) -> &'static str { "style::coroutine_create_over_task_spawn" }
+    fn severity(&self) -> Severity { Severity::Allow }
+
+    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        visit::each_call(ast, |call, _ctx| {
+            if visit::is_dot_call(call, "coroutine", "create") {
+                hits.push(Hit {
+                    pos: visit::call_pos(call),
+                    msg: "coroutine.create() + coroutine.resume() — use task.spawn() or task.defer() for simpler async".into(),
+                });
+            }
+        });
+        hits
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1199,6 +1218,22 @@ mod tests {
         let src = r#"print(string.format("%s: %.2f ms", name, elapsed))"#;
         let ast = parse(src);
         let hits = NestedStringFormat.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn coroutine_create_detected() {
+        let src = "local co = coroutine.create(function() end)";
+        let ast = parse(src);
+        let hits = CoroutineCreateOverTaskSpawn.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn task_spawn_ok() {
+        let src = "task.spawn(function() end)";
+        let ast = parse(src);
+        let hits = CoroutineCreateOverTaskSpawn.check(src, &ast);
         assert_eq!(hits.len(), 0);
     }
 }

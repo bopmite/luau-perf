@@ -86,6 +86,7 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(memory::DebrisNegativeDuration),
         Box::new(memory::CollectionTagNoCleanup),
         Box::new(memory::AttributeChangedInLoop),
+        Box::new(memory::TaskDelayInLoop),
         // roblox
         Box::new(roblox::DeprecatedWait),
         Box::new(roblox::DeprecatedSpawn),
@@ -319,6 +320,7 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(style::ErrorNoLevel),
         Box::new(style::MatchForExistence),
         Box::new(style::NestedStringFormat),
+        Box::new(style::CoroutineCreateOverTaskSpawn),
     ]
 }
 
@@ -514,6 +516,7 @@ pub fn rule_level(id: &str) -> crate::lint::Level {
 
         // memory (important but not always bugs)
         | "memory::untracked_task_spawn"
+        | "memory::task_delay_in_loop"
         | "memory::heartbeat_allocation"
         | "memory::circular_connection_ref"
         | "memory::tween_completed_connect"
@@ -898,6 +901,7 @@ fn explain_text(id: &str) -> &'static str {
         "cache::local_player_uncached" => "Players.LocalPlayer crosses the Lua-C++ bridge each access. Cache in a module-level local: local localPlayer = Players.LocalPlayer.",
         "cache::workspace_lookup_in_loop" => "workspace:FindFirstChild/WaitForChild in a loop searches the workspace tree each iteration. Cache the result outside: local obj = workspace:FindFirstChild('Name').",
         "memory::task_delay_long_duration" => "task.delay() with very long durations (>5 minutes) keeps the callback and its captures alive in memory for the duration. Consider alternative approaches for long-lived timers.",
+        "memory::task_delay_in_loop" => "task.delay()/task.defer() inside a hot loop spawns untracked threads each iteration. Each thread has scheduler overhead and keeps its closure alive until it runs. Accumulates rapidly in while/repeat loops.",
         "memory::tween_completed_connect" => ".Completed:Connect() creates a permanent connection. Use .Completed:Once() instead - it automatically disconnects after the first fire, preventing memory leaks.",
         "memory::set_attribute_in_heartbeat" => "SetAttribute() in a RunService callback triggers attribute replication at 60Hz. That's 60 replication packets per second per attribute per instance. Use plain Lua tables for per-frame mutable data instead.",
         "style::assert_in_hot_path" => "assert() has overhead even when the condition is true - it evaluates all arguments and checks the result. In hot loops, this adds up. Remove assertions or guard with a debug flag.",
@@ -970,6 +974,7 @@ fn explain_text(id: &str) -> &'static str {
         "style::error_no_level" => "error('msg') without a second argument defaults to level 1, pointing to the error() call itself. Use error('msg', 2) to point to the caller, making the error message more useful for debugging.",
         "style::match_for_existence" => "string.match() allocates captures. When you only check if a pattern exists (in an if condition or ~= nil check), string.find() is faster because it returns indices without allocating.",
         "style::nested_string_format" => "Nested string.format() calls create an intermediate string that's immediately consumed by the outer format. Combine them into a single string.format() call to avoid the intermediate allocation.",
+        "style::coroutine_create_over_task_spawn" => "coroutine.create()+resume() is the manual way to run async code. task.spawn()/task.defer() are the Roblox-idiomatic equivalents that integrate with the engine's scheduler and error handling.",
 
         _ => "No detailed explanation available for this rule. Run --list-rules to see all rules.",
     }
