@@ -101,28 +101,30 @@ impl Rule for StringConcatInLoop {
         let loop_depth = build_hot_loop_depth_map(source);
         let line_starts = line_start_offsets(source);
 
-        concat_positions
-            .into_iter()
-            .filter(|&pos| {
-                // Skip "..." (varargs) - check if a third dot follows
-                if pos + 2 < source.len() && source.as_bytes()[pos + 2] == b'.' {
-                    return false;
-                }
-                // Also skip if preceded by a dot (we matched the last two dots of "...")
-                if pos > 0 && source.as_bytes()[pos - 1] == b'.' {
-                    return false;
-                }
-                let line = line_starts.partition_point(|&s| s <= pos).saturating_sub(1);
-                if line >= loop_depth.len() || loop_depth[line] == 0 {
-                    return false;
-                }
-                !is_in_error_or_debug_path(source, pos)
-            })
-            .map(|pos| Hit {
+        let mut hits = Vec::new();
+        let mut last_hit_line = usize::MAX;
+        for pos in concat_positions {
+            if pos + 2 < source.len() && source.as_bytes()[pos + 2] == b'.' {
+                continue;
+            }
+            if pos > 0 && source.as_bytes()[pos - 1] == b'.' {
+                continue;
+            }
+            let line = line_starts.partition_point(|&s| s <= pos).saturating_sub(1);
+            if line >= loop_depth.len() || loop_depth[line] == 0 {
+                continue;
+            }
+            if is_in_error_or_debug_path(source, pos) {
+                continue;
+            }
+            if line == last_hit_line { continue; }
+            last_hit_line = line;
+            hits.push(Hit {
                 pos,
                 msg: "string concatenation (..) in loop - use table.concat or buffer".into(),
-            })
-            .collect()
+            });
+        }
+        hits
     }
 }
 
