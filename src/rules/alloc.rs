@@ -205,17 +205,36 @@ impl Rule for RepeatedGsub {
 
         let line_starts = line_start_offsets(source);
         let mut hits = Vec::new();
+        let mut chain_start: Option<usize> = None;
+        let mut chain_count = 1u32;
         let mut prev_line = usize::MAX;
 
         for &pos in &gsub_positions {
             let line = line_starts.partition_point(|&s| s <= pos).saturating_sub(1);
             if prev_line != usize::MAX && (line == prev_line || line == prev_line + 1) {
-                hits.push(Hit {
-                    pos,
-                    msg: "chained :gsub() calls - each allocates a new string, consider combining with a lookup table or buffer".into(),
-                });
+                if chain_start.is_none() { chain_start = Some(pos); }
+                chain_count += 1;
+            } else {
+                if chain_count >= 2 {
+                    if let Some(start) = chain_start {
+                        hits.push(Hit {
+                            pos: start,
+                            msg: format!("{chain_count} chained :gsub() calls - each allocates a new string, consider combining with a lookup table or buffer"),
+                        });
+                    }
+                }
+                chain_start = None;
+                chain_count = 1;
             }
             prev_line = line;
+        }
+        if chain_count >= 2 {
+            if let Some(start) = chain_start {
+                hits.push(Hit {
+                    pos: start,
+                    msg: format!("{chain_count} chained :gsub() calls - each allocates a new string, consider combining with a lookup table or buffer"),
+                });
+            }
         }
         hits
     }
