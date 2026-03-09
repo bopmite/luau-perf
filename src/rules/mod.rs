@@ -143,6 +143,8 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(roblox::GetFullNameInLoop),
         Box::new(roblox::BindToRenderStepNoCleanup),
         Box::new(roblox::CFrameOldConstructor),
+        Box::new(roblox::ApplyDescriptionInLoop),
+        Box::new(roblox::HumanoidMoveToInLoop),
         // alloc
         Box::new(alloc::StringConcatInLoop),
         Box::new(alloc::StringFormatInLoop),
@@ -585,6 +587,8 @@ pub fn rule_level(id: &str) -> crate::lint::Level {
         | "roblox::descendant_event_workspace"
         | "roblox::get_attribute_in_heartbeat"
         | "roblox::pivot_to_in_loop"
+        | "roblox::apply_description_in_loop"
+        | "roblox::humanoid_move_to_in_loop"
         | "roblox::while_wait_do"
         | "roblox::get_property_changed_in_loop"
         | "roblox::clone_set_parent"
@@ -950,6 +954,8 @@ fn explain_text(id: &str) -> &'static str {
         "roblox::descendant_event_workspace" => "DescendantAdded/Removing on workspace fires for EVERY instance added or removed anywhere in the entire game. Use CollectionService tags for indexed lookup or scope the listener to a smaller subtree.",
         "roblox::get_attribute_in_heartbeat" => ":GetAttribute() in a RunService callback crosses the Lua-C++ bridge at 60Hz. Cache the value in a Lua variable and update via AttributeChanged events.",
         "roblox::pivot_to_in_loop" => ":PivotTo() in a loop crosses the Lua-C++ bridge per call and triggers replication. workspace:BulkMoveTo() batches all moves into a single engine call.",
+        "roblox::apply_description_in_loop" => ":ApplyDescription() fully resets a Humanoid's appearance — clothing, accessories, body parts, colors, scaling. Each call is extremely expensive. Cache the description and apply once outside loops.",
+        "roblox::humanoid_move_to_in_loop" => "Humanoid:MoveTo() triggers internal pathfinding computation each call. In a hot loop, this overwhelms the physics engine. Use CFrame assignment or set Humanoid.MoveDirection for smooth movement.",
         "table::pairs_over_generalized" => "pairs()/ipairs() are function calls that return an iterator. Luau's generalized iteration (for k, v in t do) emits the same FORGPREP bytecode without the function call overhead.",
         "style::type_over_typeof" => "type() returns Lua types only ('string', 'number', 'table', etc.). typeof() also handles Roblox types ('Vector3', 'CFrame', 'Instance', etc.). Use typeof() for correct Roblox type checking.",
         "style::nested_ternary" => "Deeply nested if/then/else expressions are hard to read and maintain. Extract to a helper function or use a lookup table.",

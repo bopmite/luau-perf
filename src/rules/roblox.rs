@@ -61,6 +61,8 @@ pub struct FindFirstChildNoCheck;
 pub struct GetFullNameInLoop;
 pub struct BindToRenderStepNoCleanup;
 pub struct CFrameOldConstructor;
+pub struct ApplyDescriptionInLoop;
+pub struct HumanoidMoveToInLoop;
 
 impl Rule for DeprecatedWait {
     fn id(&self) -> &'static str { "roblox::deprecated_wait" }
@@ -1583,6 +1585,45 @@ impl Rule for BindToRenderStepNoCleanup {
     }
 }
 
+impl Rule for ApplyDescriptionInLoop {
+    fn id(&self) -> &'static str { "roblox::apply_description_in_loop" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        visit::each_call(ast, |call, ctx| {
+            if ctx.in_hot_loop && visit::is_method_call(call, "ApplyDescription") {
+                hits.push(Hit {
+                    pos: visit::call_pos(call),
+                    msg: ":ApplyDescription() in loop - fully resets character appearance each call, extremely expensive".into(),
+                });
+            }
+        });
+        hits
+    }
+}
+
+impl Rule for HumanoidMoveToInLoop {
+    fn id(&self) -> &'static str { "roblox::humanoid_move_to_in_loop" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        visit::each_call(ast, |call, ctx| {
+            if ctx.in_hot_loop && visit::is_method_call(call, "MoveTo") {
+                let src = format!("{call}");
+                if src.contains("umanoid") || src.contains("humanoid") || src.contains("hum") {
+                    hits.push(Hit {
+                        pos: visit::call_pos(call),
+                        msg: "Humanoid:MoveTo() in loop - triggers pathfinding computation each call, use CFrame assignment or set MoveDirection instead".into(),
+                    });
+                }
+            }
+        });
+        hits
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2190,6 +2231,38 @@ mod tests {
         let src = "RunService:BindToRenderStep(\"Camera\", 200, updateCamera)\nRunService:UnbindFromRenderStep(\"Camera\")";
         let ast = parse(src);
         let hits = BindToRenderStepNoCleanup.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn apply_description_in_loop_detected() {
+        let src = "for i = 1, 10 do\n  humanoid:ApplyDescription(desc)\nend";
+        let ast = parse(src);
+        let hits = ApplyDescriptionInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn apply_description_outside_loop_ok() {
+        let src = "humanoid:ApplyDescription(desc)";
+        let ast = parse(src);
+        let hits = ApplyDescriptionInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn humanoid_move_to_in_loop_detected() {
+        let src = "while true do\n  humanoid:MoveTo(target)\n  task.wait()\nend";
+        let ast = parse(src);
+        let hits = HumanoidMoveToInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn humanoid_move_to_outside_loop_ok() {
+        let src = "humanoid:MoveTo(target)";
+        let ast = parse(src);
+        let hits = HumanoidMoveToInLoop.check(src, &ast);
         assert_eq!(hits.len(), 0);
     }
 }
