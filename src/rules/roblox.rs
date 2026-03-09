@@ -65,6 +65,8 @@ pub struct ApplyDescriptionInLoop;
 pub struct HumanoidMoveToInLoop;
 pub struct DeprecatedVersion;
 pub struct DeprecatedYpcall;
+pub struct DeprecatedElapsedTime;
+pub struct CharacterAppearanceLoaded;
 
 impl Rule for DeprecatedWait {
     fn id(&self) -> &'static str { "roblox::deprecated_wait" }
@@ -1621,6 +1623,40 @@ impl Rule for HumanoidMoveToInLoop {
     }
 }
 
+impl Rule for DeprecatedElapsedTime {
+    fn id(&self) -> &'static str { "roblox::deprecated_elapsed_time" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        visit::each_call(ast, |call, _ctx| {
+            if visit::is_bare_call(call, "elapsedTime") || visit::is_bare_call(call, "ElapsedTime") {
+                hits.push(Hit {
+                    pos: visit::call_pos(call),
+                    msg: "elapsedTime() is deprecated - use os.clock() for elapsed time or workspace:GetServerTimeNow() for server time".into(),
+                });
+            }
+        });
+        hits
+    }
+}
+
+impl Rule for CharacterAppearanceLoaded {
+    fn id(&self) -> &'static str { "roblox::character_appearance_loaded" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        for pos in visit::find_pattern_positions(source, "CharacterAppearanceLoaded") {
+            hits.push(Hit {
+                pos,
+                msg: "CharacterAppearanceLoaded is being deprecated - use CharacterAdded and check HasAppearanceLoaded()".into(),
+            });
+        }
+        hits
+    }
+}
+
 impl Rule for DeprecatedVersion {
     fn id(&self) -> &'static str { "roblox::deprecated_version" }
     fn severity(&self) -> Severity { Severity::Warn }
@@ -1664,6 +1700,30 @@ mod tests {
 
     fn parse(src: &str) -> full_moon::ast::Ast {
         full_moon::parse(src).unwrap()
+    }
+
+    #[test]
+    fn deprecated_elapsed_time_detected() {
+        let src = "local t = elapsedTime()";
+        let ast = parse(src);
+        let hits = DeprecatedElapsedTime.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn character_appearance_loaded_detected() {
+        let src = "player.CharacterAppearanceLoaded:Connect(function(char) end)";
+        let ast = parse(src);
+        let hits = CharacterAppearanceLoaded.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn character_added_ok_no_appearance() {
+        let src = "player.CharacterAdded:Connect(function(char) end)";
+        let ast = parse(src);
+        let hits = CharacterAppearanceLoaded.check(src, &ast);
+        assert_eq!(hits.len(), 0);
     }
 
     #[test]

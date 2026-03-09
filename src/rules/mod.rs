@@ -147,6 +147,8 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(roblox::HumanoidMoveToInLoop),
         Box::new(roblox::DeprecatedVersion),
         Box::new(roblox::DeprecatedYpcall),
+        Box::new(roblox::DeprecatedElapsedTime),
+        Box::new(roblox::CharacterAppearanceLoaded),
         // alloc
         Box::new(alloc::StringConcatInLoop),
         Box::new(alloc::StringFormatInLoop),
@@ -438,6 +440,8 @@ pub fn rule_level(id: &str) -> crate::lint::Level {
         | "table::maxn_deprecated"
         | "roblox::deprecated_version"
         | "roblox::deprecated_ypcall"
+        | "roblox::deprecated_elapsed_time"
+        | "roblox::character_appearance_loaded"
 
         // correctness / race conditions
         | "roblox::game_loaded_race"
@@ -1010,6 +1014,8 @@ fn explain_text(id: &str) -> &'static str {
 
         "roblox::deprecated_version" => "version() is a legacy global that returns the Roblox engine version string. Use game.PlaceVersion for the place version number.",
         "roblox::deprecated_ypcall" => "ypcall() is a legacy error-handling function from early Roblox. Use pcall() which is the standard Lua equivalent with identical behavior.",
+        "roblox::deprecated_elapsed_time" => "elapsedTime() is a legacy global that returns time since the engine started. Use os.clock() for high-resolution elapsed time or workspace:GetServerTimeNow() for synchronized server time.",
+        "roblox::character_appearance_loaded" => "CharacterAppearanceLoaded is being deprecated. Use CharacterAdded and check player:HasAppearanceLoaded() if you need to wait for the character model to be fully loaded.",
 
         _ => "No detailed explanation available for this rule. Run --list-rules to see all rules.",
     }
