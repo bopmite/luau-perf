@@ -22,18 +22,20 @@ pub struct CallCtx {
     pub func_depth: u32,
     pub in_hot_loop: bool,
     pub in_loop_direct: bool,
+    pub for_in_depth: u32,
 }
 
 struct Walker<F> {
     loop_depth: u32,
     hot_loop_depth: u32,
+    for_in_depth: u32,
     func_depth: u32,
     func_in_loop_depth: u32,
     cb: F,
 }
 
 pub fn each_call(ast: &Ast, f: impl FnMut(&FunctionCall, &CallCtx)) {
-    let mut w = Walker { loop_depth: 0, hot_loop_depth: 0, func_depth: 0, func_in_loop_depth: 0, cb: f };
+    let mut w = Walker { loop_depth: 0, hot_loop_depth: 0, for_in_depth: 0, func_depth: 0, func_in_loop_depth: 0, cb: f };
     w.visit_ast(ast);
 }
 
@@ -42,8 +44,8 @@ impl<F: FnMut(&FunctionCall, &CallCtx)> Visitor for Walker<F> {
     fn visit_while_end(&mut self, _: &While) { self.loop_depth -= 1; self.hot_loop_depth -= 1; }
     fn visit_numeric_for(&mut self, _: &NumericFor) { self.loop_depth += 1; self.hot_loop_depth += 1; }
     fn visit_numeric_for_end(&mut self, _: &NumericFor) { self.loop_depth -= 1; self.hot_loop_depth -= 1; }
-    fn visit_generic_for(&mut self, _: &GenericFor) { self.loop_depth += 1; }
-    fn visit_generic_for_end(&mut self, _: &GenericFor) { self.loop_depth -= 1; }
+    fn visit_generic_for(&mut self, _: &GenericFor) { self.loop_depth += 1; self.for_in_depth += 1; }
+    fn visit_generic_for_end(&mut self, _: &GenericFor) { self.loop_depth -= 1; self.for_in_depth -= 1; }
     fn visit_repeat(&mut self, _: &Repeat) { self.loop_depth += 1; self.hot_loop_depth += 1; }
     fn visit_repeat_end(&mut self, _: &Repeat) { self.loop_depth -= 1; self.hot_loop_depth -= 1; }
     fn visit_function_body(&mut self, _: &FunctionBody) {
@@ -62,6 +64,7 @@ impl<F: FnMut(&FunctionCall, &CallCtx)> Visitor for Walker<F> {
             func_depth: self.func_depth,
             in_hot_loop: self.hot_loop_depth > 0,
             in_loop_direct: self.loop_depth > 0 && self.func_in_loop_depth == 0,
+            for_in_depth: self.for_in_depth,
         };
         (self.cb)(node, &ctx);
     }
@@ -283,11 +286,11 @@ pub fn find_pattern_positions(source: &str, pattern: &str) -> Vec<usize> {
     positions
 }
 
-fn in_comment_range(ranges: &[(usize, usize)], pos: usize) -> bool {
+pub fn in_comment_range(ranges: &[(usize, usize)], pos: usize) -> bool {
     ranges.iter().any(|&(start, end)| pos >= start && pos < end)
 }
 
-fn build_comment_ranges(source: &str) -> Vec<(usize, usize)> {
+pub fn build_comment_ranges(source: &str) -> Vec<(usize, usize)> {
     let mut ranges = Vec::new();
     let bytes = source.as_bytes();
     let len = bytes.len();
@@ -303,6 +306,9 @@ fn build_comment_ranges(source: &str) -> Vec<(usize, usize)> {
                     i = end;
                     continue;
                 }
+            }
+            while i < len && bytes[i] != b'\n' {
+                i += 1;
             }
             continue;
         }
@@ -336,7 +342,7 @@ fn build_comment_ranges(source: &str) -> Vec<(usize, usize)> {
     ranges
 }
 
-fn in_line_comment_or_string(source: &str, pos: usize) -> bool {
+pub fn in_line_comment_or_string(source: &str, pos: usize) -> bool {
     let before = &source[..pos];
     let line_start = before.rfind('\n').map(|i| i + 1).unwrap_or(0);
     let line = &source[line_start..pos];

@@ -19,6 +19,7 @@ pub struct HugeComparison;
 pub struct ExpOverPow;
 pub struct FloorRoundManual;
 pub struct MaxMinSingleArg;
+pub struct PowSlowExponent;
 
 impl Rule for RandomDeprecated {
     fn id(&self) -> &'static str { "math::random_deprecated" }
@@ -383,6 +384,80 @@ impl Rule for ExpOverPow {
         });
         hits
     }
+}
+
+impl Rule for PowSlowExponent {
+    fn id(&self) -> &'static str { "math::pow_slow_exponent" }
+    fn severity(&self) -> Severity { Severity::Allow }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        let comment_ranges = visit::build_comment_ranges(source);
+        let bytes = source.as_bytes();
+        for (i, &b) in bytes.iter().enumerate() {
+            if b != b'^' { continue; }
+            if visit::in_comment_range(&comment_ranges, i) || visit::in_line_comment_or_string(source, i) {
+                continue;
+            }
+            let mut j = i + 1;
+            while j < bytes.len() && bytes[j] == b' ' { j += 1; }
+            if j >= bytes.len() { continue; }
+            let neg = bytes[j] == b'-';
+            if neg { j += 1; }
+            if j >= bytes.len() || (!bytes[j].is_ascii_digit() && bytes[j] != b'(') { continue; }
+            if bytes[j] == b'(' {
+                let mut k = j + 1;
+                while k < bytes.len() && bytes[k] == b' ' { k += 1; }
+                let inner_neg = k < bytes.len() && bytes[k] == b'-';
+                if inner_neg { k += 1; }
+                if k >= bytes.len() || !bytes[k].is_ascii_digit() { continue; }
+                let num_start = k;
+                while k < bytes.len() && (bytes[k].is_ascii_digit() || bytes[k] == b'.') { k += 1; }
+                while k < bytes.len() && bytes[k] == b' ' { k += 1; }
+                if k < bytes.len() && bytes[k] == b'/' {
+                    continue;
+                }
+                if k >= bytes.len() || bytes[k] != b')' { continue; }
+                let num_str = std::str::from_utf8(&bytes[num_start..k]).unwrap_or("").trim();
+                if let Ok(val) = num_str.parse::<f64>() {
+                    let val = if inner_neg { -val } else { val };
+                    if val == 2.0 || val == 0.5 || val == 3.0 { continue; }
+                    let suggestion = suggest_pow_replacement(val);
+                    hits.push(Hit {
+                        pos: i,
+                        msg: format!("^({val}) uses slow libc pow() — VM only fast-paths ^2, ^0.5, ^3{suggestion}"),
+                    });
+                }
+                continue;
+            }
+            let num_start = j;
+            while j < bytes.len() && (bytes[j].is_ascii_digit() || bytes[j] == b'.') { j += 1; }
+            let num_str = std::str::from_utf8(&bytes[num_start..j]).unwrap_or("").trim();
+            if let Ok(val) = num_str.parse::<f64>() {
+                let val = if neg { -val } else { val };
+                if val == 2.0 || val == 0.5 || val == 3.0 { continue; }
+                let suggestion = suggest_pow_replacement(val);
+                hits.push(Hit {
+                    pos: i,
+                    msg: format!("^{val} uses slow libc pow() — VM only fast-paths ^2, ^0.5, ^3{suggestion}"),
+                });
+            }
+        }
+        hits
+    }
+}
+
+fn suggest_pow_replacement(exp: f64) -> String {
+    if exp == 4.0 {
+        return ". Use: local x2 = x*x; x2*x2".into();
+    }
+    if exp == -1.0 {
+        return ". Use: 1/x".into();
+    }
+    if exp == 0.25 {
+        return ". Use: math.sqrt(math.sqrt(x))".into();
+    }
+    String::new()
 }
 
 fn line_start_offsets(source: &str) -> Vec<usize> {
@@ -761,5 +836,29 @@ mod tests {
         let ast = parse(src);
         let hits = MaxMinSingleArg.check(src, &ast);
         assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn pow_slow_exponent_detected() {
+        let src = "local x = y ^ 4";
+        let ast = parse(src);
+        let hits = PowSlowExponent.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn pow_slow_negative_detected() {
+        let src = "local x = y ^ (-1)";
+        let ast = parse(src);
+        let hits = PowSlowExponent.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn pow_fast_exponents_ok() {
+        let src = "local a = x ^ 2\nlocal b = x ^ 0.5\nlocal c = x ^ 3";
+        let ast = parse(src);
+        let hits = PowSlowExponent.check(src, &ast);
+        assert_eq!(hits.len(), 0);
     }
 }

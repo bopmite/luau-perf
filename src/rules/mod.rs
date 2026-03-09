@@ -65,6 +65,7 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(cache::EnumLookupInLoop),
         Box::new(cache::BrickColorNewInLoop),
         Box::new(cache::RegionNewInLoop),
+        Box::new(cache::RepeatedPropertyChain),
         // memory
         Box::new(memory::UntrackedConnection),
         Box::new(memory::UntrackedTaskSpawn),
@@ -191,6 +192,7 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(math::ExpOverPow),
         Box::new(math::FloorRoundManual),
         Box::new(math::MaxMinSingleArg),
+        Box::new(math::PowSlowExponent),
         // string
         Box::new(string::LenOverHash),
         Box::new(string::RepInLoop),
@@ -265,6 +267,7 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(physics::WeldConstraintInLoop),
         Box::new(physics::MasslessNotSet),
         Box::new(physics::AssemblyVelocityInLoop),
+        Box::new(physics::SpatialQueryPerFrame),
         // render
         Box::new(render::GuiCreationInLoop),
         Box::new(render::BeamTrailInLoop),
@@ -546,6 +549,7 @@ pub fn rule_level(id: &str) -> crate::lint::Level {
         | "physics::cframe_assign_in_loop"
         | "physics::weld_constraint_in_loop"
         | "physics::assembly_velocity_in_loop"
+        | "physics::spatial_query_per_frame"
 
         // render
         | "render::gui_creation_in_loop"
@@ -813,6 +817,7 @@ fn explain_text(id: &str) -> &'static str {
         // physics
         "physics::spatial_query_in_loop" => "Physics queries (Raycast, GetPartBoundsInBox, GetPartsInPart, etc.) are expensive C++ operations. In a loop, consider spatial indexing or batching queries.",
         "physics::move_to_in_loop" => ":MoveTo() sets CFrame and fires events for each call. workspace:BulkMoveTo() batches multiple moves into a single operation with less overhead.",
+        "physics::spatial_query_per_frame" => "Spatial queries (Raycast, GetPartBoundsInBox, etc.) inside RunService callbacks run every frame at 60Hz. Each call traverses the physics spatial hash. Throttle with a counter, cache results across frames, or use CollectionService tags for entity tracking.",
 
         // render
         "render::gui_creation_in_loop" => "Creating GUI instances (Frame, TextLabel, etc.) in a loop is expensive. Pre-create templates and use :Clone(), or pool GUI elements for reuse.",
@@ -879,6 +884,7 @@ fn explain_text(id: &str) -> &'static str {
 
         // batch 1 additions
         "math::pow_two" => "math.pow(x, 2) is a function call. x * x is a single MUL instruction - faster and avoids call overhead. The VM has special-cased x^2 in POWK, but x * x is still clearer.",
+        "math::pow_slow_exponent" => "The Luau VM only fast-paths ^2 (x*x), ^0.5 (sqrt), and ^3 (x*x*x) in the POWK opcode. All other constant exponents call libc pow() which is ~50-100x slower. Common fixes: ^4 → local x2=x*x; x2*x2, ^(-1) → 1/x, ^0.25 → math.sqrt(math.sqrt(x)).",
         "math::vector_normalize_manual" => "v / v.Magnitude manually normalizes a vector. v.Unit is a built-in property that computes the unit vector natively - no Lua-side division needed.",
         "math::unnecessary_tonumber" => "tonumber() on a numeric literal is a no-op. The value is already a number - remove the unnecessary function call.",
         "math::lerp_manual" => "a + (b - a) * t is a manual linear interpolation. Use Vector3:Lerp(target, alpha), CFrame:Lerp(target, alpha), or a dedicated lerp utility for clarity and potential optimization.",
@@ -949,6 +955,7 @@ fn explain_text(id: &str) -> &'static str {
         "network::unreliable_remote_preferred" => "Reliable RemoteEvents in per-frame callbacks guarantee delivery and ordering, consuming bandwidth for data that's immediately superseded. UnreliableRemoteEvent drops stale packets automatically.",
         "network::invoke_client_dangerous" => ":InvokeClient() yields the server thread until the client responds. A malicious or disconnecting client can stall the server indefinitely. Use FireClient + client-to-server response pattern instead.",
         "cache::repeated_color3" => "The same Color3.fromRGB/new call repeated 4+ times wastes constructor calls. Extract to a module-level constant: local RED = Color3.fromRGB(255, 0, 0).",
+        "cache::repeated_property_chain" => "Long property chains like player.Character.HumanoidRootPart accessed 3+ times cost multiple GETTABLEKS ops each time. Cache in a local: local rootPart = character.HumanoidRootPart.",
         "cache::enum_lookup_in_loop" => "Enum.Category.Value crosses the Lua-C++ bridge each access. In a loop, cache outside: local material = Enum.Material.SmoothPlastic.",
         "native::method_call_defeats_fastcall" => "Method syntax (:byte, :sub, :len, :char) generates NAMECALL instead of FASTCALL. In loops, use string.byte(s, i) instead of s:byte(i) for the fast builtin path.",
         "native::shared_global_mutation" => "Writing to shared.* (like _G.*) disables GETIMPORT, FASTCALL, and DUPCLOSURE optimizations for the ENTIRE script. Use a required module for cross-script state instead.",

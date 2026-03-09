@@ -14,6 +14,7 @@ pub struct CanTouchQueryNotDisabled;
 pub struct WeldConstraintInLoop;
 pub struct MasslessNotSet;
 pub struct AssemblyVelocityInLoop;
+pub struct SpatialQueryPerFrame;
 
 impl Rule for SpatialQueryInLoop {
     fn id(&self) -> &'static str { "physics::spatial_query_in_loop" }
@@ -348,6 +349,59 @@ impl Rule for AssemblyVelocityInLoop {
     }
 }
 
+impl Rule for SpatialQueryPerFrame {
+    fn id(&self) -> &'static str { "physics::spatial_query_per_frame" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let connect_patterns = ["Heartbeat:Connect(", "RenderStepped:Connect(", ".Stepped:Connect("];
+        let spatial_methods = [":Raycast(", ":GetPartBoundsInBox(", ":GetPartBoundsInRadius(",
+            ":GetPartsInPart(", ":Blockcast(", ":Spherecast(", ":Shapecast("];
+
+        let mut connect_positions: Vec<usize> = Vec::new();
+        for pattern in &connect_patterns {
+            for pos in visit::find_pattern_positions(source, pattern) {
+                connect_positions.push(pos);
+            }
+        }
+        if connect_positions.is_empty() {
+            return vec![];
+        }
+
+        let mut hits = Vec::new();
+        for &pos in &connect_positions {
+            let end = visit::ceil_char(source, (pos + 1500).min(source.len()));
+            let callback = &source[pos..end];
+
+            let mut depth = 0i32;
+            let mut body_end = callback.len();
+            for (i, line) in callback.lines().enumerate() {
+                let t = line.trim();
+                if t.contains("function") { depth += 1; }
+                if t == "end" || t == "end)" || t.starts_with("end)") || t.starts_with("end,") {
+                    depth -= 1;
+                    if depth <= 0 {
+                        body_end = callback.lines().take(i + 1).map(|l| l.len() + 1).sum::<usize>();
+                        break;
+                    }
+                }
+            }
+
+            let body = &callback[..body_end.min(callback.len())];
+            for method in &spatial_methods {
+                if body.contains(method) {
+                    hits.push(Hit {
+                        pos,
+                        msg: format!("spatial query {} in RunService callback - runs every frame at 60Hz, consider throttling or caching results", method.trim_matches(':')),
+                    });
+                    break;
+                }
+            }
+        }
+        hits
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -539,5 +593,29 @@ mod tests {
         let ast = parse(src);
         let hits = AssemblyVelocityInLoop.check(src, &ast);
         assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn spatial_query_per_frame_detected() {
+        let src = "RunService.Heartbeat:Connect(function()\n  local result = workspace:Raycast(origin, dir)\nend)";
+        let ast = parse(src);
+        let hits = SpatialQueryPerFrame.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn spatial_query_outside_heartbeat_ok() {
+        let src = "local result = workspace:Raycast(origin, dir)";
+        let ast = parse(src);
+        let hits = SpatialQueryPerFrame.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn spatial_query_render_stepped() {
+        let src = "RunService.RenderStepped:Connect(function()\n  workspace:GetPartBoundsInBox(cf, size)\nend)";
+        let ast = parse(src);
+        let hits = SpatialQueryPerFrame.check(src, &ast);
+        assert_eq!(hits.len(), 1);
     }
 }

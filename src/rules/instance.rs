@@ -155,8 +155,9 @@ impl Rule for PropertyBeforeParent {
             return vec![];
         }
 
-        let instance_new_positions = visit::find_pattern_positions(source, "Instance.new(");
-        if instance_new_positions.is_empty() {
+        let has_instance_new = source.contains("Instance.new(");
+        let has_clone = source.contains(":Clone()");
+        if !has_instance_new && !has_clone {
             return vec![];
         }
 
@@ -172,7 +173,7 @@ impl Rule for PropertyBeforeParent {
 
             let search_start = visit::floor_char(source, parent_pos.saturating_sub(300));
             let before = &source[search_start..parent_pos];
-            if !before.contains("Instance.new(") {
+            if !before.contains("Instance.new(") && !before.contains(":Clone()") {
                 continue;
             }
 
@@ -525,6 +526,22 @@ mod tests {
     #[test]
     fn property_before_parent_correct_order() {
         let src = "local p = Instance.new(\"Part\")\np.Size = Vector3.new(1,1,1)\np.Parent = workspace";
+        let ast = parse(src);
+        let hits = PropertyBeforeParent.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn clone_parent_before_properties() {
+        let src = "local clone = template:Clone()\nclone.Parent = workspace\nclone.Size = Vector3.new(1,1,1)\nclone.Anchored = true";
+        let ast = parse(src);
+        let hits = PropertyBeforeParent.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn clone_parent_last_ok() {
+        let src = "local clone = template:Clone()\nclone.Size = Vector3.new(1,1,1)\nclone.Parent = workspace";
         let ast = parse(src);
         let hits = PropertyBeforeParent.check(src, &ast);
         assert_eq!(hits.len(), 0);

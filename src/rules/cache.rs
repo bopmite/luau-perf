@@ -49,6 +49,7 @@ pub struct RepeatedColor3;
 pub struct EnumLookupInLoop;
 pub struct BrickColorNewInLoop;
 pub struct RegionNewInLoop;
+pub struct RepeatedPropertyChain;
 
 impl Rule for MagnitudeOverSquared {
     fn id(&self) -> &'static str { "cache::magnitude_over_squared" }
@@ -642,6 +643,46 @@ impl Rule for EnumLookupInLoop {
     }
 }
 
+impl Rule for RepeatedPropertyChain {
+    fn id(&self) -> &'static str { "cache::repeated_property_chain" }
+    fn severity(&self) -> Severity { Severity::Allow }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let chains = [
+            ".Character.HumanoidRootPart",
+            ".Character.Humanoid",
+            ".Character.Head",
+            ".Character.PrimaryPart",
+        ];
+        let mut hits = Vec::new();
+        let comment_ranges = visit::build_comment_ranges(source);
+        for chain in &chains {
+            let mut positions = Vec::new();
+            let mut start = 0;
+            while let Some(idx) = source[start..].find(chain) {
+                let abs = start + idx;
+                let after_pos = abs + chain.len();
+                let at_boundary = after_pos >= source.len()
+                    || !source.as_bytes()[after_pos].is_ascii_alphanumeric();
+                if at_boundary
+                    && !visit::in_comment_range(&comment_ranges, abs)
+                    && !visit::in_line_comment_or_string(source, abs)
+                {
+                    positions.push(abs);
+                }
+                start = abs + chain.len();
+            }
+            if positions.len() >= 3 {
+                hits.push(Hit {
+                    pos: positions[2],
+                    msg: format!("{chain} accessed {} times — cache in a local", positions.len()),
+                });
+            }
+        }
+        hits
+    }
+}
+
 fn line_start_offsets(source: &str) -> Vec<usize> {
     let mut starts = vec![0];
     for (i, b) in source.bytes().enumerate() {
@@ -889,6 +930,22 @@ mod tests {
         let src = "local r = Region3.new(min, max)";
         let ast = parse(src);
         let hits = RegionNewInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn repeated_property_chain_detected() {
+        let src = "local a = player.Character.HumanoidRootPart.Position\nlocal b = player.Character.HumanoidRootPart.CFrame\nlocal c = player.Character.HumanoidRootPart.Velocity";
+        let ast = parse(src);
+        let hits = RepeatedPropertyChain.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn repeated_property_chain_under_threshold_ok() {
+        let src = "local a = player.Character.HumanoidRootPart.Position\nlocal b = player.Character.HumanoidRootPart.CFrame";
+        let ast = parse(src);
+        let hits = RepeatedPropertyChain.check(src, &ast);
         assert_eq!(hits.len(), 0);
     }
 }

@@ -608,6 +608,12 @@ impl Rule for CircularConnectionRef {
             if body.contains(":Disconnect(") {
                 continue;
             }
+            if obj_name.contains("Observable") || obj_name.contains("observable")
+                || obj_name.contains("Promise") || obj_name.contains("promise")
+                || obj_name.contains("Signal") || obj_name.contains("signal")
+            {
+                continue;
+            }
 
             if contains_word(body, root_var) {
                 let body_lines: Vec<&str> = body.lines().collect();

@@ -289,7 +289,7 @@ impl Rule for PairsInPairs {
     fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.loop_depth >= 2 && ctx.in_loop_direct {
+            if ctx.for_in_depth >= 2 && ctx.in_loop_direct {
                 let is_iter = visit::is_bare_call(call, "pairs")
                     || visit::is_bare_call(call, "ipairs");
                 if is_iter {
@@ -782,6 +782,14 @@ mod tests {
     #[test]
     fn pairs_structured_traversal_ok() {
         let src = "for k, v in pairs(outer) do\n  for k2, v2 in pairs(v) do\n    print(k2, v2)\n  end\nend";
+        let ast = parse(src);
+        let hits = PairsInPairs.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn pairs_in_numeric_for_ok() {
+        let src = "for i = 1, select(\"#\", ...) do\n  for k, v in pairs(sources[i]) do\n    t[k] = v\n  end\nend";
         let ast = parse(src);
         let hits = PairsInPairs.check(src, &ast);
         assert_eq!(hits.len(), 0);

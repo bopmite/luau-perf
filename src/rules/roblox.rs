@@ -360,7 +360,7 @@ impl Rule for StringValueOverAttribute {
                     let line_prefix = source[line_start..pos].trim();
                     let var_name = line_prefix.strip_prefix("local ").unwrap_or(line_prefix)
                         .split('=').next().unwrap_or("").trim();
-                    let after_end = (pos + 800).min(source.len());
+                    let after_end = (pos + 1500).min(source.len());
                     let after = &source[pos..after_end];
                     let is_tween_target = !var_name.is_empty() && after.contains("TweenService:Create(")
                         && after.contains(&format!("TweenService:Create({var_name}"));
@@ -372,16 +372,34 @@ impl Rule for StringValueOverAttribute {
                     if func_context.contains("leaderstats") || func_context.contains("Leaderstats") {
                         return;
                     }
+                    if var_name.starts_with("self.") || var_name.starts_with("self._") {
+                        return;
+                    }
                     if class == "ObjectValue" {
                         return;
                     }
                     if !var_name.is_empty() {
                         let changed_pat = format!("{var_name}.Changed");
-                        let observe_pat = format!("{var_name})");
                         if after.contains(&changed_pat)
-                            || (after.contains(&observe_pat) && (after.contains("Observe") || after.contains("Subscribe") || after.contains("Blend")))
                             || after.contains(&format!("{var_name}.Parent =")) || after.contains(&format!("{var_name}.Parent="))
                         {
+                            return;
+                        }
+                        let has_reactive_use = (after.contains(&format!("({var_name})"))
+                            || after.contains(&format!("({var_name},"))
+                            || after.contains(&format!(", {var_name})"))
+                            || after.contains(&format!(", {var_name},")))
+                            && (after.contains("Observe") || after.contains("Subscribe")
+                                || after.contains("Blend") || after.contains("Computed")
+                                || after.contains("Spring") || after.contains("Rx"));
+                        if has_reactive_use {
+                            return;
+                        }
+                        let has_return = after.lines().any(|line| {
+                            let t = line.trim();
+                            t.starts_with("return ") && t.contains(var_name)
+                        });
+                        if has_return {
                             return;
                         }
                     }
@@ -505,8 +523,19 @@ impl Rule for BindableSameScript {
         let has_connect = source.contains(".Event:Connect(") || source.contains(".Event:connect(");
 
         if has_fire && has_connect {
+            if source.contains("self._") && (source.contains("self._bindable") || source.contains("self._event")) {
+                return vec![];
+            }
+            if source.contains("Signal") || source.contains("signal") {
+                return vec![];
+            }
             let fire_positions = visit::find_pattern_positions(source, ":Fire(");
             if let Some(&pos) = fire_positions.first() {
+                let fire_line_start = source[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
+                let fire_line = &source[fire_line_start..source[pos..].find('\n').map(|p| pos + p).unwrap_or(source.len())];
+                if fire_line.contains("self.") || fire_line.contains("self._") {
+                    return vec![];
+                }
                 return vec![Hit {
                     pos,
                     msg: "BindableEvent:Fire() and .Event:Connect() in same script - use direct function calls instead".into(),
@@ -799,6 +828,15 @@ impl Rule for ChangedEventUnfiltered {
                 if first_char.is_ascii_lowercase() && !matches!(accessor, "part" | "gui" | "button" | "frame" | "label" | "instance" | "inst" | "obj" | "descendant" | "child" | "player" | "character" | "humanoid" | "camera" | "sound" | "model" | "tool" | "workspace") {
                     continue;
                 }
+            }
+            let after_connect = &source[pos..visit::ceil_char(source, (pos + 500).min(source.len()))];
+            let has_property_filter = after_connect.contains("property ==")
+                || after_connect.contains("property ==\"")
+                || after_connect.contains("prop ==")
+                || after_connect.contains("if property")
+                || after_connect.contains("if prop ");
+            if has_property_filter {
+                continue;
             }
             hits.push(Hit {
                 pos,
@@ -1098,26 +1136,26 @@ impl Rule for CloneSetParent {
             if !trimmed.contains(":Clone()") { continue; }
             if let Some(eq_pos) = trimmed.find(" = ") {
                 let var = trimmed[..eq_pos].trim().trim_start_matches("local ");
-                if i + 1 < lines.len() {
-                    let next = lines[i + 1].trim();
-                    if next.starts_with(&format!("{var}.Parent")) {
-                        let mut props_before_parent = 0;
-                        for j in (i + 2)..lines.len().min(i + 10) {
-                            let after_line = lines[j].trim();
-                            if after_line.starts_with(&format!("{var}.")) && after_line.contains(" = ") {
-                                props_before_parent += 1;
-                            } else {
-                                break;
-                            }
-                        }
-                        if props_before_parent > 0 {
-                            let byte_pos: usize = lines[..i + 1].iter().map(|l| l.len() + 1).sum();
-                            hits.push(Hit {
-                                pos: byte_pos,
-                                msg: "Clone():Parent set before other properties - set .Parent last to batch replication into a single packet".into(),
-                            });
-                        }
+                let prefix = format!("{var}.");
+                let parent_pat = format!("{var}.Parent");
+                let mut parent_line = None;
+                let mut props_after = 0;
+                for j in (i + 1)..lines.len().min(i + 12) {
+                    let jt = lines[j].trim();
+                    if jt.is_empty() || jt.starts_with("--") { continue; }
+                    if !jt.starts_with(&prefix) || !jt.contains(" = ") { break; }
+                    if jt.starts_with(&parent_pat) {
+                        parent_line = Some(j);
+                    } else if parent_line.is_some() {
+                        props_after += 1;
                     }
+                }
+                if parent_line.is_some() && props_after > 0 {
+                    let byte_pos: usize = lines[..parent_line.unwrap()].iter().map(|l| l.len() + 1).sum();
+                    hits.push(Hit {
+                        pos: byte_pos,
+                        msg: "Clone(): .Parent set before other properties — set .Parent last to batch replication".into(),
+                    });
                 }
             }
         }
@@ -1864,6 +1902,14 @@ mod tests {
         let ast = parse(src);
         let hits = CloneSetParent.check(src, &ast);
         assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn clone_parent_with_gap_detected() {
+        let src = "local p = template:Clone()\n-- setup\np.Parent = workspace\np.Name = \"test\"";
+        let ast = parse(src);
+        let hits = CloneSetParent.check(src, &ast);
+        assert_eq!(hits.len(), 1);
     }
 
     #[test]
