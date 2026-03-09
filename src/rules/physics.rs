@@ -403,6 +403,32 @@ impl Rule for SpatialQueryPerFrame {
     }
 }
 
+impl Rule for TerrainWriteInLoop {
+    fn id(&self) -> &'static str { "physics::terrain_write_in_loop" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let terrain_methods = [
+            "FillBlock", "FillRegion", "FillBall", "FillCylinder", "FillWedge",
+            "WriteVoxels", "ReplaceMaterial",
+        ];
+        let mut hits = Vec::new();
+        visit::each_call(ast, |call, ctx| {
+            if !ctx.in_hot_loop { return; }
+            for method in &terrain_methods {
+                if visit::is_method_call(call, method) {
+                    hits.push(Hit {
+                        pos: visit::call_pos(call),
+                        msg: format!(":{method}() in loop - terrain operations are extremely expensive, batch outside the loop"),
+                    });
+                    return;
+                }
+            }
+        });
+        hits
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -595,32 +621,6 @@ mod tests {
         let hits = AssemblyVelocityInLoop.check(src, &ast);
         assert_eq!(hits.len(), 0);
     }
-
-impl Rule for TerrainWriteInLoop {
-    fn id(&self) -> &'static str { "physics::terrain_write_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
-
-    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
-        let terrain_methods = [
-            "FillBlock", "FillRegion", "FillBall", "FillCylinder", "FillWedge",
-            "WriteVoxels", "ReplaceMaterial",
-        ];
-        let mut hits = Vec::new();
-        visit::each_call(ast, |call, ctx| {
-            if !ctx.in_hot_loop { return; }
-            for method in &terrain_methods {
-                if visit::is_method_call(call, method) {
-                    hits.push(Hit {
-                        pos: visit::call_pos(call),
-                        msg: format!(":{method}() in loop - terrain operations are extremely expensive, batch outside the loop"),
-                    });
-                    return;
-                }
-            }
-        });
-        hits
-    }
-}
 
     #[test]
     fn spatial_query_per_frame_detected() {
