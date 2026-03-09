@@ -1,0 +1,322 @@
+use super::*;
+use crate::lint::Rule;
+
+fn parse(src: &str) -> full_moon::ast::Ast {
+    full_moon::parse(src).unwrap()
+}
+
+#[test]
+fn dot_method_call_detected() {
+    let src = "obj.DoSomething(obj, 1, 2)";
+    let ast = parse(src);
+    let hits = DotMethodCall.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+    assert!(hits[0].msg.contains("NAMECALL"));
+}
+
+#[test]
+fn colon_method_not_flagged() {
+    let src = "obj:DoSomething(1, 2)";
+    let ast = parse(src);
+    let hits = DotMethodCall.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn dot_lowercase_not_flagged() {
+    let src = "obj.dosomething(obj, 1)";
+    let ast = parse(src);
+    let hits = DotMethodCall.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn print_in_loop_detected() {
+    let src = "for i = 1, 10 do\n  print(i)\nend";
+    let ast = parse(src);
+    let hits = PrintInHotPath.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn warn_in_loop_detected() {
+    let src = "while true do\n  warn(\"test\")\nend";
+    let ast = parse(src);
+    let hits = PrintInHotPath.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn debug_traceback_in_loop_detected() {
+    let src = "for i = 1, 10 do\n  debug.traceback()\nend";
+    let ast = parse(src);
+    let hits = DebugInHotPath.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn debug_info_in_loop_detected() {
+    let src = "for i = 1, 10 do\n  debug.info(1, \"s\")\nend";
+    let ast = parse(src);
+    let hits = DebugInHotPath.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn debug_outside_loop_not_flagged() {
+    let src = "local tb = debug.traceback()";
+    let ast = parse(src);
+    let hits = DebugInHotPath.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn index_function_detected() {
+    let src = "setmetatable(t, {__index = function(self, key) return nil end})";
+    let ast = parse(src);
+    let hits = IndexFunctionMetatable.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn index_table_not_flagged() {
+    let src = "setmetatable(t, {__index = methods})";
+    let ast = parse(src);
+    let hits = IndexFunctionMetatable.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn conditional_field_detected() {
+    let src = "local t = {}\nif cond then\n  t.health = 100\nelse\n  t.damage = 50\nend";
+    let ast = parse(src);
+    let hits = ConditionalFieldInConstructor.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn uniform_fields_not_flagged() {
+    let src = "local t = {}\nif cond then\n  t.health = 100\nelse\n  t.health = 50\nend";
+    let ast = parse(src);
+    let hits = ConditionalFieldInConstructor.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn global_function_detected() {
+    let src = "function foo()\n  return 1\nend";
+    let ast = parse(src);
+    let hits = GlobalFunctionNotLocal.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+    assert!(hits[0].msg.contains("local function"));
+}
+
+#[test]
+fn local_function_not_flagged() {
+    let src = "local function foo()\n  return 1\nend";
+    let ast = parse(src);
+    let hits = GlobalFunctionNotLocal.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn method_definition_not_flagged() {
+    let src = "function obj:Method()\n  return 1\nend";
+    let ast = parse(src);
+    let hits = GlobalFunctionNotLocal.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn assert_in_loop_detected() {
+    let src = "for i = 1, 10 do\n  assert(i > 0)\nend";
+    let ast = parse(src);
+    let hits = AssertInHotPath.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn assert_outside_loop_ok() {
+    let src = "assert(x > 0)";
+    let ast = parse(src);
+    let hits = AssertInHotPath.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn redundant_if_true_detected() {
+    let src = "if true then\n  print(1)\nend";
+    let ast = parse(src);
+    let hits = RedundantCondition.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn redundant_if_false_detected() {
+    let src = "if false then\n  print(1)\nend";
+    let ast = parse(src);
+    let hits = RedundantCondition.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn normal_condition_ok() {
+    let src = "if x > 0 then\n  print(1)\nend";
+    let ast = parse(src);
+    let hits = RedundantCondition.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn duplicate_string_literal_detected() {
+    let src = "local a = \"hello\"\nlocal b = \"hello\"\nlocal c = \"hello\"\nlocal d = \"hello\"\nlocal e = \"hello\"";
+    let ast = parse(src);
+    let hits = DuplicateStringLiteral.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn few_strings_ok() {
+    let src = "local a = \"hello\"\nlocal b = \"hello\"";
+    let ast = parse(src);
+    let hits = DuplicateStringLiteral.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn udim2_from_offset_detected() {
+    let src = "local a = UDim2.new(0, 10, 0, 20)";
+    let ast = parse(src);
+    let hits = UDim2PreferFromOffset.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn udim2_from_offset_skips_zeros() {
+    let src = "local a = UDim2.new(0, 0, 0, 0)";
+    let ast = parse(src);
+    let hits = UDim2PreferFromOffset.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn udim2_from_scale_detected() {
+    let src = "local a = UDim2.new(0.5, 0, 1, 0)";
+    let ast = parse(src);
+    let hits = UDim2PreferFromScale.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn udim2_mixed_not_flagged() {
+    let src = "local a = UDim2.new(0.5, 10, 0.5, 20)";
+    let ast = parse(src);
+    let hits_offset = UDim2PreferFromOffset.check(src, &ast);
+    let hits_scale = UDim2PreferFromScale.check(src, &ast);
+    assert_eq!(hits_offset.len(), 0);
+    assert_eq!(hits_scale.len(), 0);
+}
+
+#[test]
+fn index_function_proxy_not_flagged() {
+    let src = "setmetatable({}, {\n\t__index = function(_, key)\n\t\treturn cache[key]\n\tend,\n})";
+    let ast = parse(src);
+    let hits = IndexFunctionMetatable.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn tostring_math_floor_detected() {
+    let src = "local s = tostring(math.floor(health))";
+    let ast = parse(src);
+    let hits = TostringMathFloor.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn tostring_alone_ok() {
+    let src = "local s = tostring(health)";
+    let ast = parse(src);
+    let hits = TostringMathFloor.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn deep_parent_chain_detected() {
+    let src = "local root = script.Parent.Parent.Parent";
+    let ast = parse(src);
+    let hits = DeepParentChain.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn two_parents_ok() {
+    let src = "local root = script.Parent.Parent";
+    let ast = parse(src);
+    let hits = DeepParentChain.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn error_no_level_detected() {
+    let src = r#"error("something went wrong")"#;
+    let ast = parse(src);
+    let hits = ErrorNoLevel.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn error_with_level_ok() {
+    let src = r#"error("something went wrong", 2)"#;
+    let ast = parse(src);
+    let hits = ErrorNoLevel.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn match_for_existence_detected() {
+    let src = r#"if string.match(text, "pattern") then print("found") end"#;
+    let ast = parse(src);
+    let hits = MatchForExistence.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn match_with_capture_ok() {
+    let src = r#"local name = string.match(text, "(%w+)")"#;
+    let ast = parse(src);
+    let hits = MatchForExistence.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn nested_string_format_detected() {
+    let src = r#"print(string.format("%s | %s", name, string.format("%.2f ms", elapsed)))"#;
+    let ast = parse(src);
+    let hits = NestedStringFormat.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn single_string_format_ok() {
+    let src = r#"print(string.format("%s: %.2f ms", name, elapsed))"#;
+    let ast = parse(src);
+    let hits = NestedStringFormat.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn coroutine_create_detected() {
+    let src = "local co = coroutine.create(function() end)";
+    let ast = parse(src);
+    let hits = CoroutineCreateOverTaskSpawn.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn task_spawn_ok() {
+    let src = "task.spawn(function() end)";
+    let ast = parse(src);
+    let hits = CoroutineCreateOverTaskSpawn.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
