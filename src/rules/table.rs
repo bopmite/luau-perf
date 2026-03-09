@@ -20,6 +20,7 @@ pub struct PairsOverGeneralized;
 pub struct NilFieldInConstructor;
 pub struct RawsetInLoop;
 pub struct NextTNilOverPairs;
+pub struct MixedTableConstructor;
 
 impl Rule for ForeachDeprecated {
     fn id(&self) -> &'static str { "table::foreach_deprecated" }
@@ -658,6 +659,60 @@ impl Rule for NextTNilOverPairs {
     }
 }
 
+impl Rule for MixedTableConstructor {
+    fn id(&self) -> &'static str { "table::mixed_table_constructor" }
+    fn severity(&self) -> Severity { Severity::Allow }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        let positions = visit::find_pattern_positions(source, "= {");
+        for &pos in &positions {
+            let after_start = pos + "= {".len();
+            let after_end = visit::ceil_char(source, (after_start + 500).min(source.len()));
+            let after = &source[after_start..after_end];
+            let trimmed = after.trim_start();
+            if trimmed.starts_with('}') || trimmed.starts_with('\n') { continue; }
+            let mut depth = 1i32;
+            let mut end_idx = after.len();
+            for (i, ch) in after.char_indices() {
+                if ch == '{' { depth += 1; }
+                if ch == '}' {
+                    depth -= 1;
+                    if depth <= 0 { end_idx = i; break; }
+                }
+            }
+            let content = &after[..end_idx];
+            let mut has_record = false;
+            let mut has_list = false;
+            let mut top_depth = 0i32;
+            for segment in content.split(',') {
+                let seg = segment.trim();
+                if seg.is_empty() { continue; }
+                for ch in seg.chars() {
+                    if ch == '{' { top_depth += 1; }
+                    if ch == '}' { top_depth -= 1; }
+                }
+                if top_depth != 0 { continue; }
+                if seg.contains(" = ") && !seg.starts_with('[') {
+                    let key_part = seg.split(" = ").next().unwrap_or("").trim();
+                    if key_part.chars().all(|c| c.is_alphanumeric() || c == '_') {
+                        has_record = true;
+                    }
+                } else if !seg.starts_with("--") && !seg.starts_with('[') {
+                    has_list = true;
+                }
+            }
+            if has_record && has_list {
+                hits.push(Hit {
+                    pos: pos + 2,
+                    msg: "mixed record + list items in table constructor defeats DUPTABLE optimization — separate list items".into(),
+                });
+            }
+        }
+        hits
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -889,6 +944,30 @@ mod tests {
         let src = "rawset(t, \"key\", val)";
         let ast = parse(src);
         let hits = RawsetInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn mixed_table_constructor_detected() {
+        let src = "local t = {name = \"foo\", child, size = 10}";
+        let ast = parse(src);
+        let hits = MixedTableConstructor.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn record_only_constructor_ok() {
+        let src = "local t = {name = \"foo\", size = 10}";
+        let ast = parse(src);
+        let hits = MixedTableConstructor.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn list_only_constructor_ok() {
+        let src = "local t = {a, b, c}";
+        let ast = parse(src);
+        let hits = MixedTableConstructor.check(src, &ast);
         assert_eq!(hits.len(), 0);
     }
 }

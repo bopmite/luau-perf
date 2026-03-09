@@ -233,6 +233,7 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(table::NilFieldInConstructor),
         Box::new(table::RawsetInLoop),
         Box::new(table::NextTNilOverPairs),
+        Box::new(table::MixedTableConstructor),
         // native
         Box::new(native::GetfenvSetfenv),
         Box::new(native::DynamicRequire),
@@ -675,6 +676,7 @@ fn explain_text(id: &str) -> &'static str {
         "table::nil_field_in_constructor" => "Setting a field to nil in a table constructor defeats Luau's table template optimization. The compiler pre-allocates exact shapes, but nil fields waste hash slots. Omit them - nil is the default.",
         "table::rawset_in_loop" => "rawset() bypasses __newindex but is not a FASTCALL builtin. If no metatable is set, regular t[k] = v is faster because it uses SETTABLEKS/SETTABLE opcodes directly.",
         "table::next_t_nil_over_pairs" => "next(t, nil) is equivalent to next(t). The nil second argument is unnecessary and adds visual noise.",
+        "table::mixed_table_constructor" => "A table constructor with both record fields (key = value) and positional list items defeats the compiler's DUPTABLE optimization. DUPTABLE clones a pre-built template shape in one operation; mixing styles forces the slower NEWTABLE + individual field sets. Move list items to explicit keys or a separate table.",
         "complexity::filter_then_first" => "Iterating over GetDescendants/GetChildren just to find the first match is O(n). FindFirstChild or FindFirstChildOfClass is O(1) lookup with early return.",
         "complexity::nested_table_find" => "table.find() in a nested loop creates O(n*m*k) complexity. Convert the inner collection to a hashset: local set = {}; for _,v in t do set[v] = true end.",
         "memory::debris_negative_duration" => "Debris:AddItem with zero or negative duration destroys the instance on the same frame - likely a bug. Use a positive duration for timed cleanup.",
