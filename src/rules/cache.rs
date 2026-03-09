@@ -983,4 +983,100 @@ mod tests {
         let hits = LoadAnimationInLoop.check(src, &ast);
         assert_eq!(hits.len(), 0);
     }
+
+    #[test]
+    fn magnitude_over_squared_detected() {
+        let src = "if (a - b).Magnitude > 10 then end";
+        let ast = parse(src);
+        let hits = MagnitudeOverSquared.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn magnitude_squared_ok() {
+        let src = "local dist = (a - b).Magnitude";
+        let ast = parse(src);
+        let hits = MagnitudeOverSquared.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn tween_info_in_function_detected() {
+        let src = "local function animate()\n  local info = TweenInfo.new(0.5)\n  TweenService:Create(part, info, goal):Play()\nend";
+        let ast = parse(src);
+        let hits = TweenInfoInFunction.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn tween_info_at_module_level_ok() {
+        let src = "local info = TweenInfo.new(0.5)";
+        let ast = parse(src);
+        let hits = TweenInfoInFunction.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn instance_new_in_loop_detected() {
+        let src = "while true do\n  local p = Instance.new(\"Part\")\n  task.wait()\nend";
+        let ast = parse(src);
+        let hits = InstanceNewInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn instance_new_outside_loop_ok() {
+        let src = "local p = Instance.new(\"Part\")";
+        let ast = parse(src);
+        let hits = InstanceNewInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn vector3_new_in_loop_detected() {
+        let src = "for i = 1, 100 do\n  local v = Vector3.new(0, i, 0)\nend";
+        let ast = parse(src);
+        let hits = Vector3NewInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn vector3_new_outside_loop_ok() {
+        let src = "local v = Vector3.new(0, 1, 0)";
+        let ast = parse(src);
+        let hits = Vector3NewInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn get_attribute_in_loop_detected() {
+        let src = "for i = 1, 100 do\n  local v = part:GetAttribute(\"Speed\")\nend";
+        let ast = parse(src);
+        let hits = GetAttributeInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn get_attribute_outside_loop_ok() {
+        let src = "local v = part:GetAttribute(\"Speed\")";
+        let ast = parse(src);
+        let hits = GetAttributeInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn tween_create_in_loop_detected() {
+        let src = "while true do\n  TweenService:Create(part, info, goal):Play()\n  task.wait()\nend";
+        let ast = parse(src);
+        let hits = TweenCreateInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn tween_create_outside_loop_ok() {
+        let src = "TweenService:Create(part, info, goal):Play()";
+        let ast = parse(src);
+        let hits = TweenCreateInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
 }
