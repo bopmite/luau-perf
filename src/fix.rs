@@ -37,6 +37,7 @@ pub fn compute_fix(rule_id: &str, source: &str, pos: usize) -> Option<Fix> {
         "string::format_redundant_tostring" => fix_redundant_tostring(source, pos),
         "roblox::game_workspace" => fix_game_workspace(source, pos),
         "roblox::coroutine_resume_create" => fix_coroutine_resume_create(source, pos),
+        "style::type_over_typeof" => fix_type_over_typeof(source, pos),
         _ => None,
     }
 }
@@ -649,6 +650,17 @@ fn fix_redundant_tostring(source: &str, pos: usize) -> Option<Fix> {
     })
 }
 
+fn fix_type_over_typeof(source: &str, pos: usize) -> Option<Fix> {
+    let slice = source.get(pos..pos + 5)?;
+    if slice != "type(" { return None; }
+    if pos > 0 && source.as_bytes()[pos - 1].is_ascii_alphanumeric() { return None; }
+    Some(Fix {
+        start: pos,
+        end: pos + 4,
+        replacement: "typeof".into(),
+    })
+}
+
 fn fix_game_workspace(source: &str, pos: usize) -> Option<Fix> {
     let slice = source.get(pos..pos + "game.Workspace".len())?;
     if slice != "game.Workspace" { return None; }
@@ -984,6 +996,15 @@ mod tests {
         let mut result = src.to_string();
         result.replace_range(fix.start..fix.end, &fix.replacement);
         assert_eq!(result, "task.spawn(fn)");
+    }
+
+    #[test]
+    fn test_fix_type_over_typeof() {
+        let src = "if type(x) == \"Instance\" then end";
+        let fix = compute_fix("style::type_over_typeof", src, 3).unwrap();
+        let mut result = src.to_string();
+        result.replace_range(fix.start..fix.end, &fix.replacement);
+        assert_eq!(result, "if typeof(x) == \"Instance\" then end");
     }
 
     #[test]

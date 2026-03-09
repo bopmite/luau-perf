@@ -653,7 +653,8 @@ fn is_fixable(id: &str) -> bool {
         "roblox::getservice_workspace" | "math::floor_round_manual" |
         "roblox::deprecated_tick" | "math::random_deprecated" |
         "string::format_redundant_tostring" | "roblox::game_workspace" |
-        "roblox::coroutine_resume_create"
+        "roblox::coroutine_resume_create" |
+        "style::type_over_typeof"
     )
 }
 
