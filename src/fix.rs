@@ -35,6 +35,8 @@ pub fn compute_fix(rule_id: &str, source: &str, pos: usize) -> Option<Fix> {
         "roblox::deprecated_tick" => fix_deprecated_tick(source, pos),
         "math::random_deprecated" => fix_random_deprecated(source, pos),
         "string::format_redundant_tostring" => fix_redundant_tostring(source, pos),
+        "roblox::game_workspace" => fix_game_workspace(source, pos),
+        "roblox::coroutine_resume_create" => fix_coroutine_resume_create(source, pos),
         _ => None,
     }
 }
@@ -647,6 +649,42 @@ fn fix_redundant_tostring(source: &str, pos: usize) -> Option<Fix> {
     })
 }
 
+fn fix_game_workspace(source: &str, pos: usize) -> Option<Fix> {
+    let slice = source.get(pos..pos + "game.Workspace".len())?;
+    if slice != "game.Workspace" { return None; }
+    Some(Fix {
+        start: pos,
+        end: pos + "game.Workspace".len(),
+        replacement: "workspace".into(),
+    })
+}
+
+fn fix_coroutine_resume_create(source: &str, pos: usize) -> Option<Fix> {
+    let slice = &source[pos..];
+    if !slice.starts_with("coroutine.resume(coroutine.create(") { return None; }
+    let inner_start = "coroutine.resume(coroutine.create(".len();
+    let after = &slice[inner_start..];
+    let mut depth = 2i32;
+    let mut end_offset = 0;
+    for (i, ch) in after.char_indices() {
+        match ch {
+            '(' => depth += 1,
+            ')' => {
+                depth -= 1;
+                if depth == 0 { end_offset = i; break; }
+            }
+            _ => {}
+        }
+    }
+    if end_offset == 0 { return None; }
+    let inner = after[..end_offset].trim_end_matches(')').trim();
+    Some(Fix {
+        start: pos,
+        end: pos + inner_start + end_offset + 1,
+        replacement: format!("task.spawn({inner})"),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -928,6 +966,24 @@ mod tests {
         let mut result = src.to_string();
         result.replace_range(fix.start..fix.end, &fix.replacement);
         assert_eq!(result, "local t = os.clock()");
+    }
+
+    #[test]
+    fn test_fix_game_workspace() {
+        let src = "local x = game.Workspace.Part";
+        let fix = compute_fix("roblox::game_workspace", src, 10).unwrap();
+        let mut result = src.to_string();
+        result.replace_range(fix.start..fix.end, &fix.replacement);
+        assert_eq!(result, "local x = workspace.Part");
+    }
+
+    #[test]
+    fn test_fix_coroutine_resume_create() {
+        let src = "coroutine.resume(coroutine.create(fn))";
+        let fix = compute_fix("roblox::coroutine_resume_create", src, 0).unwrap();
+        let mut result = src.to_string();
+        result.replace_range(fix.start..fix.end, &fix.replacement);
+        assert_eq!(result, "task.spawn(fn)");
     }
 
     #[test]

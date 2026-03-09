@@ -646,7 +646,10 @@ fn is_fixable(id: &str) -> bool {
         "math::vector3_zero_constant" | "math::vector2_zero_constant" |
         "math::cframe_identity_constant" |
         "roblox::color3_new_misuse" | "roblox::raycast_filter_deprecated" |
-        "roblox::getservice_workspace" | "math::floor_round_manual"
+        "roblox::getservice_workspace" | "math::floor_round_manual" |
+        "roblox::deprecated_tick" | "math::random_deprecated" |
+        "string::format_redundant_tostring" | "roblox::game_workspace" |
+        "roblox::coroutine_resume_create"
     )
 }
 
