@@ -53,6 +53,7 @@ pub struct NestedTableFind;
 pub struct StringMatchInLoop;
 pub struct PromiseChainInLoop;
 pub struct RepeatedTypeof;
+pub struct QuadraticStringBuild;
 
 impl Rule for TableFindInLoop {
     fn id(&self) -> &'static str { "complexity::table_find_in_loop" }
@@ -658,6 +659,44 @@ impl Rule for RepeatedTypeof {
     }
 }
 
+impl Rule for QuadraticStringBuild {
+    fn id(&self) -> &'static str { "complexity::quadratic_string_build" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let loop_depth = build_hot_loop_depth_map(source);
+        let line_starts = line_start_offsets(source);
+        let mut hits = Vec::new();
+        let mut seen_lines = std::collections::HashSet::new();
+        for pos in visit::find_pattern_positions(source, "..") {
+            if pos + 2 < source.len() && source.as_bytes()[pos + 2] == b'.' { continue; }
+            if pos > 0 && source.as_bytes()[pos - 1] == b'.' { continue; }
+            let line = line_starts.partition_point(|&s| s <= pos).saturating_sub(1);
+            if line >= loop_depth.len() || loop_depth[line] == 0 { continue; }
+            let line_start = line_starts[line];
+            let line_end = source[line_start..].find('\n').map(|i| line_start + i).unwrap_or(source.len());
+            let line_text = &source[line_start..line_end];
+            let trimmed = line_text.trim();
+            let is_accumulate = trimmed.contains(" = ") && {
+                if let Some(eq_pos) = trimmed.find(" = ") {
+                    let lhs = trimmed[..eq_pos].trim();
+                    let rhs = trimmed[eq_pos + 3..].trim();
+                    rhs.starts_with(lhs) && rhs[lhs.len()..].trim_start().starts_with("..")
+                } else {
+                    false
+                }
+            };
+            if is_accumulate && seen_lines.insert(line) {
+                hits.push(Hit {
+                    pos,
+                    msg: "O(n²) string accumulation in loop - each concatenation copies the entire string, use table.insert + table.concat".into(),
+                });
+            }
+        }
+        hits
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -920,6 +959,22 @@ mod tests {
         let src = "if typeof(x) == \"Instance\" then\nelseif typeof(x) == \"string\" then\nend";
         let ast = parse(src);
         let hits = RepeatedTypeof.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn quadratic_string_build_detected() {
+        let src = "while true do\n  result = result .. chunk\n  task.wait()\nend";
+        let ast = parse(src);
+        let hits = QuadraticStringBuild.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn string_concat_no_accumulate_ok() {
+        let src = "while true do\n  local msg = prefix .. name\n  task.wait()\nend";
+        let ast = parse(src);
+        let hits = QuadraticStringBuild.check(src, &ast);
         assert_eq!(hits.len(), 0);
     }
 }
