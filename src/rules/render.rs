@@ -11,6 +11,7 @@ pub struct NeonGlassMaterialInLoop;
 pub struct SurfaceGuiInLoop;
 pub struct ImageLabelInLoop;
 pub struct ScrollingFrameInLoop;
+pub struct GuiPropertyInHeartbeat;
 
 impl Rule for GuiCreationInLoop {
     fn id(&self) -> &'static str { "render::gui_creation_in_loop" }
@@ -259,6 +260,55 @@ impl Rule for ScrollingFrameInLoop {
     }
 }
 
+impl Rule for GuiPropertyInHeartbeat {
+    fn id(&self) -> &'static str { "render::gui_property_in_heartbeat" }
+    fn severity(&self) -> Severity { Severity::Allow }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let signals = ["Heartbeat:Connect(", "RenderStepped:Connect(", "Stepped:Connect("];
+        let mut connect_positions: Vec<usize> = Vec::new();
+        for sig in &signals {
+            for pos in visit::find_pattern_positions(source, sig) {
+                connect_positions.push(pos);
+            }
+        }
+        if connect_positions.is_empty() { return vec![]; }
+
+        let gui_props = [".Text ", ".Text=", ".TextColor3 ", ".TextColor3=",
+                         ".Visible ", ".Visible=", ".ImageColor3 ", ".ImageColor3=",
+                         ".BackgroundColor3 ", ".BackgroundColor3="];
+        let mut hits = Vec::new();
+        for &pos in &connect_positions {
+            let end = visit::ceil_char(source, (pos + 1000).min(source.len()));
+            let callback = &source[pos..end];
+            let mut depth = 0i32;
+            let mut body_end = callback.len();
+            for (i, line) in callback.lines().enumerate() {
+                let t = line.trim();
+                if t.contains("function") { depth += 1; }
+                if t == "end" || t == "end)" || t.starts_with("end)") {
+                    depth -= 1;
+                    if depth <= 0 {
+                        body_end = callback.lines().take(i + 1).map(|l| l.len() + 1).sum::<usize>();
+                        break;
+                    }
+                }
+            }
+            let body = &callback[..body_end.min(callback.len())];
+            for prop in &gui_props {
+                if body.contains(prop) {
+                    hits.push(Hit {
+                        pos,
+                        msg: "GUI property updated in per-frame callback - triggers layout recalculation at 60Hz, throttle or use events".into(),
+                    });
+                    break;
+                }
+            }
+        }
+        hits
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -369,6 +419,22 @@ mod tests {
         let src = "local img = Instance.new(\"ImageLabel\")";
         let ast = parse(src);
         let hits = ImageLabelInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn gui_property_in_heartbeat_detected() {
+        let src = "RunService.Heartbeat:Connect(function()\n  label.Text = tostring(score)\nend)";
+        let ast = parse(src);
+        let hits = GuiPropertyInHeartbeat.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn gui_property_outside_heartbeat_ok() {
+        let src = "label.Text = \"Hello\"";
+        let ast = parse(src);
+        let hits = GuiPropertyInHeartbeat.check(src, &ast);
         assert_eq!(hits.len(), 0);
     }
 }

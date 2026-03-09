@@ -286,6 +286,7 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(render::SurfaceGuiInLoop),
         Box::new(render::ImageLabelInLoop),
         Box::new(render::ScrollingFrameInLoop),
+        Box::new(render::GuiPropertyInHeartbeat),
         // instance
         Box::new(instance::TwoArgInstanceNew),
         Box::new(instance::PropertyChangeSignalWrong),
@@ -715,6 +716,7 @@ fn explain_text(id: &str) -> &'static str {
         "network::marketplace_info_in_loop" => "GetProductInfo() in a loop makes an HTTP request per iteration. Cache results in a table keyed by product ID.",
         "render::image_label_in_loop" => "Creating ImageLabel/ImageButton in a loop loads an image asset per instance. Pre-create a template and use :Clone() for better performance.",
         "render::scrolling_frame_in_loop" => "ScrollingFrame creation in a loop triggers expensive layout computation per instance. Pre-create a template and :Clone().",
+        "render::gui_property_in_heartbeat" => "Setting GUI properties (Text, Visible, Color) in RunService callbacks runs every frame at 60Hz. Each change triggers layout recalculation. Throttle with dirty-flag pattern: only update when the value actually changes.",
         "instance::destroy_in_loop" => ":Destroy() in a loop fires ancestry-changed events, Destroying events, and processes connections per call. For clearing children, use :ClearAllChildren() instead.",
         "instance::get_children_in_loop" => ":GetChildren/:GetDescendants allocates a new table of all children each call. In a loop, cache outside: local children = obj:GetChildren().",
         "math::huge_comparison" => "math.huge in a loop requires a GETIMPORT lookup each access. Cache in a local: local INF = math.huge before the loop.",
