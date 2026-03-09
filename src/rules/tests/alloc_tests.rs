@@ -289,11 +289,19 @@ fn unnecessary_closure_task_spawn_detected() {
 }
 
 #[test]
-fn unnecessary_closure_task_defer_detected() {
+fn unnecessary_closure_task_defer_ok() {
     let src = "task.defer(function()\n    cleanup(a, b)\nend)";
     let ast = parse(src);
     let hits = UnnecessaryClosure.check(src, &ast);
-    assert_eq!(hits.len(), 1);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn unnecessary_closure_task_delay_ok() {
+    let src = "task.delay(5, function()\n    doWork(x)\nend)";
+    let ast = parse(src);
+    let hits = UnnecessaryClosure.check(src, &ast);
+    assert_eq!(hits.len(), 0);
 }
 
 #[test]

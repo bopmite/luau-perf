@@ -789,18 +789,12 @@ fn fix_unnecessary_closure(source: &str, pos: usize) -> Option<Fix> {
     let line = full_line.trim_start();
     let leading_ws = full_line.len() - line.len();
 
-    let (wrapper, match_offset) = if let Some(idx) = line.find("task.delay(") {
-        let after_delay = &line[idx + 11..];
-        after_delay.find(", function()")?;
-        ("task.delay", idx)
-    } else if let Some(idx) = line.find("pcall(function()") {
+    let (wrapper, match_offset) = if let Some(idx) = line.find("pcall(function()") {
         ("pcall", idx)
     } else if let Some(idx) = line.find("xpcall(function()") {
         ("xpcall", idx)
     } else if let Some(idx) = line.find("task.spawn(function()") {
         ("task.spawn", idx)
-    } else if let Some(idx) = line.find("task.defer(function()") {
-        ("task.defer", idx)
     } else {
         return None;
     };
@@ -871,16 +865,7 @@ fn fix_unnecessary_closure(source: &str, pos: usize) -> Option<Fix> {
     }
     let args = call_str[args_start..args_end?].trim();
 
-    let replacement = if wrapper == "task.delay" {
-        let delay_part = &line[match_offset + 11..];
-        let comma = delay_part.find(", function()")?;
-        let time_arg = delay_part[..comma].trim();
-        if args.is_empty() {
-            format!("task.delay({time_arg}, {fn_name})")
-        } else {
-            format!("task.delay({time_arg}, {fn_name}, {args})")
-        }
-    } else if args.is_empty() {
+    let replacement = if args.is_empty() {
         format!("{wrapper}({fn_name})")
     } else {
         format!("{wrapper}({fn_name}, {args})")

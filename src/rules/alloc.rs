@@ -782,7 +782,7 @@ impl Rule for UnnecessaryClosure {
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         let lines: Vec<&str> = source.lines().collect();
-        let wrappers = ["pcall(function()", "xpcall(function()", "task.spawn(function()", "task.defer(function()", "task.delay("];
+        let wrappers = ["pcall(function()", "xpcall(function()", "task.spawn(function()"];
 
         for (i, line) in lines.iter().enumerate() {
             let trimmed = line.trim();
@@ -790,17 +790,6 @@ impl Rule for UnnecessaryClosure {
 
             let mut matched_wrapper = None;
             for w in &wrappers {
-                if *w == "task.delay(" {
-                    if let Some(idx) = trimmed.find("task.delay(") {
-                        let after = &trimmed[idx + 11..];
-                        if let Some(comma) = after.find(", function()") {
-                            let _ = &after[..comma];
-                            matched_wrapper = Some("task.delay");
-                            break;
-                        }
-                    }
-                    continue;
-                }
                 if trimmed.contains(w) {
                     matched_wrapper = Some(&w[..w.len() - 11]);
                     break;

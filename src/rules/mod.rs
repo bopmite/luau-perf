@@ -541,7 +541,6 @@ pub fn rule_level(id: &str) -> crate::lint::Level {
         // memory (important but not always bugs)
         | "memory::untracked_task_spawn"
         | "memory::task_delay_in_loop"
-        | "memory::parent_nil_over_destroy"
         | "memory::heartbeat_allocation"
         | "memory::circular_connection_ref"
         | "memory::tween_completed_connect"
@@ -747,7 +746,7 @@ fn explain_text(id: &str) -> &'static str {
         "alloc::typeof_in_loop" => "typeof() in a loop crosses the Lua-C++ bridge each call to determine the type. Cache outside if checking the same value repeatedly.",
         "alloc::setmetatable_in_loop" => "setmetatable() in a loop creates a new metatable-linked table per iteration. Consider object pooling or a constructor pattern to reuse metatables.",
         "alloc::table_clone_in_loop" => "table.clone() in a loop shallow-copies the entire table each iteration. If the template doesn't change, restructure to avoid repeated cloning.",
-        "alloc::unnecessary_closure" => "Wrapping a single function call in function() ... end allocates a closure unnecessarily. Pass the function directly: pcall(function() return fn(x) end) becomes pcall(fn, x). Same applies to task.spawn, task.defer, and task.delay.",
+        "alloc::unnecessary_closure" => "Wrapping a single function call in function() ... end allocates a closure unnecessarily. Pass the function directly: pcall(function() return fn(x) end) becomes pcall(fn, x). Also applies to task.spawn. Not flagged for task.defer/task.delay since argument evaluation timing changes.",
         "roblox::yield_in_connect_callback" => "Yielding (task.wait, WaitForChild) inside :Connect callbacks blocks the signal handler. Use task.spawn to run async work from within a connection callback.",
         "roblox::deprecated_udim" => "UDim2.new(0, px, 0, py) can be UDim2.fromOffset(px, py). UDim2.new(sx, 0, sy, 0) can be UDim2.fromScale(sx, sy). Cleaner and more readable.",
         "roblox::teleport_service_race" => "TeleportAsync can fail from rate limits, network errors, or invalid place IDs. Without pcall, the error kills the script. Always wrap in pcall with retry logic.",

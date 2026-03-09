@@ -973,7 +973,7 @@ impl Rule for TaskDelayInLoop {
 
 impl Rule for ParentNilOverDestroy {
     fn id(&self) -> &'static str { "memory::parent_nil_over_destroy" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn severity(&self) -> Severity { Severity::Allow }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();

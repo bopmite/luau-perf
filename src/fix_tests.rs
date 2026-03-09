@@ -440,27 +440,21 @@ fn test_fix_unnecessary_closure_task_spawn() {
 }
 
 #[test]
-fn test_fix_unnecessary_closure_task_defer() {
-    let src = "task.defer(function()\n    cleanup(a, b)\nend)";
-    let fix = compute_fix("alloc::unnecessary_closure", src, 0).unwrap();
-    let mut result = src.to_string();
-    result.replace_range(fix.start..fix.end, &fix.replacement);
-    assert_eq!(result, "task.defer(cleanup, a, b)");
-}
-
-#[test]
 fn test_fix_unnecessary_closure_method_rejected() {
     let src = "pcall(function()\n    return obj:Method()\nend)";
     assert!(compute_fix("alloc::unnecessary_closure", src, 0).is_none());
 }
 
 #[test]
-fn test_fix_unnecessary_closure_task_delay() {
+fn test_fix_unnecessary_closure_task_defer_not_fixed() {
+    let src = "task.defer(function()\n    cleanup(a, b)\nend)";
+    assert!(compute_fix("alloc::unnecessary_closure", src, 0).is_none());
+}
+
+#[test]
+fn test_fix_unnecessary_closure_task_delay_not_fixed() {
     let src = "task.delay(5, function()\n    cleanup()\nend)";
-    let fix = compute_fix("alloc::unnecessary_closure", src, 0).unwrap();
-    let mut result = src.to_string();
-    result.replace_range(fix.start..fix.end, &fix.replacement);
-    assert_eq!(result, "task.delay(5, cleanup)");
+    assert!(compute_fix("alloc::unnecessary_closure", src, 0).is_none());
 }
 
 #[test]
