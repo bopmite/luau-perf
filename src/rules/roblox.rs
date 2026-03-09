@@ -95,12 +95,6 @@ impl Rule for DeprecatedSpawn {
                     msg: "spawn() is deprecated - use task.spawn()".into(),
                 });
             }
-            if visit::is_bare_call(call, "delay") {
-                hits.push(Hit {
-                    pos: visit::call_pos(call),
-                    msg: "delay() is deprecated - use task.delay()".into(),
-                });
-            }
         });
         hits
     }
