@@ -661,7 +661,8 @@ fn is_fixable(id: &str) -> bool {
         "roblox::deprecated_tick" | "math::random_deprecated" |
         "string::format_redundant_tostring" | "roblox::game_workspace" |
         "roblox::coroutine_resume_create" |
-        "style::type_over_typeof"
+        "style::type_over_typeof" |
+        "roblox::wait_for_child_no_timeout"
     )
 }
 

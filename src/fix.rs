@@ -38,6 +38,7 @@ pub fn compute_fix(rule_id: &str, source: &str, pos: usize) -> Option<Fix> {
         "roblox::game_workspace" => fix_game_workspace(source, pos),
         "roblox::coroutine_resume_create" => fix_coroutine_resume_create(source, pos),
         "style::type_over_typeof" => fix_type_over_typeof(source, pos),
+        "roblox::wait_for_child_no_timeout" => fix_wait_for_child_timeout(source, pos),
         _ => None,
     }
 }
@@ -671,6 +672,22 @@ fn fix_game_workspace(source: &str, pos: usize) -> Option<Fix> {
     })
 }
 
+fn fix_wait_for_child_timeout(source: &str, pos: usize) -> Option<Fix> {
+    let rest = source.get(pos..)?;
+    let wfc = rest.find(":WaitForChild(")?;
+    let paren_start = pos + wfc + ":WaitForChild(".len();
+    let close = find_matching_paren(source, paren_start)?;
+    let args = source.get(paren_start..close)?.trim();
+    if args.is_empty() || args.contains(',') {
+        return None;
+    }
+    Some(Fix {
+        start: close,
+        end: close,
+        replacement: ", 5".into(),
+    })
+}
+
 fn fix_coroutine_resume_create(source: &str, pos: usize) -> Option<Fix> {
     let slice = &source[pos..];
     if !slice.starts_with("coroutine.resume(coroutine.create(") { return None; }
@@ -1005,6 +1022,21 @@ mod tests {
         let mut result = src.to_string();
         result.replace_range(fix.start..fix.end, &fix.replacement);
         assert_eq!(result, "if typeof(x) == \"Instance\" then end");
+    }
+
+    #[test]
+    fn test_fix_wait_for_child_timeout() {
+        let src = r#"local gui = player:WaitForChild("PlayerGui")"#;
+        let fix = compute_fix("roblox::wait_for_child_no_timeout", src, 0).unwrap();
+        let mut result = src.to_string();
+        result.replace_range(fix.start..fix.end, &fix.replacement);
+        assert_eq!(result, r#"local gui = player:WaitForChild("PlayerGui", 5)"#);
+    }
+
+    #[test]
+    fn test_fix_wait_for_child_already_has_timeout() {
+        let src = r#"local gui = player:WaitForChild("PlayerGui", 10)"#;
+        assert!(compute_fix("roblox::wait_for_child_no_timeout", src, 0).is_none());
     }
 
     #[test]

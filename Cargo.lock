@@ -154,7 +154,7 @@ dependencies = [
 
 [[package]]
 name = "luauperf"
-version = "0.1.11"
+version = "0.1.14"
 dependencies = [
  "full_moon",
  "rayon",

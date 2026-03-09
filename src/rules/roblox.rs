@@ -834,6 +834,7 @@ impl Rule for ChangedEventUnfiltered {
             let is_value_base = value_base_types.iter().any(|vt| {
                 context.contains(&format!("Instance.new(\"{vt}\")"))
                     || context.contains(&format!(": {vt}"))
+                    || context.contains(&format!("IsA(\"{vt}\")"))
             }) || {
                 let assign_pat = format!("{var_name} = Instance.new(\"");
                 if let Some(apos) = context.rfind(&assign_pat) {

@@ -37,6 +37,10 @@ impl Rule for PropertyChangeSignalWrong {
     fn severity(&self) -> Severity { Severity::Warn }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let value_base_types = [
+            "BoolValue", "IntValue", "StringValue", "ObjectValue", "NumberValue",
+            "Color3Value", "Vector3Value", "CFrameValue", "BrickColorValue", "RayValue",
+        ];
         let mut hits = Vec::new();
         for pos in visit::find_pattern_positions(source, ".Changed:Connect") {
             let before = &source[..pos];
@@ -58,11 +62,29 @@ impl Rule for PropertyChangeSignalWrong {
             {
                 continue;
             }
+            let search_start = visit::floor_char(source, pos.saturating_sub(2000));
+            let context = &source[search_start..pos];
+            let is_value_base = value_base_types.iter().any(|vt| {
+                context.contains(&format!("Instance.new(\"{vt}\")"))
+                    || context.contains(&format!(": {vt}"))
+                    || context.contains(&format!("IsA(\"{vt}\")"))
+            });
+            if is_value_base {
+                continue;
+            }
             if !accessor.contains('.') {
                 let first_char = accessor.chars().next().unwrap_or('A');
                 if first_char.is_ascii_lowercase() && !matches!(accessor, "part" | "gui" | "button" | "frame" | "label" | "instance" | "inst" | "obj" | "descendant" | "child" | "player" | "character" | "humanoid" | "camera" | "sound" | "model" | "tool" | "workspace") {
                     continue;
                 }
+            }
+            let after_end = visit::ceil_char(source, (pos + 500).min(source.len()));
+            let after_connect = &source[pos..after_end];
+            if after_connect.contains("property ==") || after_connect.contains("property ==\"")
+                || after_connect.contains("prop ==") || after_connect.contains("if property")
+                || after_connect.contains("if prop ")
+            {
+                continue;
             }
             hits.push(Hit {
                 pos,
