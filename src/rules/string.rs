@@ -22,8 +22,12 @@ pub struct FormatSimpleConcat;
 pub struct ToStringInInterpolation;
 
 impl Rule for LenOverHash {
-    fn id(&self) -> &'static str { "string::len_over_hash" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "string::len_over_hash"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -33,7 +37,8 @@ impl Rule for LenOverHash {
                 if !src.contains("table") {
                     hits.push(Hit {
                         pos: visit::call_pos(call),
-                        msg: "string.len(s) / s:len() - use #s instead (faster, no function call)".into(),
+                        msg: "string.len(s) / s:len() - use #s instead (faster, no function call)"
+                            .into(),
                     });
                 }
             }
@@ -43,13 +48,19 @@ impl Rule for LenOverHash {
 }
 
 impl Rule for RepInLoop {
-    fn id(&self) -> &'static str { "string::rep_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "string::rep_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_hot_loop && (visit::is_dot_call(call, "string", "rep") || visit::is_method_call(call, "rep")) {
+            if ctx.in_hot_loop
+                && (visit::is_dot_call(call, "string", "rep") || visit::is_method_call(call, "rep"))
+            {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
                     msg: "string.rep() in loop - allocates a new string each iteration".into(),
@@ -61,8 +72,12 @@ impl Rule for RepInLoop {
 }
 
 impl Rule for GsubForFind {
-    fn id(&self) -> &'static str { "string::gsub_for_find" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "string::gsub_for_find"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -80,7 +95,8 @@ impl Rule for GsubForFind {
                 }
                 let line_start = source[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
                 let line_before = source[line_start..pos].trim();
-                if line_before.contains("= ") || line_before.starts_with("return")
+                if line_before.contains("= ")
+                    || line_before.starts_with("return")
                     || line_before.starts_with("local ")
                 {
                     continue;
@@ -96,8 +112,12 @@ impl Rule for GsubForFind {
 }
 
 impl Rule for LowerUpperInLoop {
-    fn id(&self) -> &'static str { "string::lower_upper_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "string::lower_upper_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -121,23 +141,30 @@ impl Rule for LowerUpperInLoop {
 }
 
 impl Rule for ByteComparison {
-    fn id(&self) -> &'static str { "string::byte_comparison" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "string::byte_comparison"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_hot_loop && (visit::is_dot_call(call, "string", "sub") || visit::is_method_call(call, "sub")) {
-                if visit::call_arg_count(call) >= 2 {
-                    if let (Some(start), Some(end_arg)) = (visit::nth_arg(call, 0), visit::nth_arg(call, 1)) {
-                        let s = format!("{start}");
-                        let e = format!("{end_arg}");
-                        if s.trim() == e.trim() {
-                            hits.push(Hit {
-                                pos: visit::call_pos(call),
-                                msg: "string.sub(s, i, i) for single char - use string.byte(s, i) for comparison (no allocation)".into(),
-                            });
-                        }
+            if ctx.in_hot_loop
+                && (visit::is_dot_call(call, "string", "sub") || visit::is_method_call(call, "sub"))
+                && visit::call_arg_count(call) >= 2
+            {
+                if let (Some(start), Some(end_arg)) =
+                    (visit::nth_arg(call, 0), visit::nth_arg(call, 1))
+                {
+                    let s = format!("{start}");
+                    let e = format!("{end_arg}");
+                    if s.trim() == e.trim() {
+                        hits.push(Hit {
+                            pos: visit::call_pos(call),
+                            msg: "string.sub(s, i, i) for single char - use string.byte(s, i) for comparison (no allocation)".into(),
+                        });
                     }
                 }
             }
@@ -147,22 +174,26 @@ impl Rule for ByteComparison {
 }
 
 impl Rule for SubForSingleChar {
-    fn id(&self) -> &'static str { "string::sub_for_single_char" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "string::sub_for_single_char"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, _ctx| {
-            if visit::is_dot_call(call, "string", "sub") || visit::is_method_call(call, "sub") {
-                if visit::call_arg_count(call) == 2 {
-                    if let Some(arg) = visit::nth_arg(call, 1) {
-                        let s = format!("{arg}");
-                        if s.trim() == "1" || s.trim() == "-1" {
-                            hits.push(Hit {
-                                pos: visit::call_pos(call),
-                                msg: "string.sub for single char extraction - use string.byte for comparisons (avoids allocation)".into(),
-                            });
-                        }
+            if (visit::is_dot_call(call, "string", "sub") || visit::is_method_call(call, "sub"))
+                && visit::call_arg_count(call) == 2
+            {
+                if let Some(arg) = visit::nth_arg(call, 1) {
+                    let s = format!("{arg}");
+                    if s.trim() == "1" || s.trim() == "-1" {
+                        hits.push(Hit {
+                            pos: visit::call_pos(call),
+                            msg: "string.sub for single char extraction - use string.byte for comparisons (avoids allocation)".into(),
+                        });
                     }
                 }
             }
@@ -172,8 +203,12 @@ impl Rule for SubForSingleChar {
 }
 
 impl Rule for TostringOnString {
-    fn id(&self) -> &'static str { "string::tostring_on_string" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "string::tostring_on_string"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -199,15 +234,19 @@ impl Rule for TostringOnString {
 }
 
 impl Rule for FindMissingPlainFlag {
-    fn id(&self) -> &'static str { "string::find_missing_plain_flag" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "string::find_missing_plain_flag"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         let magic_chars = ['.', '%', '+', '-', '*', '?', '[', '^', '$', '(', ')'];
         visit::each_call(ast, |call, _ctx| {
-            let is_find = visit::is_dot_call(call, "string", "find")
-                || visit::is_method_call(call, "find");
+            let is_find =
+                visit::is_dot_call(call, "string", "find") || visit::is_method_call(call, "find");
             if !is_find {
                 return;
             }
@@ -217,15 +256,19 @@ impl Rule for FindMissingPlainFlag {
             }
             if let Some(pattern_arg) = visit::nth_arg(call, 1) {
                 let txt = format!("{pattern_arg}").trim().to_string();
-                if txt.len() >= 2 && ((txt.starts_with('"') && txt.ends_with('"')) || (txt.starts_with('\'') && txt.ends_with('\''))) {
-                    let inner = &txt[1..txt.len()-1];
-                    if !inner.chars().any(|c| magic_chars.contains(&c)) && !inner.is_empty() {
-                        if arg_count < 3 {
-                            hits.push(Hit {
-                                pos: visit::call_pos(call),
-                                msg: "string.find with literal pattern - add plain flag (nil, true) to skip pattern compilation".into(),
-                            });
-                        }
+                if txt.len() >= 2
+                    && ((txt.starts_with('"') && txt.ends_with('"'))
+                        || (txt.starts_with('\'') && txt.ends_with('\'')))
+                {
+                    let inner = &txt[1..txt.len() - 1];
+                    if !inner.chars().any(|c| magic_chars.contains(&c))
+                        && !inner.is_empty()
+                        && arg_count < 3
+                    {
+                        hits.push(Hit {
+                            pos: visit::call_pos(call),
+                            msg: "string.find with literal pattern - add plain flag (nil, true) to skip pattern compilation".into(),
+                        });
                     }
                 }
             }
@@ -235,16 +278,24 @@ impl Rule for FindMissingPlainFlag {
 }
 
 impl Rule for LowerForComparison {
-    fn id(&self) -> &'static str { "string::lower_for_comparison" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "string::lower_for_comparison"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         for pos in visit::find_pattern_positions(source, ":lower()") {
             let line_start = source[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
-            let line_end = source[pos..].find('\n').map(|p| pos + p).unwrap_or(source.len());
+            let line_end = source[pos..]
+                .find('\n')
+                .map(|p| pos + p)
+                .unwrap_or(source.len());
             let line = &source[line_start..line_end];
-            let lower_count = line.matches(":lower()").count() + line.matches("string.lower(").count();
+            let lower_count =
+                line.matches(":lower()").count() + line.matches("string.lower(").count();
             if lower_count >= 2 && (line.contains(" == ") || line.contains(" ~= ")) {
                 hits.push(Hit {
                     pos,
@@ -257,8 +308,12 @@ impl Rule for LowerForComparison {
 }
 
 impl Rule for MatchForBoolean {
-    fn id(&self) -> &'static str { "string::match_for_boolean" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "string::match_for_boolean"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -266,11 +321,16 @@ impl Rule for MatchForBoolean {
         for pattern in &patterns {
             for pos in visit::find_pattern_positions(source, pattern) {
                 let line_start = source[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
-                let line_end = source[pos..].find('\n').map(|p| pos + p).unwrap_or(source.len());
+                let line_end = source[pos..]
+                    .find('\n')
+                    .map(|p| pos + p)
+                    .unwrap_or(source.len());
                 let line = &source[line_start..line_end].trim();
-                if line.starts_with("if ") || line.starts_with("elseif ")
+                if line.starts_with("if ")
+                    || line.starts_with("elseif ")
                     || line.starts_with("while ")
-                    || line.contains("if not ") || line.contains("elseif not ")
+                    || line.contains("if not ")
+                    || line.contains("elseif not ")
                 {
                     let before_match = &source[line_start..pos];
                     if !before_match.contains("local ") && !before_match.contains("= ") {
@@ -287,15 +347,23 @@ impl Rule for MatchForBoolean {
 }
 
 impl Rule for ConcatChain {
-    fn id(&self) -> &'static str { "string::concat_chain" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "string::concat_chain"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         for (line_num, line) in source.lines().enumerate() {
             let concat_count = line.matches(" .. ").count();
             if concat_count >= 5 {
-                let pos = source.lines().take(line_num).map(|l| l.len() + 1).sum::<usize>();
+                let pos = source
+                    .lines()
+                    .take(line_num)
+                    .map(|l| l.len() + 1)
+                    .sum::<usize>();
                 hits.push(Hit {
                     pos,
                     msg: format!("{} concatenation operators in one expression - use string.format() or string interpolation", concat_count + 1),
@@ -307,8 +375,12 @@ impl Rule for ConcatChain {
 }
 
 impl Rule for SubForPrefixCheck {
-    fn id(&self) -> &'static str { "string::sub_for_prefix_check" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "string::sub_for_prefix_check"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -330,12 +402,25 @@ impl Rule for SubForPrefixCheck {
 }
 
 impl Rule for PatternBacktracking {
-    fn id(&self) -> &'static str { "string::pattern_backtracking" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "string::pattern_backtracking"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
-        let pattern_funcs = ["string.find(", "string.match(", "string.gmatch(", "string.gsub(", ":find(", ":match(", ":gmatch(", ":gsub("];
+        let pattern_funcs = [
+            "string.find(",
+            "string.match(",
+            "string.gmatch(",
+            "string.gsub(",
+            ":find(",
+            ":match(",
+            ":gmatch(",
+            ":gsub(",
+        ];
         for func in &pattern_funcs {
             for pos in visit::find_pattern_positions(source, func) {
                 let after = &source[pos + func.len()..];
@@ -345,7 +430,8 @@ impl Rule for PatternBacktracking {
                         let pattern = &args[comma + 3..];
                         if let Some(pend) = pattern.find('"') {
                             let pat = &pattern[..pend];
-                            let greedy_count = pat.matches(".*").count() + pat.matches(".+").count();
+                            let greedy_count =
+                                pat.matches(".*").count() + pat.matches(".+").count();
                             if greedy_count >= 2 {
                                 hits.push(Hit {
                                     pos,
@@ -362,8 +448,12 @@ impl Rule for PatternBacktracking {
 }
 
 impl Rule for ReverseInLoop {
-    fn id(&self) -> &'static str { "string::reverse_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "string::reverse_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -386,8 +476,12 @@ impl Rule for ReverseInLoop {
 }
 
 impl Rule for FormatKnownTypes {
-    fn id(&self) -> &'static str { "string::format_known_types" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "string::format_known_types"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -415,7 +509,9 @@ impl Rule for FormatKnownTypes {
 fn line_start_offsets(source: &str) -> Vec<usize> {
     let mut starts = vec![0];
     for (i, b) in source.bytes().enumerate() {
-        if b == b'\n' { starts.push(i + 1); }
+        if b == b'\n' {
+            starts.push(i + 1);
+        }
     }
     starts
 }
@@ -449,7 +545,9 @@ fn build_hot_loop_depth_map(source: &str) -> Vec<i32> {
             current += 1;
         }
         depth[i] = current;
-        if (t == "end" || t.starts_with("end ") || t.starts_with("end)") || t.starts_with("end,")) && current > 0 {
+        if (t == "end" || t.starts_with("end ") || t.starts_with("end)") || t.starts_with("end,"))
+            && current > 0
+        {
             current -= 1;
         }
         if t.starts_with("until ") && current > 0 {
@@ -460,15 +558,21 @@ fn build_hot_loop_depth_map(source: &str) -> Vec<i32> {
 }
 
 impl Rule for FormatNoArgs {
-    fn id(&self) -> &'static str { "string::format_no_args" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "string::format_no_args"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         for pos in visit::find_pattern_positions(source, "string.format(") {
             let after = &source[pos + "string.format(".len()..];
             let quote = after.chars().next().unwrap_or(' ');
-            if quote != '"' && quote != '\'' { continue; }
+            if quote != '"' && quote != '\'' {
+                continue;
+            }
             if let Some(close_quote) = after[1..].find(quote) {
                 let after_quote = &after[close_quote + 2..];
                 let next = after_quote.chars().next().unwrap_or(' ');
@@ -488,22 +592,30 @@ impl Rule for FormatNoArgs {
 }
 
 impl Rule for FormatRedundantTostring {
-    fn id(&self) -> &'static str { "string::format_redundant_tostring" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "string::format_redundant_tostring"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         for pos in visit::find_pattern_positions(source, "string.format(") {
             let after = &source[pos + "string.format(".len()..];
             let quote = after.chars().next().unwrap_or(' ');
-            if quote != '"' && quote != '\'' { continue; }
+            if quote != '"' && quote != '\'' {
+                continue;
+            }
             let close_quote = match after[1..].find(quote) {
                 Some(i) => i + 1,
                 None => continue,
             };
             let fmt_str = &after[1..close_quote];
             let s_count = fmt_str.matches("%s").count();
-            if s_count == 0 { continue; }
+            if s_count == 0 {
+                continue;
+            }
             let args_str = &after[close_quote + 1..];
             let line_end = args_str.find('\n').unwrap_or(args_str.len());
             let args_line = &args_str[..line_end];
@@ -522,8 +634,12 @@ impl Rule for FormatRedundantTostring {
 }
 
 impl Rule for FormatSimpleConcat {
-    fn id(&self) -> &'static str { "string::format_simple_concat" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "string::format_simple_concat"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -534,16 +650,19 @@ impl Rule for FormatSimpleConcat {
                 None => continue,
             };
             let fmt = &after[..close_quote];
-            if fmt.is_empty() { continue; }
-            let only_s = fmt.replace("%s", "").chars().all(|c| !c.is_alphanumeric() || c == ' ');
+            if fmt.is_empty() {
+                continue;
+            }
+            let _only_s = fmt
+                .replace("%s", "")
+                .chars()
+                .all(|c| !c.is_alphanumeric() || c == ' ');
             let s_count = fmt.matches("%s").count();
-            if only_s && s_count >= 2 && !fmt.contains('%') || (s_count > 0 && fmt.replace("%s", "").find('%').is_none()) {
-                if s_count >= 2 && fmt.replace("%s", "").find('%').is_none() {
-                    hits.push(Hit {
-                        pos,
-                        msg: "string.format with only %s specifiers - use .. concatenation instead (concat is a single VM opcode, format is not a fastcall)".into(),
-                    });
-                }
+            if s_count >= 2 && fmt.replace("%s", "").find('%').is_none() {
+                hits.push(Hit {
+                    pos,
+                    msg: "string.format with only %s specifiers - use .. concatenation instead (concat is a single VM opcode, format is not a fastcall)".into(),
+                });
             }
         }
         hits
@@ -551,8 +670,12 @@ impl Rule for FormatSimpleConcat {
 }
 
 impl Rule for ToStringInInterpolation {
-    fn id(&self) -> &'static str { "string::tostring_in_interpolation" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "string::tostring_in_interpolation"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -565,10 +688,15 @@ impl Rule for ToStringInInterpolation {
                 if i < len && bytes[i] == b'[' {
                     let mut eq = 0;
                     let mut j = i + 1;
-                    while j < len && bytes[j] == b'=' { eq += 1; j += 1; }
+                    while j < len && bytes[j] == b'=' {
+                        eq += 1;
+                        j += 1;
+                    }
                     if j < len && bytes[j] == b'[' {
                         let mut close = String::from("]");
-                        for _ in 0..eq { close.push('='); }
+                        for _ in 0..eq {
+                            close.push('=');
+                        }
                         close.push(']');
                         if let Some(end) = source[j + 1..].find(&close) {
                             i = j + 1 + end + close.len();
@@ -578,17 +706,23 @@ impl Rule for ToStringInInterpolation {
                         continue;
                     }
                 }
-                while i < len && bytes[i] != b'\n' { i += 1; }
+                while i < len && bytes[i] != b'\n' {
+                    i += 1;
+                }
                 continue;
             }
             if bytes[i] == b'"' || bytes[i] == b'\'' {
                 let q = bytes[i];
                 i += 1;
                 while i < len && bytes[i] != q && bytes[i] != b'\n' {
-                    if bytes[i] == b'\\' { i += 1; }
+                    if bytes[i] == b'\\' {
+                        i += 1;
+                    }
                     i += 1;
                 }
-                if i < len { i += 1; }
+                if i < len {
+                    i += 1;
+                }
                 continue;
             }
             if bytes[i] == b'`' {
@@ -604,12 +738,16 @@ impl Rule for ToStringInInterpolation {
                                 depth += 1;
                             } else if bytes[i] == b'}' {
                                 depth -= 1;
-                                if depth == 0 { break; }
+                                if depth == 0 {
+                                    break;
+                                }
                             } else if bytes[i] == b'"' || bytes[i] == b'\'' {
                                 let q = bytes[i];
                                 i += 1;
                                 while i < len && bytes[i] != q && bytes[i] != b'\n' {
-                                    if bytes[i] == b'\\' { i += 1; }
+                                    if bytes[i] == b'\\' {
+                                        i += 1;
+                                    }
                                     i += 1;
                                 }
                             }
@@ -621,12 +759,16 @@ impl Rule for ToStringInInterpolation {
                         if trimmed.starts_with("tostring(") && trimmed.ends_with(')') {
                             let inner = &trimmed["tostring(".len()..trimmed.len() - 1];
                             let mut paren_depth = 0i32;
-                            let balanced = inner.chars().all(|c| {
-                                match c {
-                                    '(' => { paren_depth += 1; true }
-                                    ')' => { paren_depth -= 1; paren_depth >= 0 }
-                                    _ => true,
+                            let balanced = inner.chars().all(|c| match c {
+                                '(' => {
+                                    paren_depth += 1;
+                                    true
                                 }
+                                ')' => {
+                                    paren_depth -= 1;
+                                    paren_depth >= 0
+                                }
+                                _ => true,
                             }) && paren_depth == 0;
                             if balanced {
                                 hits.push(Hit {
@@ -635,13 +777,19 @@ impl Rule for ToStringInInterpolation {
                                 });
                             }
                         }
-                        if i < len { i += 1; }
+                        if i < len {
+                            i += 1;
+                        }
                         continue;
                     }
-                    if bytes[i] == b'\\' { i += 1; }
+                    if bytes[i] == b'\\' {
+                        i += 1;
+                    }
                     i += 1;
                 }
-                if i < len { i += 1; }
+                if i < len {
+                    i += 1;
+                }
                 continue;
             }
             i += 1;

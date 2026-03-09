@@ -32,8 +32,12 @@ pub struct NestedStringFormat;
 pub struct CoroutineCreateOverTaskSpawn;
 
 impl Rule for ServiceLocatorAntiPattern {
-    fn id(&self) -> &'static str { "style::duplicate_get_service" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "style::duplicate_get_service"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut service_calls: HashMap<String, Vec<usize>> = HashMap::new();
@@ -55,7 +59,9 @@ impl Rule for ServiceLocatorAntiPattern {
                 for &pos in &positions[1..] {
                     hits.push(Hit {
                         pos,
-                        msg: format!("duplicate GetService(\"{name}\") - cache in a module-level local"),
+                        msg: format!(
+                            "duplicate GetService(\"{name}\") - cache in a module-level local"
+                        ),
                     });
                 }
             }
@@ -65,8 +71,12 @@ impl Rule for ServiceLocatorAntiPattern {
 }
 
 impl Rule for EmptyFunctionBody {
-    fn id(&self) -> &'static str { "style::empty_function_body" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "style::empty_function_body"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -76,7 +86,8 @@ impl Rule for EmptyFunctionBody {
             if trimmed.starts_with("end") {
                 hits.push(Hit {
                     pos,
-                    msg: "empty function body - use a NOOP constant or remove if unnecessary".into(),
+                    msg: "empty function body - use a NOOP constant or remove if unnecessary"
+                        .into(),
                 });
             }
         }
@@ -85,13 +96,20 @@ impl Rule for EmptyFunctionBody {
 }
 
 impl Rule for DeprecatedGlobalCall {
-    fn id(&self) -> &'static str { "style::deprecated_global" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "style::deprecated_global"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, _ctx| {
-            if visit::is_bare_call(call, "rawget") || visit::is_bare_call(call, "rawset") || visit::is_bare_call(call, "rawequal") {
+            if visit::is_bare_call(call, "rawget")
+                || visit::is_bare_call(call, "rawset")
+                || visit::is_bare_call(call, "rawequal")
+            {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
                     msg: "rawget/rawset/rawequal - may indicate metatable workaround, verify necessity".into(),
@@ -103,8 +121,12 @@ impl Rule for DeprecatedGlobalCall {
 }
 
 impl Rule for TypeCheckInLoop {
-    fn id(&self) -> &'static str { "style::type_check_in_loop" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "style::type_check_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -121,8 +143,12 @@ impl Rule for TypeCheckInLoop {
 }
 
 impl Rule for DeepNesting {
-    fn id(&self) -> &'static str { "style::deep_nesting" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "style::deep_nesting"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -161,8 +187,12 @@ impl Rule for DeepNesting {
 }
 
 impl Rule for DotMethodCall {
-    fn id(&self) -> &'static str { "style::dot_method_call" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "style::dot_method_call"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -205,12 +235,18 @@ impl Rule for DotMethodCall {
 }
 
 impl Rule for PrintInHotPath {
-    fn id(&self) -> &'static str { "style::print_in_hot_path" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "style::print_in_hot_path"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
-        let has_runservice = source.contains("Heartbeat") || source.contains("RenderStepped") || source.contains("Stepped");
+        let has_runservice = source.contains("Heartbeat")
+            || source.contains("RenderStepped")
+            || source.contains("Stepped");
 
         visit::each_call(ast, |call, ctx| {
             let is_print = visit::is_bare_call(call, "print") || visit::is_bare_call(call, "warn");
@@ -226,11 +262,16 @@ impl Rule for PrintInHotPath {
                 let pos = visit::call_pos(call);
                 let before_start = visit::floor_char(source, pos.saturating_sub(300));
                 let before = &source[before_start..pos];
-                let rs_patterns = ["Heartbeat:Connect(", "RenderStepped:Connect(", "Stepped:Connect("];
+                let rs_patterns = [
+                    "Heartbeat:Connect(",
+                    "RenderStepped:Connect(",
+                    "Stepped:Connect(",
+                ];
                 let has_rs = rs_patterns.iter().any(|pat| {
                     if let Some(connect_idx) = before.rfind(pat) {
                         let between = &before[connect_idx + pat.len()..];
-                        !between.contains("\nend)") && !between.contains("\n\tend)")
+                        !between.contains("\nend)")
+                            && !between.contains("\n\tend)")
                             && !between.contains("\n\t\tend)")
                     } else {
                         false
@@ -249,8 +290,12 @@ impl Rule for PrintInHotPath {
 }
 
 impl Rule for DebugInHotPath {
-    fn id(&self) -> &'static str { "style::debug_in_hot_path" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "style::debug_in_hot_path"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -272,8 +317,12 @@ impl Rule for DebugInHotPath {
 }
 
 impl Rule for IndexFunctionMetatable {
-    fn id(&self) -> &'static str { "style::index_function_metatable" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "style::index_function_metatable"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -281,11 +330,14 @@ impl Rule for IndexFunctionMetatable {
         for pattern in &patterns {
             for pos in visit::find_pattern_positions(source, pattern) {
                 let func_start = pos + pattern.len();
-                let body_end = source[func_start..].find("\n\tend")
+                let body_end = source[func_start..]
+                    .find("\n\tend")
                     .or_else(|| source[func_start..].find("\nend"))
                     .unwrap_or(500.min(source.len() - func_start));
                 let body = &source[func_start..func_start + body_end];
-                let same_line_end = source[func_start..].find('\n').unwrap_or(source.len() - func_start);
+                let same_line_end = source[func_start..]
+                    .find('\n')
+                    .unwrap_or(source.len() - func_start);
                 let same_line = &source[func_start..func_start + same_line_end];
                 if let Some(paren_end) = same_line.find(')') {
                     let after_parens = same_line[paren_end + 1..].trim();
@@ -293,18 +345,26 @@ impl Rule for IndexFunctionMetatable {
                         continue;
                     }
                 }
-                let is_proxy = body.contains("if key") || body.contains("if k ")
-                    || body.contains("if type(key)") || body.contains("if type(k)")
-                    || body.contains("[key]") || body.contains("[k]")
-                    || body.contains("rawget") || body.contains("error(")
-                    || body.contains("throw(") || body.contains("warn(")
-                    || body.contains("console.") || body.contains("if index");
+                let is_proxy = body.contains("if key")
+                    || body.contains("if k ")
+                    || body.contains("if type(key)")
+                    || body.contains("if type(k)")
+                    || body.contains("[key]")
+                    || body.contains("[k]")
+                    || body.contains("rawget")
+                    || body.contains("error(")
+                    || body.contains("throw(")
+                    || body.contains("warn(")
+                    || body.contains("console.")
+                    || body.contains("if index");
                 if is_proxy {
                     continue;
                 }
                 let func_sig_end = source[func_start..].find(')').unwrap_or(0);
                 let params = &source[func_start..func_start + func_sig_end];
-                let param_name = params.split(',').nth(1)
+                let param_name = params
+                    .split(',')
+                    .nth(1)
                     .map(|s| s.trim().trim_start_matches('_'))
                     .unwrap_or("");
                 if !param_name.is_empty() && body.contains(&format!("[{param_name}]")) {
@@ -321,8 +381,12 @@ impl Rule for IndexFunctionMetatable {
 }
 
 impl Rule for ConditionalFieldInConstructor {
-    fn id(&self) -> &'static str { "style::conditional_field_in_constructor" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "style::conditional_field_in_constructor"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -358,14 +422,16 @@ impl Rule for ConditionalFieldInConstructor {
                 } else if trimmed == "else" {
                     in_if = false;
                     in_else = true;
-                } else if trimmed == "end" {
-                    if in_if || in_else {
-                        break;
-                    }
+                } else if trimmed == "end" && (in_if || in_else) {
+                    break;
                 }
 
                 if trimmed.starts_with(&field_prefix) && trimmed.contains(" = ") {
-                    let field = trimmed[field_prefix.len()..].split(' ').next().unwrap_or("").to_string();
+                    let field = trimmed[field_prefix.len()..]
+                        .split(' ')
+                        .next()
+                        .unwrap_or("")
+                        .to_string();
                     if in_if {
                         if_fields.push(field);
                     } else if in_else {
@@ -390,8 +456,12 @@ impl Rule for ConditionalFieldInConstructor {
 }
 
 impl Rule for GlobalFunctionNotLocal {
-    fn id(&self) -> &'static str { "style::global_function_not_local" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "style::global_function_not_local"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -412,8 +482,12 @@ impl Rule for GlobalFunctionNotLocal {
 }
 
 impl Rule for AssertInHotPath {
-    fn id(&self) -> &'static str { "style::assert_in_hot_path" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "style::assert_in_hot_path"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -430,8 +504,12 @@ impl Rule for AssertInHotPath {
 }
 
 impl Rule for RedundantCondition {
-    fn id(&self) -> &'static str { "style::redundant_condition" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "style::redundant_condition"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -458,8 +536,12 @@ impl Rule for RedundantCondition {
 }
 
 impl Rule for LongFunctionBody {
-    fn id(&self) -> &'static str { "style::long_function_body" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "style::long_function_body"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -499,9 +581,13 @@ fn check_functions(block: &full_moon::ast::Block, hits: &mut Vec<Hit>) {
             full_moon::ast::Stmt::If(s) => {
                 check_functions(s.block(), hits);
                 if let Some(eis) = s.else_if() {
-                    for ei in eis { check_functions(ei.block(), hits); }
+                    for ei in eis {
+                        check_functions(ei.block(), hits);
+                    }
                 }
-                if let Some(eb) = s.else_block() { check_functions(eb, hits); }
+                if let Some(eb) = s.else_block() {
+                    check_functions(eb, hits);
+                }
             }
             full_moon::ast::Stmt::While(s) => check_functions(s.block(), hits),
             full_moon::ast::Stmt::Repeat(s) => check_functions(s.block(), hits),
@@ -520,9 +606,13 @@ fn count_stmts(block: &full_moon::ast::Block) -> usize {
             full_moon::ast::Stmt::If(s) => {
                 count += count_stmts(s.block());
                 if let Some(eis) = s.else_if() {
-                    for ei in eis { count += count_stmts(ei.block()); }
+                    for ei in eis {
+                        count += count_stmts(ei.block());
+                    }
                 }
-                if let Some(eb) = s.else_block() { count += count_stmts(eb); }
+                if let Some(eb) = s.else_block() {
+                    count += count_stmts(eb);
+                }
             }
             full_moon::ast::Stmt::While(s) => count += count_stmts(s.block()),
             full_moon::ast::Stmt::Repeat(s) => count += count_stmts(s.block()),
@@ -536,8 +626,12 @@ fn count_stmts(block: &full_moon::ast::Block) -> usize {
 }
 
 impl Rule for DuplicateStringLiteral {
-    fn id(&self) -> &'static str { "style::duplicate_string_literal" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "style::duplicate_string_literal"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut counts: HashMap<String, (usize, usize)> = HashMap::new();
@@ -549,7 +643,9 @@ impl Rule for DuplicateStringLiteral {
                 let start = i;
                 i += 1;
                 while i < bytes.len() && bytes[i] != quote {
-                    if bytes[i] == b'\\' { i += 1; }
+                    if bytes[i] == b'\\' {
+                        i += 1;
+                    }
                     i += 1;
                 }
                 if i < bytes.len() {
@@ -562,7 +658,8 @@ impl Rule for DuplicateStringLiteral {
             }
             i += 1;
         }
-        counts.into_iter()
+        counts
+            .into_iter()
             .filter(|(_, (count, _))| *count >= 5)
             .map(|(s, (count, pos))| Hit {
                 pos,
@@ -573,8 +670,12 @@ impl Rule for DuplicateStringLiteral {
 }
 
 impl Rule for TypeOverTypeof {
-    fn id(&self) -> &'static str { "style::type_over_typeof" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "style::type_over_typeof"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -591,15 +692,23 @@ impl Rule for TypeOverTypeof {
 }
 
 impl Rule for NestedTernary {
-    fn id(&self) -> &'static str { "style::nested_ternary" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "style::nested_ternary"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         for (line_num, line) in source.lines().enumerate() {
             let if_count = line.matches(" if ").count() + line.matches("(if ").count();
             if if_count >= 3 {
-                let pos = source.lines().take(line_num).map(|l| l.len() + 1).sum::<usize>();
+                let pos = source
+                    .lines()
+                    .take(line_num)
+                    .map(|l| l.len() + 1)
+                    .sum::<usize>();
                 hits.push(Hit {
                     pos,
                     msg: "deeply nested ternary (if/then/else) expression - extract to a helper function for readability".into(),
@@ -611,8 +720,12 @@ impl Rule for NestedTernary {
 }
 
 impl Rule for UnusedVariable {
-    fn id(&self) -> &'static str { "style::unused_variable_in_loop" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "style::unused_variable_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -620,19 +733,30 @@ impl Rule for UnusedVariable {
         let loop_depth = build_hot_loop_depth_map(source);
         for (i, line) in lines.iter().enumerate() {
             let trimmed = line.trim();
-            if i >= loop_depth.len() || loop_depth[i] == 0 { continue; }
-            if !trimmed.starts_with("local ") { continue; }
+            if i >= loop_depth.len() || loop_depth[i] == 0 {
+                continue;
+            }
+            if !trimmed.starts_with("local ") {
+                continue;
+            }
             let after_local = trimmed.strip_prefix("local ").unwrap();
-            if after_local.starts_with("function") { continue; }
+            if after_local.starts_with("function") {
+                continue;
+            }
             if let Some(eq_pos) = after_local.find(" = ") {
                 let var_name = after_local[..eq_pos].trim();
-                if var_name.contains(',') || var_name.starts_with('_') { continue; }
+                if var_name.contains(',') || var_name.starts_with('_') {
+                    continue;
+                }
                 let rhs = &after_local[eq_pos + 3..];
-                if rhs.contains("Instance.new") || rhs.contains(".new(") || rhs.contains(":Clone()") {
+                if rhs.contains("Instance.new") || rhs.contains(".new(") || rhs.contains(":Clone()")
+                {
                     let mut used = false;
-                    for j in (i + 1)..lines.len().min(i + 20) {
-                        let next = lines[j].trim();
-                        if next == "end" || next.starts_with("end ") || next.starts_with("until") { break; }
+                    for next_line in lines.iter().take(lines.len().min(i + 20)).skip(i + 1) {
+                        let next = next_line.trim();
+                        if next == "end" || next.starts_with("end ") || next.starts_with("until") {
+                            break;
+                        }
                         if next.contains(var_name) && !next.starts_with("local ") {
                             used = true;
                             break;
@@ -653,18 +777,24 @@ impl Rule for UnusedVariable {
 }
 
 impl Rule for MultipleReturns {
-    fn id(&self) -> &'static str { "style::multiple_returns_hot_path" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "style::multiple_returns_hot_path"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         let mut in_heartbeat = false;
         for (i, line) in source.lines().enumerate() {
             let trimmed = line.trim();
-            if trimmed.contains("Heartbeat") || trimmed.contains("RenderStepped") || trimmed.contains("Stepped") {
-                if trimmed.contains(":Connect") || trimmed.contains(":Once") {
-                    in_heartbeat = true;
-                }
+            if (trimmed.contains("Heartbeat")
+                || trimmed.contains("RenderStepped")
+                || trimmed.contains("Stepped"))
+                && (trimmed.contains(":Connect") || trimmed.contains(":Once"))
+            {
+                in_heartbeat = true;
             }
             if in_heartbeat && trimmed == "end)" {
                 in_heartbeat = false;
@@ -713,7 +843,9 @@ fn build_hot_loop_depth_map(source: &str) -> Vec<i32> {
             current += 1;
         }
         depth[i] = current;
-        if (t == "end" || t.starts_with("end ") || t.starts_with("end)") || t.starts_with("end,")) && current > 0 {
+        if (t == "end" || t.starts_with("end ") || t.starts_with("end)") || t.starts_with("end,"))
+            && current > 0
+        {
             current -= 1;
         }
         if t.starts_with("until ") && current > 0 {
@@ -724,8 +856,12 @@ fn build_hot_loop_depth_map(source: &str) -> Vec<i32> {
 }
 
 impl Rule for UDim2PreferFromOffset {
-    fn id(&self) -> &'static str { "style::udim2_prefer_from_offset" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "style::udim2_prefer_from_offset"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -755,8 +891,12 @@ impl Rule for UDim2PreferFromOffset {
 }
 
 impl Rule for UDim2PreferFromScale {
-    fn id(&self) -> &'static str { "style::udim2_prefer_from_scale" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "style::udim2_prefer_from_scale"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -789,8 +929,12 @@ impl Rule for UDim2PreferFromScale {
 }
 
 impl Rule for TostringMathFloor {
-    fn id(&self) -> &'static str { "style::tostring_math_floor" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "style::tostring_math_floor"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -811,24 +955,33 @@ impl Rule for TostringMathFloor {
 }
 
 impl Rule for MatchForExistence {
-    fn id(&self) -> &'static str { "style::match_for_existence" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "style::match_for_existence"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         for pos in visit::find_pattern_positions(source, "string.match(") {
             let line_start = source[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
-            let line_end = source[pos..].find('\n').map(|i| pos + i).unwrap_or(source.len());
+            let line_end = source[pos..]
+                .find('\n')
+                .map(|i| pos + i)
+                .unwrap_or(source.len());
             let line = &source[line_start..line_end];
-            if line.contains("~= nil") || line.contains("== nil")
-                || line.trim().starts_with("if ") || line.trim().starts_with("elseif ")
+            if (line.contains("~= nil")
+                || line.contains("== nil")
+                || line.trim().starts_with("if ")
+                || line.trim().starts_with("elseif "))
+                && !line.contains("local ")
+                && !line.contains("return string.match")
             {
-                if !line.contains("local ") && !line.contains("return string.match") {
-                    hits.push(Hit {
-                        pos,
-                        msg: "string.match() used for existence check - string.find() is faster when you don't need captures".into(),
-                    });
-                }
+                hits.push(Hit {
+                    pos,
+                    msg: "string.match() used for existence check - string.find() is faster when you don't need captures".into(),
+                });
             }
         }
         hits
@@ -836,8 +989,12 @@ impl Rule for MatchForExistence {
 }
 
 impl Rule for NestedStringFormat {
-    fn id(&self) -> &'static str { "style::nested_string_format" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "style::nested_string_format"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -848,7 +1005,8 @@ impl Rule for NestedStringFormat {
                 if !between.contains('\n') {
                     hits.push(Hit {
                         pos,
-                        msg: "nested string.format() calls - combine into a single format string".into(),
+                        msg: "nested string.format() calls - combine into a single format string"
+                            .into(),
                     });
                 }
             }
@@ -858,8 +1016,12 @@ impl Rule for NestedStringFormat {
 }
 
 impl Rule for ErrorNoLevel {
-    fn id(&self) -> &'static str { "style::error_no_level" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "style::error_no_level"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -876,8 +1038,12 @@ impl Rule for ErrorNoLevel {
 }
 
 impl Rule for DeepParentChain {
-    fn id(&self) -> &'static str { "style::deep_parent_chain" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "style::deep_parent_chain"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -895,8 +1061,12 @@ impl Rule for DeepParentChain {
 }
 
 impl Rule for CoroutineCreateOverTaskSpawn {
-    fn id(&self) -> &'static str { "style::coroutine_create_over_task_spawn" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "style::coroutine_create_over_task_spawn"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();

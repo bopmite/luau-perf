@@ -23,8 +23,12 @@ pub struct NextTNilOverPairs;
 pub struct MixedTableConstructor;
 
 impl Rule for ForeachDeprecated {
-    fn id(&self) -> &'static str { "table::foreach_deprecated" }
-    fn severity(&self) -> Severity { Severity::Error }
+    fn id(&self) -> &'static str {
+        "table::foreach_deprecated"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Error
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -47,8 +51,12 @@ impl Rule for ForeachDeprecated {
 }
 
 impl Rule for GetnDeprecated {
-    fn id(&self) -> &'static str { "table::getn_deprecated" }
-    fn severity(&self) -> Severity { Severity::Error }
+    fn id(&self) -> &'static str {
+        "table::getn_deprecated"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Error
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -65,8 +73,12 @@ impl Rule for GetnDeprecated {
 }
 
 impl Rule for MaxnDeprecated {
-    fn id(&self) -> &'static str { "table::maxn_deprecated" }
-    fn severity(&self) -> Severity { Severity::Error }
+    fn id(&self) -> &'static str {
+        "table::maxn_deprecated"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Error
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -83,8 +95,12 @@ impl Rule for MaxnDeprecated {
 }
 
 impl Rule for FreezeInLoop {
-    fn id(&self) -> &'static str { "table::freeze_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "table::freeze_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -92,7 +108,9 @@ impl Rule for FreezeInLoop {
             if ctx.in_hot_loop && visit::is_dot_call(call, "table", "freeze") {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
-                    msg: "table.freeze() in loop - freeze tables once at creation, not per-iteration".into(),
+                    msg:
+                        "table.freeze() in loop - freeze tables once at creation, not per-iteration"
+                            .into(),
                 });
             }
         });
@@ -101,8 +119,12 @@ impl Rule for FreezeInLoop {
 }
 
 impl Rule for InsertWithPosition {
-    fn id(&self) -> &'static str { "table::insert_with_position" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "table::insert_with_position"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -119,8 +141,12 @@ impl Rule for InsertWithPosition {
 }
 
 impl Rule for RemoveInIpairs {
-    fn id(&self) -> &'static str { "table::remove_in_ipairs" }
-    fn severity(&self) -> Severity { Severity::Error }
+    fn id(&self) -> &'static str {
+        "table::remove_in_ipairs"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Error
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let remove_positions = visit::find_pattern_positions(source, "table.remove(");
@@ -147,8 +173,12 @@ impl Rule for RemoveInIpairs {
 }
 
 impl Rule for PackOverLiteral {
-    fn id(&self) -> &'static str { "table::pack_over_literal" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "table::pack_over_literal"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -174,8 +204,12 @@ impl Rule for PackOverLiteral {
 }
 
 impl Rule for ManualCopyLoop {
-    fn id(&self) -> &'static str { "table::manual_copy_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "table::manual_copy_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -187,24 +221,42 @@ impl Rule for ManualCopyLoop {
             }
             let after_end = visit::ceil_char(source, (pos + 200).min(source.len()));
             let after = &source[pos..after_end];
-            let end_pos = after.find("\nend").or_else(|| after.find(" end")).unwrap_or(after.len());
+            let end_pos = after
+                .find("\nend")
+                .or_else(|| after.find(" end"))
+                .unwrap_or(after.len());
             let body = &after[..end_pos];
-            if !body.contains("] = ") { continue; }
+            if !body.contains("] = ") {
+                continue;
+            }
             let do_pos = match body.find("do") {
                 Some(p) => p + 2,
                 None => continue,
             };
             let body_content = body[do_pos..].trim();
-            let body_lines: Vec<&str> = body_content.lines().map(|l| l.trim()).filter(|l| !l.is_empty()).collect();
-            if body_lines.len() != 1 { continue; }
+            let body_lines: Vec<&str> = body_content
+                .lines()
+                .map(|l| l.trim())
+                .filter(|l| !l.is_empty())
+                .collect();
+            if body_lines.len() != 1 {
+                continue;
+            }
             let line = body_lines[0];
-            if line.contains("if ") || line.contains("or ") || line.contains("and ")
-                || line.contains("nil") || line.contains("(") || line.contains("+")
-                || line.contains("-") || line.contains("..") || line.contains("not ")
+            if line.contains("if ")
+                || line.contains("or ")
+                || line.contains("and ")
+                || line.contains("nil")
+                || line.contains("(")
+                || line.contains("+")
+                || line.contains("-")
+                || line.contains("..")
+                || line.contains("not ")
             {
                 continue;
             }
-            if let Some(bracket_content) = line.split('[').nth(1).and_then(|s| s.split(']').next()) {
+            if let Some(bracket_content) = line.split('[').nth(1).and_then(|s| s.split(']').next())
+            {
                 if bracket_content.contains('.') || bracket_content.contains(':') {
                     continue;
                 }
@@ -219,8 +271,12 @@ impl Rule for ManualCopyLoop {
 }
 
 impl Rule for DeferredFieldAssignment {
-    fn id(&self) -> &'static str { "table::deferred_field_assignment" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "table::deferred_field_assignment"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let empty_positions = visit::find_pattern_positions(source, "= {}");
@@ -271,8 +327,12 @@ impl Rule for DeferredFieldAssignment {
 }
 
 impl Rule for IpairsOverNumericFor {
-    fn id(&self) -> &'static str { "table::ipairs_over_numeric_for" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "table::ipairs_over_numeric_for"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -303,7 +363,9 @@ impl Rule for IpairsOverNumericFor {
 
             let hash_idx = after_eq.find('#').unwrap();
             let after_hash = &after_eq[hash_idx + 1..];
-            let table_name_end = after_hash.find(|c: char| !c.is_alphanumeric() && c != '_').unwrap_or(after_hash.len());
+            let table_name_end = after_hash
+                .find(|c: char| !c.is_alphanumeric() && c != '_')
+                .unwrap_or(after_hash.len());
             let table_name = &after_hash[..table_name_end];
             if table_name.is_empty() {
                 continue;
@@ -322,8 +384,12 @@ impl Rule for IpairsOverNumericFor {
 }
 
 impl Rule for PolymorphicConstructor {
-    fn id(&self) -> &'static str { "table::polymorphic_constructor" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "table::polymorphic_constructor"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         use std::collections::HashSet;
@@ -349,7 +415,9 @@ impl Rule for PolymorphicConstructor {
             let mut depth = 1i32;
             let mut end_idx = after.len();
             for (i, ch) in after.char_indices() {
-                if ch == '{' { depth += 1; }
+                if ch == '{' {
+                    depth += 1;
+                }
                 if ch == '}' {
                     depth -= 1;
                     if depth <= 0 {
@@ -384,7 +452,11 @@ impl Rule for PolymorphicConstructor {
                 if pos_b - pos_a > 2000 {
                     break;
                 }
-                if keys_a != keys_b && !keys_a.is_disjoint(keys_b) && keys_a.len() >= 2 && keys_b.len() >= 2 {
+                if keys_a != keys_b
+                    && !keys_a.is_disjoint(keys_b)
+                    && keys_a.len() >= 2
+                    && keys_b.len() >= 2
+                {
                     hits.push(Hit {
                         pos: *pos_b,
                         msg: "table constructors with different key sets in same scope - defeats inline caching (~27% overhead), use consistent shapes".into(),
@@ -398,8 +470,12 @@ impl Rule for PolymorphicConstructor {
 }
 
 impl Rule for SortComparisonAllocation {
-    fn id(&self) -> &'static str { "table::sort_comparison_allocation" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "table::sort_comparison_allocation"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -427,8 +503,12 @@ impl Rule for SortComparisonAllocation {
 }
 
 impl Rule for ClearVsNew {
-    fn id(&self) -> &'static str { "table::clear_vs_new" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "table::clear_vs_new"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -453,8 +533,12 @@ impl Rule for ClearVsNew {
 }
 
 impl Rule for TableMoveOverLoop {
-    fn id(&self) -> &'static str { "table::move_over_loop" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "table::move_over_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -467,17 +551,19 @@ impl Rule for TableMoveOverLoop {
             }
             if let Some(eq_pos) = trimmed.find(" = ") {
                 let rest = &trimmed[eq_pos + 3..];
-                if rest.starts_with("1,") || rest.starts_with("1 ,") {
-                    if after.contains("] = ") && after.contains("[") {
-                        let assigns: Vec<&str> = after.lines()
-                            .filter(|l| l.contains("] = ") && l.contains("["))
-                            .collect();
-                        if assigns.len() == 1 {
-                            hits.push(Hit {
-                                pos,
-                                msg: "element-by-element array copy - use table.move(src, 1, #src, 1, dst) instead".into(),
-                            });
-                        }
+                if (rest.starts_with("1,") || rest.starts_with("1 ,"))
+                    && after.contains("] = ")
+                    && after.contains("[")
+                {
+                    let assigns: Vec<&str> = after
+                        .lines()
+                        .filter(|l| l.contains("] = ") && l.contains("["))
+                        .collect();
+                    if assigns.len() == 1 {
+                        hits.push(Hit {
+                            pos,
+                            msg: "element-by-element array copy - use table.move(src, 1, #src, 1, dst) instead".into(),
+                        });
                     }
                 }
             }
@@ -487,8 +573,12 @@ impl Rule for TableMoveOverLoop {
 }
 
 impl Rule for ConcatWithSeparatorLoop {
-    fn id(&self) -> &'static str { "table::concat_with_separator_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "table::concat_with_separator_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -501,7 +591,10 @@ impl Rule for ConcatWithSeparatorLoop {
                 continue;
             }
             let line_start = line_starts[line_idx];
-            let line_end = source[pos..].find('\n').map(|p| pos + p).unwrap_or(source.len());
+            let line_end = source[pos..]
+                .find('\n')
+                .map(|p| pos + p)
+                .unwrap_or(source.len());
             let line = &source[line_start..line_end];
             let trimmed = line.trim();
             if trimmed.contains(" .. ") && trimmed.split(" .. ").count() >= 3 {
@@ -522,7 +615,9 @@ impl Rule for ConcatWithSeparatorLoop {
 fn line_start_offsets(source: &str) -> Vec<usize> {
     let mut starts = vec![0];
     for (i, b) in source.bytes().enumerate() {
-        if b == b'\n' { starts.push(i + 1); }
+        if b == b'\n' {
+            starts.push(i + 1);
+        }
     }
     starts
 }
@@ -551,13 +646,18 @@ fn build_hot_loop_depth_map(source: &str) -> Vec<u32> {
             depths.push(depth);
             continue;
         }
-        if trimmed.starts_with("while ") || trimmed.starts_with("repeat") {
-            depth += 1;
-        } else if trimmed.starts_with("for ") && !trimmed.contains(" in ") {
+        if trimmed.starts_with("while ")
+            || trimmed.starts_with("repeat")
+            || (trimmed.starts_with("for ") && !trimmed.contains(" in "))
+        {
             depth += 1;
         }
         depths.push(depth);
-        if trimmed == "end" || trimmed.starts_with("end ") || trimmed.starts_with("until ") || trimmed == "until" {
+        if trimmed == "end"
+            || trimmed.starts_with("end ")
+            || trimmed.starts_with("until ")
+            || trimmed == "until"
+        {
             depth = depth.saturating_sub(1);
         }
     }
@@ -565,8 +665,12 @@ fn build_hot_loop_depth_map(source: &str) -> Vec<u32> {
 }
 
 impl Rule for PairsOverGeneralized {
-    fn id(&self) -> &'static str { "table::pairs_over_generalized" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "table::pairs_over_generalized"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -587,14 +691,22 @@ impl Rule for PairsOverGeneralized {
 }
 
 impl Rule for NilFieldInConstructor {
-    fn id(&self) -> &'static str { "table::nil_field_in_constructor" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "table::nil_field_in_constructor"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         for (i, line) in source.lines().enumerate() {
             let trimmed = line.trim();
-            if trimmed.contains("= nil") && (trimmed.contains("= nil,") || trimmed.contains("= nil;") || trimmed.ends_with("= nil")) {
+            if trimmed.contains("= nil")
+                && (trimmed.contains("= nil,")
+                    || trimmed.contains("= nil;")
+                    || trimmed.ends_with("= nil"))
+            {
                 let before = &source[..source.lines().take(i).map(|l| l.len() + 1).sum::<usize>()];
                 let open_braces = before.matches('{').count();
                 let close_braces = before.matches('}').count();
@@ -612,8 +724,12 @@ impl Rule for NilFieldInConstructor {
 }
 
 impl Rule for RawsetInLoop {
-    fn id(&self) -> &'static str { "table::rawset_in_loop" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "table::rawset_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -630,8 +746,12 @@ impl Rule for RawsetInLoop {
 }
 
 impl Rule for NextTNilOverPairs {
-    fn id(&self) -> &'static str { "table::next_t_nil_over_pairs" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "table::next_t_nil_over_pairs"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -639,18 +759,23 @@ impl Rule for NextTNilOverPairs {
             let after = &source[pos + 5..];
             if let Some(close) = after.find(')') {
                 let args = &after[..close];
-                if args.contains(", nil") || args.ends_with(",nil") || args.trim() == args.split(',').next().unwrap_or("").trim() {
-                    if source[pos..].starts_with("next(") {
-                        let before = source[..pos].trim_end();
-                        if before.ends_with("==") || before.ends_with("~=") {
-                            continue;
-                        }
-                        if args.contains(',') && (args.contains("nil") || args.trim().split(',').nth(1).map(|s| s.trim()) == Some("nil")) {
-                            hits.push(Hit {
-                                pos,
-                                msg: "next(t, nil) == next(t) - omit the nil second argument for cleaner empty-table check".into(),
-                            });
-                        }
+                if (args.contains(", nil")
+                    || args.ends_with(",nil")
+                    || args.trim() == args.split(',').next().unwrap_or("").trim())
+                    && source[pos..].starts_with("next(")
+                {
+                    let before = source[..pos].trim_end();
+                    if before.ends_with("==") || before.ends_with("~=") {
+                        continue;
+                    }
+                    if args.contains(',')
+                        && (args.contains("nil")
+                            || args.trim().split(',').nth(1).map(|s| s.trim()) == Some("nil"))
+                    {
+                        hits.push(Hit {
+                            pos,
+                            msg: "next(t, nil) == next(t) - omit the nil second argument for cleaner empty-table check".into(),
+                        });
                     }
                 }
             }
@@ -660,8 +785,12 @@ impl Rule for NextTNilOverPairs {
 }
 
 impl Rule for MixedTableConstructor {
-    fn id(&self) -> &'static str { "table::mixed_table_constructor" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "table::mixed_table_constructor"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -671,14 +800,21 @@ impl Rule for MixedTableConstructor {
             let after_end = visit::ceil_char(source, (after_start + 500).min(source.len()));
             let after = &source[after_start..after_end];
             let trimmed = after.trim_start();
-            if trimmed.starts_with('}') || trimmed.starts_with('\n') { continue; }
+            if trimmed.starts_with('}') || trimmed.starts_with('\n') {
+                continue;
+            }
             let mut depth = 1i32;
             let mut end_idx = after.len();
             for (i, ch) in after.char_indices() {
-                if ch == '{' { depth += 1; }
+                if ch == '{' {
+                    depth += 1;
+                }
                 if ch == '}' {
                     depth -= 1;
-                    if depth <= 0 { end_idx = i; break; }
+                    if depth <= 0 {
+                        end_idx = i;
+                        break;
+                    }
                 }
             }
             let content = &after[..end_idx];
@@ -687,12 +823,20 @@ impl Rule for MixedTableConstructor {
             let mut top_depth = 0i32;
             for segment in content.split(',') {
                 let seg = segment.trim();
-                if seg.is_empty() { continue; }
-                for ch in seg.chars() {
-                    if ch == '{' { top_depth += 1; }
-                    if ch == '}' { top_depth -= 1; }
+                if seg.is_empty() {
+                    continue;
                 }
-                if top_depth != 0 { continue; }
+                for ch in seg.chars() {
+                    if ch == '{' {
+                        top_depth += 1;
+                    }
+                    if ch == '}' {
+                        top_depth -= 1;
+                    }
+                }
+                if top_depth != 0 {
+                    continue;
+                }
                 if seg.contains(" = ") && !seg.starts_with('[') {
                     let key_part = seg.split(" = ").next().unwrap_or("").trim();
                     if key_part.chars().all(|c| c.is_alphanumeric() || c == '_') {
