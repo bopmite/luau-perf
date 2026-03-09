@@ -425,7 +425,7 @@ impl Rule for PowSlowExponent {
                     let suggestion = suggest_pow_replacement(val);
                     hits.push(Hit {
                         pos: i,
-                        msg: format!("^({val}) uses slow libc pow() — VM only fast-paths ^2, ^0.5, ^3{suggestion}"),
+                        msg: format!("^({val}) uses slow libc pow() - VM only fast-paths ^2, ^0.5, ^3{suggestion}"),
                     });
                 }
                 continue;
@@ -439,7 +439,7 @@ impl Rule for PowSlowExponent {
                 let suggestion = suggest_pow_replacement(val);
                 hits.push(Hit {
                     pos: i,
-                    msg: format!("^{val} uses slow libc pow() — VM only fast-paths ^2, ^0.5, ^3{suggestion}"),
+                    msg: format!("^{val} uses slow libc pow() - VM only fast-paths ^2, ^0.5, ^3{suggestion}"),
                 });
             }
         }

@@ -48,6 +48,7 @@ pub struct GsubFunctionInLoop;
 pub struct TypeofInLoop;
 pub struct SetmetatableInLoop;
 pub struct TableCloneInLoop;
+pub struct UnnecessaryClosure;
 
 impl Rule for ClosureInLoop {
     fn id(&self) -> &'static str { "alloc::closure_in_loop" }
@@ -774,6 +775,117 @@ impl Rule for TableCloneInLoop {
     }
 }
 
+impl Rule for UnnecessaryClosure {
+    fn id(&self) -> &'static str { "alloc::unnecessary_closure" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        let lines: Vec<&str> = source.lines().collect();
+        let wrappers = ["pcall(function()", "xpcall(function()", "task.spawn(function()", "task.defer(function()", "task.delay("];
+
+        for (i, line) in lines.iter().enumerate() {
+            let trimmed = line.trim();
+            if trimmed.starts_with("--") { continue; }
+
+            let mut matched_wrapper = None;
+            for w in &wrappers {
+                if *w == "task.delay(" {
+                    if let Some(idx) = trimmed.find("task.delay(") {
+                        let after = &trimmed[idx + 11..];
+                        if let Some(comma) = after.find(", function()") {
+                            let _ = &after[..comma];
+                            matched_wrapper = Some("task.delay");
+                            break;
+                        }
+                    }
+                    continue;
+                }
+                if trimmed.contains(w) {
+                    matched_wrapper = Some(&w[..w.len() - 11]);
+                    break;
+                }
+            }
+            let wrapper = match matched_wrapper {
+                Some(w) => w,
+                None => continue,
+            };
+
+            let j = match Self::next_code_line(&lines, i + 1) {
+                Some(j) => j,
+                None => continue,
+            };
+            let body = lines[j].trim();
+
+            let k = match Self::next_code_line(&lines, j + 1) {
+                Some(k) => k,
+                None => continue,
+            };
+            let closer = lines[k].trim();
+            if !closer.starts_with("end)") { continue; }
+
+            let call_str = if body.starts_with("return ") {
+                &body[7..]
+            } else {
+                body
+            };
+
+            if !Self::is_single_bare_call(call_str) { continue; }
+
+            let pos = source.lines().take(i).map(|l| l.len() + 1).sum::<usize>();
+            hits.push(Hit {
+                pos,
+                msg: format!("{wrapper}(function() ... end) wraps a single call - pass the function directly to avoid closure allocation"),
+            });
+        }
+        hits
+    }
+}
+
+impl UnnecessaryClosure {
+    fn next_code_line(lines: &[&str], start: usize) -> Option<usize> {
+        for j in start..lines.len() {
+            let t = lines[j].trim();
+            if t.is_empty() || t.starts_with("--") { continue; }
+            return Some(j);
+        }
+        None
+    }
+
+    fn is_single_bare_call(s: &str) -> bool {
+        let s = s.trim();
+        if s.is_empty() { return false; }
+
+        let paren = match s.find('(') {
+            Some(p) => p,
+            None => return false,
+        };
+        let fn_part = &s[..paren];
+        if fn_part.is_empty() { return false; }
+        if fn_part.contains(':') { return false; }
+        if fn_part.contains('{') || fn_part.contains('[') { return false; }
+
+        for ch in fn_part.chars() {
+            if !ch.is_alphanumeric() && ch != '_' && ch != '.' { return false; }
+        }
+
+        let mut depth = 0i32;
+        for b in s[paren..].bytes() {
+            match b {
+                b'(' => depth += 1,
+                b')' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        return true;
+                    }
+                }
+                _ => {}
+            }
+        }
+        false
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1046,5 +1158,63 @@ mod tests {
         let ast = parse(src);
         let hits = TableCloneInLoop.check(src, &ast);
         assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn unnecessary_closure_pcall_detected() {
+        let src = "local ok, val = pcall(function()\n    return require(module)\nend)";
+        let ast = parse(src);
+        let hits = UnnecessaryClosure.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+        assert!(hits[0].msg.contains("pcall"));
+    }
+
+    #[test]
+    fn unnecessary_closure_task_spawn_detected() {
+        let src = "task.spawn(function()\n    doWork()\nend)";
+        let ast = parse(src);
+        let hits = UnnecessaryClosure.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+        assert!(hits[0].msg.contains("task.spawn"));
+    }
+
+    #[test]
+    fn unnecessary_closure_task_defer_detected() {
+        let src = "task.defer(function()\n    cleanup(a, b)\nend)";
+        let ast = parse(src);
+        let hits = UnnecessaryClosure.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn unnecessary_closure_method_call_ok() {
+        let src = "pcall(function()\n    return obj:Method()\nend)";
+        let ast = parse(src);
+        let hits = UnnecessaryClosure.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn unnecessary_closure_multi_line_ok() {
+        let src = "pcall(function()\n    local x = getValue()\n    return process(x)\nend)";
+        let ast = parse(src);
+        let hits = UnnecessaryClosure.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn unnecessary_closure_with_params_ok() {
+        let src = "pcall(function(err)\n    return handleError(err)\nend)";
+        let ast = parse(src);
+        let hits = UnnecessaryClosure.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn unnecessary_closure_dotted_call_detected() {
+        let src = "pcall(function()\n    return game.GetService(game, \"Players\")\nend)";
+        let ast = parse(src);
+        let hits = UnnecessaryClosure.check(src, &ast);
+        assert_eq!(hits.len(), 1);
     }
 }

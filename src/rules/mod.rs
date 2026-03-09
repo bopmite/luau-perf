@@ -89,6 +89,7 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(memory::CollectionTagNoCleanup),
         Box::new(memory::AttributeChangedInLoop),
         Box::new(memory::TaskDelayInLoop),
+        Box::new(memory::ParentNilOverDestroy),
         // roblox
         Box::new(roblox::DeprecatedWait),
         Box::new(roblox::DeprecatedSpawn),
@@ -171,6 +172,7 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(alloc::TypeofInLoop),
         Box::new(alloc::SetmetatableInLoop),
         Box::new(alloc::TableCloneInLoop),
+        Box::new(alloc::UnnecessaryClosure),
         // network
         Box::new(network::FireInLoop),
         Box::new(network::InvokeServerInLoop),
@@ -539,6 +541,7 @@ pub fn rule_level(id: &str) -> crate::lint::Level {
         // memory (important but not always bugs)
         | "memory::untracked_task_spawn"
         | "memory::task_delay_in_loop"
+        | "memory::parent_nil_over_destroy"
         | "memory::heartbeat_allocation"
         | "memory::circular_connection_ref"
         | "memory::tween_completed_connect"
@@ -742,6 +745,7 @@ fn explain_text(id: &str) -> &'static str {
         "alloc::typeof_in_loop" => "typeof() in a loop crosses the Lua-C++ bridge each call to determine the type. Cache outside if checking the same value repeatedly.",
         "alloc::setmetatable_in_loop" => "setmetatable() in a loop creates a new metatable-linked table per iteration. Consider object pooling or a constructor pattern to reuse metatables.",
         "alloc::table_clone_in_loop" => "table.clone() in a loop shallow-copies the entire table each iteration. If the template doesn't change, restructure to avoid repeated cloning.",
+        "alloc::unnecessary_closure" => "Wrapping a single function call in function() ... end allocates a closure unnecessarily. Pass the function directly: pcall(function() return fn(x) end) becomes pcall(fn, x). Same applies to task.spawn, task.defer, and task.delay.",
         "roblox::yield_in_connect_callback" => "Yielding (task.wait, WaitForChild) inside :Connect callbacks blocks the signal handler. Use task.spawn to run async work from within a connection callback.",
         "roblox::deprecated_udim" => "UDim2.new(0, px, 0, py) can be UDim2.fromOffset(px, py). UDim2.new(sx, 0, sy, 0) can be UDim2.fromScale(sx, sy). Cleaner and more readable.",
         "roblox::teleport_service_race" => "TeleportAsync can fail from rate limits, network errors, or invalid place IDs. Without pcall, the error kills the script. Always wrap in pcall with retry logic.",
@@ -756,8 +760,8 @@ fn explain_text(id: &str) -> &'static str {
         "math::max_min_single_arg" => "math.max(x) and math.min(x) with a single argument just return that argument unchanged. This is likely a bug - you probably meant to compare against another value like math.max(x, 0) or math.min(x, limit).",
         "string::format_no_args" => "string.format(\"literal\") with no format arguments returns the string unchanged. Just use the string directly instead of wrapping it in string.format().",
         "string::format_redundant_tostring" => "string.format's %s specifier already calls tostring() internally. Wrapping the argument in tostring() is redundant and adds unnecessary overhead.",
-        "string::format_simple_concat" => "string.format() with only %s specifiers is doing simple concatenation with function call overhead. string.format is NOT a VM fastcall builtin. Use the .. operator instead — it compiles to a single CONCAT opcode that batches all operands efficiently.",
-        "string::tostring_in_interpolation" => "String interpolation (`{expr}`) already calls tostring() on each expression. Wrapping in tostring() is redundant — just use `{x}` instead of `{tostring(x)}`.",
+        "string::format_simple_concat" => "string.format() with only %s specifiers is doing simple concatenation with function call overhead. string.format is NOT a VM fastcall builtin. Use the .. operator instead - it compiles to a single CONCAT opcode that batches all operands efficiently.",
+        "string::tostring_in_interpolation" => "String interpolation (`{expr}`) already calls tostring() on each expression. Wrapping in tostring() is redundant - just use `{x}` instead of `{tostring(x)}`.",
         "roblox::find_first_child_no_check" => "FindFirstChild returns nil if the child doesn't exist. Accessing a property on the result without checking for nil will throw 'attempt to index nil' at runtime. Store in a local and check before accessing.",
         "roblox::get_full_name_in_loop" => "GetFullName() builds the full ancestry path string each call. In a loop, this allocates N strings. Cache the result outside the loop if the instance doesn't change.",
         "roblox::bind_to_render_step_no_cleanup" => "BindToRenderStep registers a named callback to run every frame. Without a matching UnbindFromRenderStep, the binding persists indefinitely, leaking if the script is reused or the feature is toggled off.",
@@ -859,7 +863,7 @@ fn explain_text(id: &str) -> &'static str {
         "physics::spatial_query_in_loop" => "Physics queries (Raycast, GetPartBoundsInBox, GetPartsInPart, etc.) are expensive C++ operations. In a loop, consider spatial indexing or batching queries.",
         "physics::move_to_in_loop" => ":MoveTo() sets CFrame and fires events for each call. workspace:BulkMoveTo() batches multiple moves into a single operation with less overhead.",
         "physics::spatial_query_per_frame" => "Spatial queries (Raycast, GetPartBoundsInBox, etc.) inside RunService callbacks run every frame at 60Hz. Each call traverses the physics spatial hash. Throttle with a counter, cache results across frames, or use CollectionService tags for entity tracking.",
-        "physics::terrain_write_in_loop" => "Terrain operations (FillBlock, WriteVoxels, etc.) are extremely expensive — each call modifies the voxel grid, triggers physics recalculation, and replicates changes. Batch terrain operations or pre-compute outside loops.",
+        "physics::terrain_write_in_loop" => "Terrain operations (FillBlock, WriteVoxels, etc.) are extremely expensive - each call modifies the voxel grid, triggers physics recalculation, and replicates changes. Batch terrain operations or pre-compute outside loops.",
 
         // render
         "render::gui_creation_in_loop" => "Creating GUI instances (Frame, TextLabel, etc.) in a loop is expensive. Pre-create templates and use :Clone(), or pool GUI elements for reuse.",
@@ -941,6 +945,7 @@ fn explain_text(id: &str) -> &'static str {
         "cache::workspace_lookup_in_loop" => "workspace:FindFirstChild/WaitForChild in a loop searches the workspace tree each iteration. Cache the result outside: local obj = workspace:FindFirstChild('Name').",
         "memory::task_delay_long_duration" => "task.delay() with very long durations (>5 minutes) keeps the callback and its captures alive in memory for the duration. Consider alternative approaches for long-lived timers.",
         "memory::task_delay_in_loop" => "task.delay()/task.defer() inside a hot loop spawns untracked threads each iteration. Each thread has scheduler overhead and keeps its closure alive until it runs. Accumulates rapidly in while/repeat loops.",
+        "memory::parent_nil_over_destroy" => "Setting .Parent = nil removes an Instance from the hierarchy but does not disconnect event connections, fire .Destroying, or release internal references. Use :Destroy() instead to properly clean up the Instance and prevent memory leaks.",
         "memory::tween_completed_connect" => ".Completed:Connect() creates a permanent connection. Use .Completed:Once() instead - it automatically disconnects after the first fire, preventing memory leaks.",
         "memory::set_attribute_in_heartbeat" => "SetAttribute() in a RunService callback triggers attribute replication at 60Hz. That's 60 replication packets per second per attribute per instance. Use plain Lua tables for per-frame mutable data instead.",
         "style::assert_in_hot_path" => "assert() has overhead even when the condition is true - it evaluates all arguments and checks the result. In hot loops, this adds up. Remove assertions or guard with a debug flag.",
@@ -976,7 +981,7 @@ fn explain_text(id: &str) -> &'static str {
         "roblox::descendant_event_workspace" => "DescendantAdded/Removing on workspace fires for EVERY instance added or removed anywhere in the entire game. Use CollectionService tags for indexed lookup or scope the listener to a smaller subtree.",
         "roblox::get_attribute_in_heartbeat" => ":GetAttribute() in a RunService callback crosses the Lua-C++ bridge at 60Hz. Cache the value in a Lua variable and update via AttributeChanged events.",
         "roblox::pivot_to_in_loop" => ":PivotTo() in a loop crosses the Lua-C++ bridge per call and triggers replication. workspace:BulkMoveTo() batches all moves into a single engine call.",
-        "roblox::apply_description_in_loop" => ":ApplyDescription() fully resets a Humanoid's appearance — clothing, accessories, body parts, colors, scaling. Each call is extremely expensive. Cache the description and apply once outside loops.",
+        "roblox::apply_description_in_loop" => ":ApplyDescription() fully resets a Humanoid's appearance - clothing, accessories, body parts, colors, scaling. Each call is extremely expensive. Cache the description and apply once outside loops.",
         "roblox::humanoid_move_to_in_loop" => "Humanoid:MoveTo() triggers internal pathfinding computation each call. In a hot loop, this overwhelms the physics engine. Use CFrame assignment or set Humanoid.MoveDirection for smooth movement.",
         "table::pairs_over_generalized" => "pairs()/ipairs() are function calls that return an iterator. Luau's generalized iteration (for k, v in t do) emits the same FORGPREP bytecode without the function call overhead.",
         "style::type_over_typeof" => "type() returns Lua types only ('string', 'number', 'table', etc.). typeof() also handles Roblox types ('Vector3', 'CFrame', 'Instance', etc.). Use typeof() for correct Roblox type checking.",

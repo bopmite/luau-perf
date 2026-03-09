@@ -1180,7 +1180,7 @@ impl Rule for CloneSetParent {
                     let byte_pos: usize = lines[..parent_line.unwrap()].iter().map(|l| l.len() + 1).sum();
                     hits.push(Hit {
                         pos: byte_pos,
-                        msg: "Clone(): .Parent set before other properties — set .Parent last to batch replication".into(),
+                        msg: "Clone(): .Parent set before other properties - set .Parent last to batch replication".into(),
                     });
                 }
             }

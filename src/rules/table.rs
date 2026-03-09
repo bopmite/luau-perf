@@ -705,7 +705,7 @@ impl Rule for MixedTableConstructor {
             if has_record && has_list {
                 hits.push(Hit {
                     pos: pos + 2,
-                    msg: "mixed record + list items in table constructor defeats DUPTABLE optimization — separate list items".into(),
+                    msg: "mixed record + list items in table constructor defeats DUPTABLE optimization - separate list items".into(),
                 });
             }
         }

@@ -904,7 +904,7 @@ impl Rule for CoroutineCreateOverTaskSpawn {
             if visit::is_dot_call(call, "coroutine", "create") {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
-                    msg: "coroutine.create() + coroutine.resume() — use task.spawn() or task.defer() for simpler async".into(),
+                    msg: "coroutine.create() + coroutine.resume() - use task.spawn() or task.defer() for simpler async".into(),
                 });
             }
         });

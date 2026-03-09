@@ -676,7 +676,7 @@ impl Rule for RepeatedPropertyChain {
             if positions.len() >= 3 {
                 hits.push(Hit {
                     pos: positions[2],
-                    msg: format!("{chain} accessed {} times — cache in a local", positions.len()),
+                    msg: format!("{chain} accessed {} times - cache in a local", positions.len()),
                 });
             }
         }

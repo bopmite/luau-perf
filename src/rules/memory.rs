@@ -22,6 +22,7 @@ pub struct DebrisNegativeDuration;
 pub struct CollectionTagNoCleanup;
 pub struct AttributeChangedInLoop;
 pub struct TaskDelayInLoop;
+pub struct ParentNilOverDestroy;
 
 impl Rule for UntrackedConnection {
     fn id(&self) -> &'static str { "memory::untracked_connection" }
@@ -962,10 +963,33 @@ impl Rule for TaskDelayInLoop {
                 let method = if visit::is_dot_call(call, "task", "delay") { "task.delay" } else { "task.defer" };
                 hits.push(Hit {
                     pos: visit::call_pos(call),
-                    msg: format!("{method}() in loop — spawns an untracked thread per iteration, potential memory leak and scheduling overhead"),
+                    msg: format!("{method}() in loop - spawns an untracked thread per iteration, potential memory leak and scheduling overhead"),
                 });
             }
         });
+        hits
+    }
+}
+
+impl Rule for ParentNilOverDestroy {
+    fn id(&self) -> &'static str { "memory::parent_nil_over_destroy" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        let positions = visit::find_pattern_positions(source, ".Parent = nil");
+        for pos in positions {
+            let line_start = source[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
+            let end = source[pos..].find('\n').map(|i| pos + i).unwrap_or(source.len());
+            let line = &source[line_start..end];
+            let trimmed = line.trim();
+            if trimmed.starts_with("--") { continue; }
+            if trimmed.contains(":Destroy()") { continue; }
+            hits.push(Hit {
+                pos,
+                msg: ".Parent = nil does not clean up connections or fire Destroying - use :Destroy() instead".into(),
+            });
+        }
         hits
     }
 }
@@ -1264,6 +1288,31 @@ mod tests {
         let src = "task.delay(1, function() print('hi') end)";
         let ast = parse(src);
         let hits = TaskDelayInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn parent_nil_detected() {
+        let src = "part.Parent = nil";
+        let ast = parse(src);
+        let hits = ParentNilOverDestroy.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+        assert!(hits[0].msg.contains("Destroy"));
+    }
+
+    #[test]
+    fn destroy_call_ok() {
+        let src = "part:Destroy()";
+        let ast = parse(src);
+        let hits = ParentNilOverDestroy.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn parent_nil_in_comment_ok() {
+        let src = "-- part.Parent = nil";
+        let ast = parse(src);
+        let hits = ParentNilOverDestroy.check(src, &ast);
         assert_eq!(hits.len(), 0);
     }
 }
