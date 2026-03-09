@@ -39,6 +39,8 @@ pub fn compute_fix(rule_id: &str, source: &str, pos: usize) -> Option<Fix> {
         "roblox::coroutine_resume_create" => fix_coroutine_resume_create(source, pos),
         "style::type_over_typeof" => fix_type_over_typeof(source, pos),
         "roblox::wait_for_child_no_timeout" => fix_wait_for_child_timeout(source, pos),
+        "roblox::model_set_primary_part_cframe" => fix_set_primary_part_cframe(source, pos),
+        "roblox::deprecated_delay" => fix_deprecated_spawn(source, pos),
         _ => None,
     }
 }
@@ -672,6 +674,24 @@ fn fix_game_workspace(source: &str, pos: usize) -> Option<Fix> {
     })
 }
 
+fn fix_set_primary_part_cframe(source: &str, pos: usize) -> Option<Fix> {
+    let rest = source.get(pos..)?;
+    let method = ":SetPrimaryPartCFrame(";
+    let idx = rest.find(method)?;
+    let method_start = pos + idx;
+    let args_start = method_start + method.len();
+    let close = find_matching_paren(source, args_start)?;
+    let arg = source.get(args_start..close)?.trim();
+    if arg.is_empty() {
+        return None;
+    }
+    Some(Fix {
+        start: method_start,
+        end: close + 1,
+        replacement: format!(":PivotTo({arg})"),
+    })
+}
+
 fn fix_wait_for_child_timeout(source: &str, pos: usize) -> Option<Fix> {
     let rest = source.get(pos..)?;
     let wfc = rest.find(":WaitForChild(")?;
@@ -1022,6 +1042,24 @@ mod tests {
         let mut result = src.to_string();
         result.replace_range(fix.start..fix.end, &fix.replacement);
         assert_eq!(result, "if typeof(x) == \"Instance\" then end");
+    }
+
+    #[test]
+    fn test_fix_set_primary_part_cframe() {
+        let src = "model:SetPrimaryPartCFrame(cf)";
+        let fix = compute_fix("roblox::model_set_primary_part_cframe", src, 0).unwrap();
+        let mut result = src.to_string();
+        result.replace_range(fix.start..fix.end, &fix.replacement);
+        assert_eq!(result, "model:PivotTo(cf)");
+    }
+
+    #[test]
+    fn test_fix_deprecated_delay_via_rule() {
+        let src = "delay(1, fn)";
+        let fix = compute_fix("roblox::deprecated_delay", src, 0).unwrap();
+        let mut result = src.to_string();
+        result.replace_range(fix.start..fix.end, &fix.replacement);
+        assert_eq!(result, "task.delay(1, fn)");
     }
 
     #[test]
