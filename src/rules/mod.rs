@@ -372,14 +372,17 @@ pub fn print_all() {
             crate::lint::Level::Strict => "\x1b[36m strict\x1b[0m ",
             crate::lint::Level::Pedantic => "\x1b[90mpedantic\x1b[0m",
         };
-        println!("   {:<42} {sev}  {lvl}", name);
+        let fix_mark = if is_fixable(id) { " \x1b[32mfix\x1b[0m" } else { "" };
+        println!("   {:<42} {sev}  {lvl}{fix_mark}", name);
     }
 
     println!();
+    let fixable_count = rules.iter().filter(|r| is_fixable(r.id())).count();
     println!(
-        " \x1b[90m{} rules across {} categories\x1b[0m",
+        " \x1b[90m{} rules across {} categories ({} auto-fixable)\x1b[0m",
         rules.len(),
         cat_count,
+        fixable_count,
     );
 }
 
