@@ -317,3 +317,83 @@ fn parent_nil_in_comment_ok() {
     let hits = ParentNilOverDestroy.check(src, &ast);
     assert_eq!(hits.len(), 0);
 }
+
+#[test]
+fn untracked_connection_detected() {
+    let src = "function setup()\n  workspace.ChildAdded:Connect(function(child)\n    print(child)\n  end)\nend";
+    let ast = parse(src);
+    let hits = UntrackedConnection.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn untracked_connection_module_scope_ok() {
+    let src = "workspace.ChildAdded:Connect(function(child)\n  print(child)\nend)";
+    let ast = parse(src);
+    let hits = UntrackedConnection.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn untracked_connection_destroying_ok() {
+    let src = "function setup()\n  obj.Destroying:Connect(function()\n    cleanup()\n  end)\nend";
+    let ast = parse(src);
+    let hits = UntrackedConnection.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn untracked_connection_maid_ok() {
+    let src = "function setup()\n  maid:GiveTask(obj.Changed:Connect(function() end))\nend";
+    let ast = parse(src);
+    let hits = UntrackedConnection.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn untracked_connection_method_init_ok() {
+    let src = "function MyService:Init()\n  workspace.ChildAdded:Connect(function(child)\n    print(child)\n  end)\nend";
+    let ast = parse(src);
+    let hits = UntrackedConnection.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn untracked_connection_plain_init_ok() {
+    let src = "function Init()\n  workspace.ChildAdded:Connect(function(child)\n    print(child)\n  end)\nend";
+    let ast = parse(src);
+    let hits = UntrackedConnection.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn untracked_connection_local_init_ok() {
+    let src = "local function Init()\n  workspace.ChildAdded:Connect(function(child)\n    print(child)\n  end)\nend";
+    let ast = parse(src);
+    let hits = UntrackedConnection.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn untracked_connection_plain_start_ok() {
+    let src = "function Start()\n  workspace.ChildAdded:Connect(function(child)\n    print(child)\n  end)\nend";
+    let ast = parse(src);
+    let hits = UntrackedConnection.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn untracked_connection_nested_in_init_ok() {
+    let src = "function Init()\n  local function bindEvents()\n    workspace.ChildAdded:Connect(function(child)\n      print(child)\n    end)\n  end\n  bindEvents()\nend";
+    let ast = parse(src);
+    let hits = UntrackedConnection.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn untracked_connection_on_client_event_ok() {
+    let src = "function setup()\n  remoteEvent.OnClientEvent:Connect(function(data)\n    print(data)\n  end)\nend";
+    let ast = parse(src);
+    let hits = UntrackedConnection.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}

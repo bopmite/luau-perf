@@ -245,21 +245,25 @@ impl Rule for HttpServiceInLoop {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if !ctx.in_loop_direct { return; }
-            let methods = ["GetAsync", "PostAsync", "RequestAsync", "JSONEncode", "JSONDecode"];
-            for m in &methods {
+            let json_methods = ["JSONEncode", "JSONDecode"];
+            let http_methods = ["GetAsync", "PostAsync", "RequestAsync"];
+            for m in &json_methods {
                 if visit::is_method_call(call, m) {
-                    if *m == "JSONEncode" || *m == "JSONDecode" {
-                        hits.push(Hit {
-                            pos: visit::call_pos(call),
-                            msg: format!(":{m}() in loop serializes/deserializes per iteration - cache results outside if data doesn't change"),
-                        });
-                    } else {
-                        hits.push(Hit {
-                            pos: visit::call_pos(call),
-                            msg: format!(":{m}() in loop makes an HTTP request per iteration - batch requests or process asynchronously"),
-                        });
-                    }
+                    if !ctx.in_hot_loop { return; }
+                    hits.push(Hit {
+                        pos: visit::call_pos(call),
+                        msg: format!(":{m}() in loop serializes/deserializes per iteration - cache results outside if data doesn't change"),
+                    });
+                    return;
+                }
+            }
+            for m in &http_methods {
+                if visit::is_method_call(call, m) {
+                    if !ctx.in_loop_direct { return; }
+                    hits.push(Hit {
+                        pos: visit::call_pos(call),
+                        msg: format!(":{m}() in loop makes an HTTP request per iteration - batch requests or process asynchronously"),
+                    });
                     return;
                 }
             }

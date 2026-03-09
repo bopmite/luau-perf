@@ -140,3 +140,19 @@ fn marketplace_outside_loop_ok() {
     let hits = MarketplaceInfoInLoop.check(src, &ast);
     assert_eq!(hits.len(), 0);
 }
+
+#[test]
+fn json_decode_in_for_in_ok() {
+    let src = "for _, raw in responses do\n  local data = http:JSONDecode(raw)\nend";
+    let ast = parse(src);
+    let hits = HttpServiceInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn json_encode_in_hot_loop_detected() {
+    let src = "while true do\n  local s = http:JSONEncode(data)\nend";
+    let ast = parse(src);
+    let hits = HttpServiceInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}

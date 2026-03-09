@@ -55,7 +55,7 @@ impl Rule for UntrackedConnection {
                     || line.contains("givetask") || line.contains(":add(") || line.contains("cleanup") {
                     return;
                 }
-                if ctx.func_depth == 1 && is_in_service_init(source, pos) {
+                if is_in_service_init(source, pos) {
                     return;
                 }
                 let before_window = &source[visit::floor_char_boundary(source, pos.saturating_sub(500))..pos];
@@ -144,14 +144,16 @@ fn is_at_module_scope(source: &str, pos: usize) -> bool {
 
 fn is_in_service_init(source: &str, pos: usize) -> bool {
     let before = &source[..pos];
-    for line in before.lines().rev().take(80) {
+    for line in before.lines().rev().take(200) {
         let t = line.trim();
         if t.starts_with("function ") || t.starts_with("local function ") {
             let tl = t.to_lowercase();
-            return tl.contains(":init(") || tl.contains(":start(") || tl.contains(":initialize(")
+            if tl.contains(":init(") || tl.contains(":start(") || tl.contains(":initialize(")
                 || tl.contains(".init(") || tl.contains(".start(") || tl.contains(".initialize(")
                 || tl.contains("function init(") || tl.contains("function start(")
-                || tl.contains("knitinit(") || tl.contains("knitstart(");
+                || tl.contains("knitinit(") || tl.contains("knitstart(") {
+                return true;
+            }
         }
     }
     false
