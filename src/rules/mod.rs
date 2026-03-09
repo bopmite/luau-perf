@@ -328,6 +328,7 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(style::MatchForExistence),
         Box::new(style::NestedStringFormat),
         Box::new(style::CoroutineCreateOverTaskSpawn),
+        Box::new(style::UnreachableCode),
     ]
 }
 
@@ -614,6 +615,7 @@ pub fn rule_level(id: &str) -> crate::lint::Level {
         | "style::debug_in_hot_path"
         | "style::index_function_metatable"
         | "style::redundant_condition"
+        | "style::unreachable_code"
 
         // string
         | "string::len_over_hash"
@@ -998,6 +1000,7 @@ fn explain_text(id: &str) -> &'static str {
         "style::match_for_existence" => "string.match() allocates captures. When you only check if a pattern exists (in an if condition or ~= nil check), string.find() is faster because it returns indices without allocating.",
         "style::nested_string_format" => "Nested string.format() calls create an intermediate string that's immediately consumed by the outer format. Combine them into a single string.format() call to avoid the intermediate allocation.",
         "style::coroutine_create_over_task_spawn" => "coroutine.create()+resume() is the manual way to run async code. task.spawn()/task.defer() are the Roblox-idiomatic equivalents that integrate with the engine's scheduler and error handling.",
+        "style::unreachable_code" => "Code after error() or assert(false) can never execute. This is likely a bug or leftover from refactoring. Remove the dead code.",
 
         _ => "No detailed explanation available for this rule. Run --list-rules to see all rules.",
     }
