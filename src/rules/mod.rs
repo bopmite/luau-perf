@@ -645,7 +645,7 @@ pub fn rule_level(id: &str) -> crate::lint::Level {
     }
 }
 
-fn is_fixable(id: &str) -> bool {
+pub fn is_fixable(id: &str) -> bool {
     matches!(id,
         "roblox::deprecated_wait" | "roblox::deprecated_spawn" |
         "roblox::missing_native" | "roblox::missing_strict" |

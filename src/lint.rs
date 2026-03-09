@@ -178,7 +178,7 @@ pub fn print_json(diagnostics: &[Diagnostic]) {
         };
         let file = d.file.display().to_string().replace('\\', "/");
         let msg = d.message.replace('\\', "\\\\").replace('"', "\\\"");
-        let fixable = if d.fix.is_some() { "true" } else { "false" };
+        let fixable = if crate::rules::is_fixable(d.rule) { "true" } else { "false" };
         print!(
             r#"{{"file":"{}","line":{},"col":{},"severity":"{}","rule":"{}","message":"{}","fixable":{}}}"#,
             file, d.line, d.col, sev, d.rule, msg, fixable,
