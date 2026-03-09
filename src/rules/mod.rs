@@ -145,6 +145,8 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(roblox::CFrameOldConstructor),
         Box::new(roblox::ApplyDescriptionInLoop),
         Box::new(roblox::HumanoidMoveToInLoop),
+        Box::new(roblox::DeprecatedVersion),
+        Box::new(roblox::DeprecatedYpcall),
         // alloc
         Box::new(alloc::StringConcatInLoop),
         Box::new(alloc::StringFormatInLoop),
@@ -434,6 +436,8 @@ pub fn rule_level(id: &str) -> crate::lint::Level {
         | "table::foreach_deprecated"
         | "table::getn_deprecated"
         | "table::maxn_deprecated"
+        | "roblox::deprecated_version"
+        | "roblox::deprecated_ypcall"
 
         // correctness / race conditions
         | "roblox::game_loaded_race"
@@ -664,7 +668,8 @@ pub fn is_fixable(id: &str) -> bool {
         "style::type_over_typeof" |
         "roblox::wait_for_child_no_timeout" |
         "roblox::model_set_primary_part_cframe" |
-        "roblox::deprecated_delay"
+        "roblox::deprecated_delay" |
+        "roblox::deprecated_ypcall"
     )
 }
 
@@ -1002,6 +1007,9 @@ fn explain_text(id: &str) -> &'static str {
         "style::match_for_existence" => "string.match() allocates captures. When you only check if a pattern exists (in an if condition or ~= nil check), string.find() is faster because it returns indices without allocating.",
         "style::nested_string_format" => "Nested string.format() calls create an intermediate string that's immediately consumed by the outer format. Combine them into a single string.format() call to avoid the intermediate allocation.",
         "style::coroutine_create_over_task_spawn" => "coroutine.create()+resume() is the manual way to run async code. task.spawn()/task.defer() are the Roblox-idiomatic equivalents that integrate with the engine's scheduler and error handling.",
+
+        "roblox::deprecated_version" => "version() is a legacy global that returns the Roblox engine version string. Use game.PlaceVersion for the place version number.",
+        "roblox::deprecated_ypcall" => "ypcall() is a legacy error-handling function from early Roblox. Use pcall() which is the standard Lua equivalent with identical behavior.",
 
         _ => "No detailed explanation available for this rule. Run --list-rules to see all rules.",
     }

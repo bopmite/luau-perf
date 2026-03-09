@@ -63,6 +63,8 @@ pub struct BindToRenderStepNoCleanup;
 pub struct CFrameOldConstructor;
 pub struct ApplyDescriptionInLoop;
 pub struct HumanoidMoveToInLoop;
+pub struct DeprecatedVersion;
+pub struct DeprecatedYpcall;
 
 impl Rule for DeprecatedWait {
     fn id(&self) -> &'static str { "roblox::deprecated_wait" }
@@ -1619,6 +1621,42 @@ impl Rule for HumanoidMoveToInLoop {
     }
 }
 
+impl Rule for DeprecatedVersion {
+    fn id(&self) -> &'static str { "roblox::deprecated_version" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        visit::each_call(ast, |call, _ctx| {
+            if visit::is_bare_call(call, "version") {
+                hits.push(Hit {
+                    pos: visit::call_pos(call),
+                    msg: "version() is deprecated - use game.PlaceVersion instead".into(),
+                });
+            }
+        });
+        hits
+    }
+}
+
+impl Rule for DeprecatedYpcall {
+    fn id(&self) -> &'static str { "roblox::deprecated_ypcall" }
+    fn severity(&self) -> Severity { Severity::Error }
+
+    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        visit::each_call(ast, |call, _ctx| {
+            if visit::is_bare_call(call, "ypcall") {
+                hits.push(Hit {
+                    pos: visit::call_pos(call),
+                    msg: "ypcall() is deprecated - use pcall() instead".into(),
+                });
+            }
+        });
+        hits
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1626,6 +1664,30 @@ mod tests {
 
     fn parse(src: &str) -> full_moon::ast::Ast {
         full_moon::parse(src).unwrap()
+    }
+
+    #[test]
+    fn deprecated_version_detected() {
+        let src = "local v = version()";
+        let ast = parse(src);
+        let hits = DeprecatedVersion.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn deprecated_ypcall_detected() {
+        let src = "local ok, err = ypcall(function() end)";
+        let ast = parse(src);
+        let hits = DeprecatedYpcall.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn pcall_ok() {
+        let src = "local ok, err = pcall(function() end)";
+        let ast = parse(src);
+        let hits = DeprecatedYpcall.check(src, &ast);
+        assert_eq!(hits.len(), 0);
     }
 
     #[test]

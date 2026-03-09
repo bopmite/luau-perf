@@ -41,6 +41,7 @@ pub fn compute_fix(rule_id: &str, source: &str, pos: usize) -> Option<Fix> {
         "roblox::wait_for_child_no_timeout" => fix_wait_for_child_timeout(source, pos),
         "roblox::model_set_primary_part_cframe" => fix_set_primary_part_cframe(source, pos),
         "roblox::deprecated_delay" => fix_deprecated_spawn(source, pos),
+        "roblox::deprecated_ypcall" => fix_ypcall(source, pos),
         _ => None,
     }
 }
@@ -731,6 +732,16 @@ fn fix_coroutine_resume_create(source: &str, pos: usize) -> Option<Fix> {
         start: pos,
         end: pos + inner_start + end_offset + 1,
         replacement: format!("task.spawn({inner})"),
+    })
+}
+
+fn fix_ypcall(source: &str, pos: usize) -> Option<Fix> {
+    let slice = source.get(pos..pos + 6)?;
+    if slice != "ypcall" { return None; }
+    Some(Fix {
+        start: pos,
+        end: pos + 6,
+        replacement: "pcall".into(),
     })
 }
 
