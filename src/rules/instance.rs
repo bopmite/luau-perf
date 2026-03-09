@@ -673,4 +673,20 @@ mod tests {
         let hits = GetChildrenInLoop.check(src, &ast);
         assert_eq!(hits.len(), 0);
     }
+
+    #[test]
+    fn changed_skip_value_base_isa() {
+        let src = "assert(instance:IsA(\"ObjectValue\"))\ninstance.Changed:Connect(function() end)";
+        let ast = parse(src);
+        let hits = PropertyChangeSignalWrong.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn changed_skip_property_filter() {
+        let src = "child.Changed:Connect(function(property)\n  if property == \"Source\" then\n    print(\"source changed\")\n  end\nend)";
+        let ast = parse(src);
+        let hits = PropertyChangeSignalWrong.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
 }
