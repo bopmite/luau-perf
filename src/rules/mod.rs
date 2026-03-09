@@ -677,7 +677,8 @@ pub fn is_fixable(id: &str) -> bool {
         "roblox::wait_for_child_no_timeout" |
         "roblox::model_set_primary_part_cframe" |
         "roblox::deprecated_delay" |
-        "roblox::deprecated_ypcall"
+        "roblox::deprecated_ypcall" |
+        "string::tostring_in_interpolation"
     )
 }
 

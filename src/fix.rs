@@ -42,6 +42,7 @@ pub fn compute_fix(rule_id: &str, source: &str, pos: usize) -> Option<Fix> {
         "roblox::model_set_primary_part_cframe" => fix_set_primary_part_cframe(source, pos),
         "roblox::deprecated_delay" => fix_deprecated_spawn(source, pos),
         "roblox::deprecated_ypcall" => fix_ypcall(source, pos),
+        "string::tostring_in_interpolation" => fix_tostring_in_interpolation(source, pos),
         _ => None,
     }
 }
@@ -735,6 +736,21 @@ fn fix_coroutine_resume_create(source: &str, pos: usize) -> Option<Fix> {
     })
 }
 
+fn fix_tostring_in_interpolation(source: &str, pos: usize) -> Option<Fix> {
+    let prefix = "tostring(";
+    if source.get(pos..pos + prefix.len())? != prefix {
+        return None;
+    }
+    let after = pos + prefix.len();
+    let close = find_matching_paren(source, after)?;
+    let inner = source.get(after..close)?;
+    Some(Fix {
+        start: pos,
+        end: close + 1,
+        replacement: inner.to_string(),
+    })
+}
+
 fn fix_ypcall(source: &str, pos: usize) -> Option<Fix> {
     let slice = source.get(pos..pos + 6)?;
     if slice != "ypcall" { return None; }
@@ -1097,6 +1113,24 @@ mod tests {
         assert_eq!(result, r#"string.format("%s", val)"#);
     }
 
+
+    #[test]
+    fn test_fix_tostring_in_interpolation() {
+        let src = "tostring(value)";
+        let fix = compute_fix("string::tostring_in_interpolation", src, 0).unwrap();
+        let mut result = src.to_string();
+        result.replace_range(fix.start..fix.end, &fix.replacement);
+        assert_eq!(result, "value");
+    }
+
+    #[test]
+    fn test_fix_tostring_in_interpolation_nested() {
+        let src = "tostring(foo(bar))";
+        let fix = compute_fix("string::tostring_in_interpolation", src, 0).unwrap();
+        let mut result = src.to_string();
+        result.replace_range(fix.start..fix.end, &fix.replacement);
+        assert_eq!(result, "foo(bar)");
+    }
 
     #[test]
     fn test_fix_wait_after_utf8() {
