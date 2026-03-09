@@ -66,6 +66,7 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(cache::BrickColorNewInLoop),
         Box::new(cache::RegionNewInLoop),
         Box::new(cache::RepeatedPropertyChain),
+        Box::new(cache::LoadAnimationInLoop),
         // memory
         Box::new(memory::UntrackedConnection),
         Box::new(memory::UntrackedTaskSpawn),
@@ -497,6 +498,7 @@ pub fn rule_level(id: &str) -> crate::lint::Level {
         | "cache::magnitude_over_squared"
         | "cache::current_camera_uncached"
         | "cache::local_player_uncached"
+        | "cache::load_animation_in_loop"
 
         // complexity
         | "complexity::filter_then_first"
@@ -965,6 +967,7 @@ fn explain_text(id: &str) -> &'static str {
         "network::invoke_client_dangerous" => ":InvokeClient() yields the server thread until the client responds. A malicious or disconnecting client can stall the server indefinitely. Use FireClient + client-to-server response pattern instead.",
         "cache::repeated_color3" => "The same Color3.fromRGB/new call repeated 4+ times wastes constructor calls. Extract to a module-level constant: local RED = Color3.fromRGB(255, 0, 0).",
         "cache::repeated_property_chain" => "Long property chains like player.Character.HumanoidRootPart accessed 3+ times cost multiple GETTABLEKS ops each time. Cache in a local: local rootPart = character.HumanoidRootPart.",
+        "cache::load_animation_in_loop" => ":LoadAnimation() creates a new AnimationTrack from an Animation each call. In a loop, this loads the same animation N times. Cache the track outside: local track = animator:LoadAnimation(anim).",
         "cache::enum_lookup_in_loop" => "Enum.Category.Value crosses the Lua-C++ bridge each access. In a loop, cache outside: local material = Enum.Material.SmoothPlastic.",
         "native::method_call_defeats_fastcall" => "Method syntax (:byte, :sub, :len, :char) generates NAMECALL instead of FASTCALL. In loops, use string.byte(s, i) instead of s:byte(i) for the fast builtin path.",
         "native::shared_global_mutation" => "Writing to shared.* (like _G.*) disables GETIMPORT, FASTCALL, and DUPCLOSURE optimizations for the ENTIRE script. Use a required module for cross-script state instead.",

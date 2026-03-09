@@ -50,6 +50,7 @@ pub struct EnumLookupInLoop;
 pub struct BrickColorNewInLoop;
 pub struct RegionNewInLoop;
 pub struct RepeatedPropertyChain;
+pub struct LoadAnimationInLoop;
 
 impl Rule for MagnitudeOverSquared {
     fn id(&self) -> &'static str { "cache::magnitude_over_squared" }
@@ -683,6 +684,24 @@ impl Rule for RepeatedPropertyChain {
     }
 }
 
+impl Rule for LoadAnimationInLoop {
+    fn id(&self) -> &'static str { "cache::load_animation_in_loop" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        visit::each_call(ast, |call, ctx| {
+            if ctx.in_hot_loop && visit::is_method_call(call, "LoadAnimation") {
+                hits.push(Hit {
+                    pos: visit::call_pos(call),
+                    msg: ":LoadAnimation() in loop - loads a new AnimationTrack each iteration, cache outside the loop".into(),
+                });
+            }
+        });
+        hits
+    }
+}
+
 fn line_start_offsets(source: &str) -> Vec<usize> {
     let mut starts = vec![0];
     for (i, b) in source.bytes().enumerate() {
@@ -946,6 +965,22 @@ mod tests {
         let src = "local a = player.Character.HumanoidRootPart.Position\nlocal b = player.Character.HumanoidRootPart.CFrame";
         let ast = parse(src);
         let hits = RepeatedPropertyChain.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn load_animation_in_loop_detected() {
+        let src = "while true do\n  local track = humanoid:LoadAnimation(anim)\n  task.wait()\nend";
+        let ast = parse(src);
+        let hits = LoadAnimationInLoop.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn load_animation_outside_loop_ok() {
+        let src = "local track = humanoid:LoadAnimation(anim)";
+        let ast = parse(src);
+        let hits = LoadAnimationInLoop.check(src, &ast);
         assert_eq!(hits.len(), 0);
     }
 }
