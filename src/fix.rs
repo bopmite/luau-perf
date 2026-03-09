@@ -51,7 +51,7 @@ fn fix_deprecated_wait(source: &str, pos: usize) -> Option<Fix> {
     if slice != "wait" {
         return None;
     }
-    if pos >= 5 && source.get(pos - 5..pos)? == "task." {
+    if pos >= 5 && source.get(pos - 5..pos) == Some("task.") {
         return None;
     }
     Some(Fix {
@@ -1095,5 +1095,15 @@ mod tests {
         let mut result = src.to_string();
         result.replace_range(fix.start..fix.end, &fix.replacement);
         assert_eq!(result, r#"string.format("%s", val)"#);
+    }
+
+
+    #[test]
+    fn test_fix_wait_after_utf8() {
+        let src = "-- 日本語\nwait()";
+        let fix = compute_fix("roblox::deprecated_wait", src, 13).unwrap();
+        let mut result = src.to_string();
+        result.replace_range(fix.start..fix.end, &fix.replacement);
+        assert_eq!(result, "-- 日本語\ntask.wait()");
     }
 }
