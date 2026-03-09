@@ -30,7 +30,6 @@ pub struct ErrorNoLevel;
 pub struct MatchForExistence;
 pub struct NestedStringFormat;
 pub struct CoroutineCreateOverTaskSpawn;
-pub struct UnreachableCode;
 
 impl Rule for ServiceLocatorAntiPattern {
     fn id(&self) -> &'static str { "style::duplicate_get_service" }
@@ -913,41 +912,6 @@ impl Rule for CoroutineCreateOverTaskSpawn {
     }
 }
 
-impl Rule for UnreachableCode {
-    fn id(&self) -> &'static str { "style::unreachable_code" }
-    fn severity(&self) -> Severity { Severity::Warn }
-
-    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
-        let mut hits = Vec::new();
-        let lines: Vec<&str> = source.lines().collect();
-        for (i, line) in lines.iter().enumerate() {
-            let trimmed = line.trim();
-            let is_never_return = trimmed.starts_with("error(")
-                || trimmed == "error()"
-                || trimmed.starts_with("assert(false")
-                || trimmed.starts_with("os.exit(");
-            if !is_never_return { continue; }
-            let next = i + 1;
-            if next >= lines.len() { continue; }
-            let next_trimmed = lines[next].trim();
-            if next_trimmed.is_empty()
-                || next_trimmed.starts_with("end")
-                || next_trimmed.starts_with("else")
-                || next_trimmed.starts_with("until")
-                || next_trimmed.starts_with("--")
-            {
-                continue;
-            }
-            let pos: usize = lines[..next].iter().map(|l| l.len() + 1).sum();
-            hits.push(Hit {
-                pos,
-                msg: "code after error()/assert(false) is unreachable".into(),
-            });
-        }
-        hits
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1273,19 +1237,4 @@ mod tests {
         assert_eq!(hits.len(), 0);
     }
 
-    #[test]
-    fn unreachable_after_error_detected() {
-        let src = "error(\"fatal\")\nprint(\"dead\")";
-        let ast = parse(src);
-        let hits = UnreachableCode.check(src, &ast);
-        assert_eq!(hits.len(), 1);
-    }
-
-    #[test]
-    fn error_then_end_ok() {
-        let src = "if bad then\n  error(\"nope\")\nend";
-        let ast = parse(src);
-        let hits = UnreachableCode.check(src, &ast);
-        assert_eq!(hits.len(), 0);
-    }
 }
