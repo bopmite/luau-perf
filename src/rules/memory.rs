@@ -149,7 +149,8 @@ fn is_in_service_init(source: &str, pos: usize) -> bool {
             let tl = t.to_lowercase();
             return tl.contains(":init(") || tl.contains(":start(") || tl.contains(":initialize(")
                 || tl.contains(".init(") || tl.contains(".start(") || tl.contains(".initialize(")
-                || tl.contains("function init(") || tl.contains("function start(");
+                || tl.contains("function init(") || tl.contains("function start(")
+                || tl.contains("knitinit(") || tl.contains("knitstart(");
         }
     }
     false

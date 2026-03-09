@@ -32,6 +32,9 @@ pub fn compute_fix(rule_id: &str, source: &str, pos: usize) -> Option<Fix> {
         "roblox::raycast_filter_deprecated" => fix_raycast_filter_deprecated(source, pos),
         "roblox::getservice_workspace" => fix_getservice_workspace(source, pos),
         "math::floor_round_manual" => fix_floor_round_manual(source, pos),
+        "roblox::deprecated_tick" => fix_deprecated_tick(source, pos),
+        "math::random_deprecated" => fix_random_deprecated(source, pos),
+        "string::format_redundant_tostring" => fix_redundant_tostring(source, pos),
         _ => None,
     }
 }
@@ -582,6 +585,68 @@ fn fix_floor_round_manual(source: &str, pos: usize) -> Option<Fix> {
     })
 }
 
+fn fix_deprecated_tick(source: &str, pos: usize) -> Option<Fix> {
+    if source.get(pos..pos + 4)? != "tick" { return None; }
+    Some(Fix { start: pos, end: pos + 4, replacement: "os.clock".into() })
+}
+
+fn fix_random_deprecated(source: &str, pos: usize) -> Option<Fix> {
+    let slice = &source[pos..];
+    if slice.starts_with("math.random(") {
+        let after = &slice["math.random(".len()..];
+        let close = after.find(')')?;
+        let args = &after[..close];
+        if args.trim().is_empty() {
+            return Some(Fix {
+                start: pos,
+                end: pos + "math.random(".len() + close + 1,
+                replacement: "Random.new():NextNumber()".into(),
+            });
+        }
+        if args.contains(',') {
+            return Some(Fix {
+                start: pos,
+                end: pos + "math.random(".len() + close + 1,
+                replacement: format!("Random.new():NextInteger({args})"),
+            });
+        }
+        return Some(Fix {
+            start: pos,
+            end: pos + "math.random(".len() + close + 1,
+            replacement: format!("Random.new():NextInteger(1, {args})"),
+        });
+    }
+    if slice.starts_with("math.randomseed") {
+        let end = pos + slice.find(')')? + 1;
+        return Some(Fix { start: pos, end, replacement: String::new() });
+    }
+    None
+}
+
+fn fix_redundant_tostring(source: &str, pos: usize) -> Option<Fix> {
+    let slice = &source[pos..];
+    if !slice.starts_with("tostring(") { return None; }
+    let after = &slice["tostring(".len()..];
+    let mut depth = 1i32;
+    let mut end_offset = 0;
+    for (i, ch) in after.char_indices() {
+        match ch {
+            '(' => depth += 1,
+            ')' => {
+                depth -= 1;
+                if depth == 0 { end_offset = i; break; }
+            }
+            _ => {}
+        }
+    }
+    let inner = &after[..end_offset];
+    Some(Fix {
+        start: pos,
+        end: pos + "tostring(".len() + end_offset + 1,
+        replacement: inner.to_string(),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -854,5 +919,23 @@ mod tests {
         let mut result = src.to_string();
         result.replace_range(fix.start..fix.end, &fix.replacement);
         assert_eq!(result, "local x = math.round(health)");
+    }
+
+    #[test]
+    fn test_fix_deprecated_tick() {
+        let src = "local t = tick()";
+        let fix = compute_fix("roblox::deprecated_tick", src, 10).unwrap();
+        let mut result = src.to_string();
+        result.replace_range(fix.start..fix.end, &fix.replacement);
+        assert_eq!(result, "local t = os.clock()");
+    }
+
+    #[test]
+    fn test_fix_redundant_tostring() {
+        let src = r#"string.format("%s", tostring(val))"#;
+        let fix = compute_fix("string::format_redundant_tostring", src, 20).unwrap();
+        let mut result = src.to_string();
+        result.replace_range(fix.start..fix.end, &fix.replacement);
+        assert_eq!(result, r#"string.format("%s", val)"#);
     }
 }
