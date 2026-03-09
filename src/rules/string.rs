@@ -653,10 +653,6 @@ impl Rule for FormatSimpleConcat {
             if fmt.is_empty() {
                 continue;
             }
-            let _only_s = fmt
-                .replace("%s", "")
-                .chars()
-                .all(|c| !c.is_alphanumeric() || c == ' ');
             let s_count = fmt.matches("%s").count();
             if s_count >= 2 && fmt.replace("%s", "").find('%').is_none() {
                 hits.push(Hit {
