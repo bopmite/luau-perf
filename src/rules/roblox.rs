@@ -523,19 +523,17 @@ impl Rule for BindableSameScript {
         let has_connect = source.contains(".Event:Connect(") || source.contains(".Event:connect(");
 
         if has_fire && has_connect {
-            if source.contains("self._") && (source.contains("self._bindable") || source.contains("self._event")) {
+            if source.contains("Signal") || source.contains("signal") {
                 return vec![];
             }
-            if source.contains("Signal") || source.contains("signal") {
+            if source.contains("self.") || source.contains("self:") {
+                return vec![];
+            }
+            if source.contains("._event") || source.contains("._bindable") || source.contains("._observable") {
                 return vec![];
             }
             let fire_positions = visit::find_pattern_positions(source, ":Fire(");
             if let Some(&pos) = fire_positions.first() {
-                let fire_line_start = source[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
-                let fire_line = &source[fire_line_start..source[pos..].find('\n').map(|p| pos + p).unwrap_or(source.len())];
-                if fire_line.contains("self.") || fire_line.contains("self._") {
-                    return vec![];
-                }
                 return vec![Hit {
                     pos,
                     msg: "BindableEvent:Fire() and .Event:Connect() in same script - use direct function calls instead".into(),
@@ -800,6 +798,10 @@ impl Rule for ChangedEventUnfiltered {
     fn severity(&self) -> Severity { Severity::Warn }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let value_base_types = [
+            "BoolValue", "IntValue", "StringValue", "ObjectValue", "NumberValue",
+            "Color3Value", "Vector3Value", "CFrameValue", "BrickColorValue", "RayValue",
+        ];
         let mut hits = Vec::new();
         for pos in visit::find_pattern_positions(source, ".Changed:Connect(") {
             let before = &source[..pos];
@@ -821,6 +823,29 @@ impl Rule for ChangedEventUnfiltered {
             if lw.ends_with("value") || lw.ends_with("action") || lw.ends_with("state")
                 || lw.ends_with("object") || lw.ends_with("signal")
             {
+                continue;
+            }
+            let var_name = accessor.split('.').next().unwrap_or(accessor);
+            let search_start = source[..pos].len().saturating_sub(2000);
+            let search_start = visit::floor_char(source, search_start);
+            let context = &source[search_start..pos];
+            let is_value_base = value_base_types.iter().any(|vt| {
+                context.contains(&format!("Instance.new(\"{vt}\")"))
+                    || context.contains(&format!(": {vt}"))
+            }) || {
+                let assign_pat = format!("{var_name} = Instance.new(\"");
+                if let Some(apos) = context.rfind(&assign_pat) {
+                    let after = &context[apos + assign_pat.len()..];
+                    after.starts_with("Bool") || after.starts_with("Int")
+                        || after.starts_with("String") || after.starts_with("Object")
+                        || after.starts_with("Number") || after.starts_with("Color3")
+                        || after.starts_with("Vector3") || after.starts_with("CFrame")
+                        || after.starts_with("BrickColor") || after.starts_with("Ray")
+                } else {
+                    false
+                }
+            };
+            if is_value_base {
                 continue;
             }
             if !accessor.contains('.') {
@@ -1717,6 +1742,30 @@ mod tests {
         let src = "part:GetPropertyChangedSignal(\"Position\"):Connect(function() end)";
         let ast = parse(src);
         let hits = ChangedEventUnfiltered.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn changed_event_value_base_skip() {
+        let src = "local v = Instance.new(\"BoolValue\")\nv.Changed:Connect(function(newVal)\n  print(newVal)\nend)";
+        let ast = parse(src);
+        let hits = ChangedEventUnfiltered.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn changed_event_int_value_skip() {
+        let src = "local count: IntValue = folder:FindFirstChild(\"Count\")\ncount.Changed:Connect(function() end)";
+        let ast = parse(src);
+        let hits = ChangedEventUnfiltered.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn bindable_self_field_skip() {
+        let src = "function MyClass:Init()\n  self._event = Instance.new(\"BindableEvent\")\n  self._event.Event:Connect(function() end)\nend\nfunction MyClass:Fire()\n  self._event:Fire()\nend";
+        let ast = parse(src);
+        let hits = BindableSameScript.check(src, &ast);
         assert_eq!(hits.len(), 0);
     }
 
