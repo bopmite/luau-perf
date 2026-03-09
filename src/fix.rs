@@ -43,6 +43,7 @@ pub fn compute_fix(rule_id: &str, source: &str, pos: usize) -> Option<Fix> {
         "roblox::deprecated_delay" => fix_deprecated_spawn(source, pos),
         "roblox::deprecated_ypcall" => fix_ypcall(source, pos),
         "string::tostring_in_interpolation" => fix_tostring_in_interpolation(source, pos),
+        "roblox::deprecated_elapsed_time" => fix_deprecated_elapsed_time(source, pos),
         _ => None,
     }
 }
@@ -751,6 +752,19 @@ fn fix_tostring_in_interpolation(source: &str, pos: usize) -> Option<Fix> {
     })
 }
 
+fn fix_deprecated_elapsed_time(source: &str, pos: usize) -> Option<Fix> {
+    if let Some(slice) = source.get(pos..pos + 11) {
+        if slice == "elapsedTime" || slice == "ElapsedTime" {
+            return Some(Fix {
+                start: pos,
+                end: pos + 11,
+                replacement: "os.clock".into(),
+            });
+        }
+    }
+    None
+}
+
 fn fix_ypcall(source: &str, pos: usize) -> Option<Fix> {
     let slice = source.get(pos..pos + 6)?;
     if slice != "ypcall" { return None; }
@@ -1130,6 +1144,24 @@ mod tests {
         let mut result = src.to_string();
         result.replace_range(fix.start..fix.end, &fix.replacement);
         assert_eq!(result, "foo(bar)");
+    }
+
+    #[test]
+    fn test_fix_deprecated_elapsed_time() {
+        let src = "local t = elapsedTime()";
+        let fix = compute_fix("roblox::deprecated_elapsed_time", src, 10).unwrap();
+        let mut result = src.to_string();
+        result.replace_range(fix.start..fix.end, &fix.replacement);
+        assert_eq!(result, "local t = os.clock()");
+    }
+
+    #[test]
+    fn test_fix_deprecated_elapsed_time_capital() {
+        let src = "local t = ElapsedTime()";
+        let fix = compute_fix("roblox::deprecated_elapsed_time", src, 10).unwrap();
+        let mut result = src.to_string();
+        result.replace_range(fix.start..fix.end, &fix.replacement);
+        assert_eq!(result, "local t = os.clock()");
     }
 
     #[test]

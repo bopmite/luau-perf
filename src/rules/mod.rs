@@ -678,7 +678,8 @@ pub fn is_fixable(id: &str) -> bool {
         "roblox::model_set_primary_part_cframe" |
         "roblox::deprecated_delay" |
         "roblox::deprecated_ypcall" |
-        "string::tostring_in_interpolation"
+        "string::tostring_in_interpolation" |
+        "roblox::deprecated_elapsed_time"
     )
 }
 
