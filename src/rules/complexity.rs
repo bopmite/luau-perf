@@ -329,6 +329,16 @@ impl Rule for DataStoreNoPcall {
     fn id(&self) -> &'static str { "complexity::datastore_no_pcall" }
     fn severity(&self) -> Severity { Severity::Warn }
 
+    fn skip_path(&self, path: &std::path::Path) -> bool {
+        path.file_name()
+            .and_then(|n| n.to_str())
+            .map(|n| {
+                let lower = n.to_ascii_lowercase();
+                lower.contains("mock")
+            })
+            .unwrap_or(false)
+    }
+
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         let ds_methods = [":GetAsync(", ":SetAsync(", ":UpdateAsync(", ":RemoveAsync(", ":IncrementAsync("];
@@ -351,6 +361,10 @@ impl Rule for DataStoreNoPcall {
                 if prev_line.contains("pcall(") || prev_line.contains("xpcall(") {
                     continue;
                 }
+                let context = &source[before_start..pos];
+                if self.is_inside_pcall_closure(context) {
+                    continue;
+                }
                 hits.push(Hit {
                     pos,
                     msg: format!("DataStore{} without pcall - can fail from throttling/network issues, always wrap in pcall", method.trim_end_matches('(')),
@@ -358,6 +372,35 @@ impl Rule for DataStoreNoPcall {
             }
         }
         hits
+    }
+}
+
+impl DataStoreNoPcall {
+    fn is_inside_pcall_closure(&self, before: &str) -> bool {
+        let mut depth: i32 = 0;
+        let bytes = before.as_bytes();
+        let len = bytes.len();
+        let mut i = len;
+        while i > 0 {
+            i -= 1;
+            if bytes[i] == b')' {
+                depth += 1;
+            } else if bytes[i] == b'(' {
+                depth -= 1;
+                if depth < 0 {
+                    let preceding = before[..i].trim_end();
+                    if preceding.ends_with("function") {
+                        let fn_start = preceding.len() - "function".len();
+                        let before_fn = preceding[..fn_start].trim_end();
+                        if before_fn.ends_with("pcall(") || before_fn.ends_with("xpcall(") {
+                            return true;
+                        }
+                    }
+                    return false;
+                }
+            }
+        }
+        false
     }
 }
 
@@ -397,6 +440,9 @@ impl Rule for OneIterationLoop {
         for (i, line) in lines.iter().enumerate() {
             let trimmed = line.trim();
             if !(trimmed.starts_with("for ") || trimmed.starts_with("while ")) {
+                continue;
+            }
+            if trimmed.ends_with(" end") || trimmed.ends_with("\tend") || trimmed.contains(" end)") || trimmed.contains(" end ") {
                 continue;
             }
             if i + 1 >= lines.len() { continue; }
@@ -867,6 +913,31 @@ mod tests {
     }
 
     #[test]
+    fn datastore_pcall_closure_ok() {
+        let src = "local ok, data = pcall(function()\n    return dataStore:GetAsync(key)\nend)";
+        let ast = parse(src);
+        let hits = DataStoreNoPcall.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn datastore_xpcall_closure_ok() {
+        let src = "local ok, data = xpcall(function()\n    dataStore:SetAsync(key, value)\nend, warn)";
+        let ast = parse(src);
+        let hits = DataStoreNoPcall.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn datastore_mock_file_skipped() {
+        let rule = DataStoreNoPcall;
+        assert!(rule.skip_path(std::path::Path::new("MockDataStore.lua")));
+        assert!(rule.skip_path(std::path::Path::new("mockDataStore.luau")));
+        assert!(rule.skip_path(std::path::Path::new("DataStoreMock.lua")));
+        assert!(!rule.skip_path(std::path::Path::new("DataStoreHandler.lua")));
+    }
+
+    #[test]
     fn accumulating_rebuild_detected() {
         let src = "while true do\n  result = {unpack(result), item}\nend";
         let ast = parse(src);
@@ -893,6 +964,14 @@ mod tests {
     #[test]
     fn normal_loop_ok() {
         let src = "for _, v in items do\n  process(v)\nend";
+        let ast = parse(src);
+        let hits = OneIterationLoop.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn one_iteration_loop_single_line_then_return_ok() {
+        let src = "for k, v in pairs(t) do tCopy[k] = v end\nreturn tCopy";
         let ast = parse(src);
         let hits = OneIterationLoop.check(src, &ast);
         assert_eq!(hits.len(), 0);

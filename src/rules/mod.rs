@@ -222,6 +222,7 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(string::FormatNoArgs),
         Box::new(string::FormatRedundantTostring),
         Box::new(string::FormatSimpleConcat),
+        Box::new(string::ToStringInInterpolation),
         // table
         Box::new(table::ForeachDeprecated),
         Box::new(table::GetnDeprecated),
@@ -754,6 +755,7 @@ fn explain_text(id: &str) -> &'static str {
         "string::format_no_args" => "string.format(\"literal\") with no format arguments returns the string unchanged. Just use the string directly instead of wrapping it in string.format().",
         "string::format_redundant_tostring" => "string.format's %s specifier already calls tostring() internally. Wrapping the argument in tostring() is redundant and adds unnecessary overhead.",
         "string::format_simple_concat" => "string.format() with only %s specifiers is doing simple concatenation with function call overhead. string.format is NOT a VM fastcall builtin. Use the .. operator instead — it compiles to a single CONCAT opcode that batches all operands efficiently.",
+        "string::tostring_in_interpolation" => "String interpolation (`{expr}`) already calls tostring() on each expression. Wrapping in tostring() is redundant — just use `{x}` instead of `{tostring(x)}`.",
         "roblox::find_first_child_no_check" => "FindFirstChild returns nil if the child doesn't exist. Accessing a property on the result without checking for nil will throw 'attempt to index nil' at runtime. Store in a local and check before accessing.",
         "roblox::get_full_name_in_loop" => "GetFullName() builds the full ancestry path string each call. In a loop, this allocates N strings. Cache the result outside the loop if the instance doesn't change.",
         "roblox::bind_to_render_step_no_cleanup" => "BindToRenderStep registers a named callback to run every frame. Without a matching UnbindFromRenderStep, the binding persists indefinitely, leaking if the script is reused or the feature is toggled off.",

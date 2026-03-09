@@ -101,6 +101,9 @@ fn lint_file(path: &Path, rules: &[Box<dyn Rule>], config: &Config, fix_mode: bo
             if !has_config_override && crate::rules::rule_level(rule.id()) > level {
                 return vec![];
             }
+            if rule.skip_path(path) {
+                return vec![];
+            }
 
             rule.check(&source, &ast)
                 .into_iter()

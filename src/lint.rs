@@ -218,5 +218,6 @@ pub trait Rule: Send + Sync {
     fn id(&self) -> &'static str;
     fn severity(&self) -> Severity;
     fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit>;
+    fn skip_path(&self, _path: &std::path::Path) -> bool { false }
 }
 

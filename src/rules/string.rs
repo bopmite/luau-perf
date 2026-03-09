@@ -19,6 +19,7 @@ pub struct FormatKnownTypes;
 pub struct FormatNoArgs;
 pub struct FormatRedundantTostring;
 pub struct FormatSimpleConcat;
+pub struct ToStringInInterpolation;
 
 impl Rule for LenOverHash {
     fn id(&self) -> &'static str { "string::len_over_hash" }
@@ -549,6 +550,106 @@ impl Rule for FormatSimpleConcat {
     }
 }
 
+impl Rule for ToStringInInterpolation {
+    fn id(&self) -> &'static str { "string::tostring_in_interpolation" }
+    fn severity(&self) -> Severity { Severity::Warn }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        let bytes = source.as_bytes();
+        let len = bytes.len();
+        let mut i = 0;
+        while i < len {
+            if bytes[i] == b'-' && i + 1 < len && bytes[i + 1] == b'-' {
+                i += 2;
+                if i < len && bytes[i] == b'[' {
+                    let mut eq = 0;
+                    let mut j = i + 1;
+                    while j < len && bytes[j] == b'=' { eq += 1; j += 1; }
+                    if j < len && bytes[j] == b'[' {
+                        let mut close = String::from("]");
+                        for _ in 0..eq { close.push('='); }
+                        close.push(']');
+                        if let Some(end) = source[j + 1..].find(&close) {
+                            i = j + 1 + end + close.len();
+                        } else {
+                            i = len;
+                        }
+                        continue;
+                    }
+                }
+                while i < len && bytes[i] != b'\n' { i += 1; }
+                continue;
+            }
+            if bytes[i] == b'"' || bytes[i] == b'\'' {
+                let q = bytes[i];
+                i += 1;
+                while i < len && bytes[i] != q && bytes[i] != b'\n' {
+                    if bytes[i] == b'\\' { i += 1; }
+                    i += 1;
+                }
+                if i < len { i += 1; }
+                continue;
+            }
+            if bytes[i] == b'`' {
+                i += 1;
+                let mut depth = 0u32;
+                while i < len && !(bytes[i] == b'`' && depth == 0) {
+                    if bytes[i] == b'{' {
+                        depth += 1;
+                        let brace_start = i;
+                        i += 1;
+                        while i < len && depth > 0 {
+                            if bytes[i] == b'{' {
+                                depth += 1;
+                            } else if bytes[i] == b'}' {
+                                depth -= 1;
+                                if depth == 0 { break; }
+                            } else if bytes[i] == b'"' || bytes[i] == b'\'' {
+                                let q = bytes[i];
+                                i += 1;
+                                while i < len && bytes[i] != q && bytes[i] != b'\n' {
+                                    if bytes[i] == b'\\' { i += 1; }
+                                    i += 1;
+                                }
+                            }
+                            i += 1;
+                        }
+                        let brace_end = i;
+                        let expr = &source[brace_start + 1..brace_end.min(len)];
+                        let trimmed = expr.trim();
+                        if trimmed.starts_with("tostring(") && trimmed.ends_with(')') {
+                            let inner = &trimmed["tostring(".len()..trimmed.len() - 1];
+                            let mut paren_depth = 0i32;
+                            let balanced = inner.chars().all(|c| {
+                                match c {
+                                    '(' => { paren_depth += 1; true }
+                                    ')' => { paren_depth -= 1; paren_depth >= 0 }
+                                    _ => true,
+                                }
+                            }) && paren_depth == 0;
+                            if balanced {
+                                hits.push(Hit {
+                                    pos: brace_start + 1 + expr.find("tostring(").unwrap_or(0),
+                                    msg: "tostring() inside string interpolation is redundant - interpolation already calls tostring".into(),
+                                });
+                            }
+                        }
+                        if i < len { i += 1; }
+                        continue;
+                    }
+                    if bytes[i] == b'\\' { i += 1; }
+                    i += 1;
+                }
+                if i < len { i += 1; }
+                continue;
+            }
+            i += 1;
+        }
+        hits
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -827,6 +928,62 @@ mod tests {
         let src = "local s = string.format(\"%s\", x)";
         let ast = parse(src);
         let hits = FormatSimpleConcat.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn tostring_in_interpolation_detected() {
+        let src = "local s = `hello {tostring(x)}`";
+        let ast = parse(src);
+        let hits = ToStringInInterpolation.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn tostring_in_interpolation_multiple() {
+        let src = "local s = `{tostring(a)} and {tostring(b)}`";
+        let ast = parse(src);
+        let hits = ToStringInInterpolation.check(src, &ast);
+        assert_eq!(hits.len(), 2);
+    }
+
+    #[test]
+    fn interpolation_without_tostring_ok() {
+        let src = "local s = `hello {x}`";
+        let ast = parse(src);
+        let hits = ToStringInInterpolation.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn tostring_outside_interpolation_ok() {
+        let src = "local s = tostring(x)";
+        let ast = parse(src);
+        let hits = ToStringInInterpolation.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn tostring_in_interpolation_nested_call() {
+        let src = "local s = `{tostring(foo(x))}`";
+        let ast = parse(src);
+        let hits = ToStringInInterpolation.check(src, &ast);
+        assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn tostring_in_regular_string_ok() {
+        let src = "local s = \"tostring(x)\"";
+        let ast = parse(src);
+        let hits = ToStringInInterpolation.check(src, &ast);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn tostring_in_comment_ok() {
+        let src = "-- `{tostring(x)}`";
+        let ast = parse(src);
+        let hits = ToStringInInterpolation.check(src, &ast);
         assert_eq!(hits.len(), 0);
     }
 }
