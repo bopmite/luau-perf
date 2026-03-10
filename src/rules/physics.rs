@@ -81,26 +81,28 @@ impl Rule for TouchedWithoutDebounce {
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
-        for pos in visit::find_pattern_positions(source, ".Touched:Connect(") {
-            let after_start = pos + ".Touched:Connect(".len();
-            let after_end = visit::ceil_char(source, (after_start + 300).min(source.len()));
-            let callback = &source[after_start..after_end];
-            let body_lines: Vec<&str> = callback.lines().take(8).collect();
-            let early_body = body_lines.join("\n");
-            let has_debounce = early_body.contains("debounce")
-                || early_body.contains("cooldown")
-                || early_body.contains("if not ")
-                || early_body.contains("if db")
-                || early_body.contains("tick()")
-                || early_body.contains("os.clock()")
-                || early_body.contains("task.wait");
-            if !has_debounce {
-                hits.push(Hit {
-                    pos,
-                    msg:
-                        ".Touched fires at ~240Hz per contact pair - add a debounce/cooldown check"
-                            .into(),
-                });
+        for pat in &[".Touched:Connect(", ".Touched:connect("] {
+            for pos in visit::find_pattern_positions(source, pat) {
+                let after_start = pos + pat.len();
+                let after_end = visit::ceil_char(source, (after_start + 300).min(source.len()));
+                let callback = &source[after_start..after_end];
+                let body_lines: Vec<&str> = callback.lines().take(8).collect();
+                let early_body = body_lines.join("\n");
+                let has_debounce = early_body.contains("debounce")
+                    || early_body.contains("cooldown")
+                    || early_body.contains("if not ")
+                    || early_body.contains("if db")
+                    || early_body.contains("tick()")
+                    || early_body.contains("os.clock()")
+                    || early_body.contains("task.wait");
+                if !has_debounce {
+                    hits.push(Hit {
+                        pos,
+                        msg:
+                            ".Touched fires at ~240Hz per contact pair - add a debounce/cooldown check"
+                                .into(),
+                    });
+                }
             }
         }
         hits

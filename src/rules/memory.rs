@@ -46,9 +46,11 @@ impl Rule for UntrackedConnection {
                     Stmt::FunctionCall(c) => c,
                     _ => return,
                 };
-                if visit::is_method_call(call, "Connect")
-                    && visit::method_call_arg_count(call, "Connect") == 1
-                {
+                let is_connect = (visit::is_method_call(call, "Connect")
+                    && visit::method_call_arg_count(call, "Connect") == 1)
+                    || (visit::is_method_call(call, "connect")
+                        && visit::method_call_arg_count(call, "connect") == 1);
+                if is_connect {
                     let suffix_count = call.suffixes().count();
                     if suffix_count < 2 {
                         return;
@@ -265,9 +267,11 @@ impl Rule for ConnectInLoop {
                     Stmt::FunctionCall(c) => c,
                     _ => return,
                 };
-                if visit::is_method_call(call, "Connect")
-                    && visit::method_call_arg_count(call, "Connect") == 1
-                {
+                let is_connect = (visit::is_method_call(call, "Connect")
+                    && visit::method_call_arg_count(call, "Connect") == 1)
+                    || (visit::is_method_call(call, "connect")
+                        && visit::method_call_arg_count(call, "connect") == 1);
+                if is_connect {
                     hits.push(Hit {
                         pos: visit::call_pos(call),
                         msg: ":Connect() in loop - creates N connections, likely a memory leak"
@@ -408,14 +412,19 @@ impl Rule for ConnectInConnect {
     }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
-        let connect_positions = visit::find_pattern_positions(source, ":Connect(");
+        let connect_positions = visit::find_connect_positions(source);
         if connect_positions.len() < 2 {
             return vec![];
         }
 
         let mut hits = Vec::new();
         for (i, &outer_pos) in connect_positions.iter().enumerate() {
-            let outer_end = outer_pos + ":Connect(".len();
+            let connect_len = if source[outer_pos..].starts_with(":Connect(") {
+                ":Connect(".len()
+            } else {
+                ":connect(".len()
+            };
+            let outer_end = outer_pos + connect_len;
             let rest = &source[outer_end..];
             if !rest.starts_with("function") && !rest.trim_start().starts_with("function") {
                 continue;
@@ -479,7 +488,7 @@ impl Rule for ConnectInConnect {
 
             if let Some(&inner_pos) = connect_positions[i + 1..].iter().find(|&&p| p < body_end) {
                 let between = &source[outer_end..inner_pos];
-                if !between.contains(":Disconnect()") {
+                if !between.contains(":Disconnect()") && !between.contains(":disconnect()") {
                     let inner_line_start =
                         source[..inner_pos].rfind('\n').map(|p| p + 1).unwrap_or(0);
                     let inner_line_end = source[inner_pos..]

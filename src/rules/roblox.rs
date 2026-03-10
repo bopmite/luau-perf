@@ -511,8 +511,10 @@ impl Rule for TouchedEventUnfiltered {
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
-        for pos in visit::find_pattern_positions(source, ".Touched:Connect(") {
-            let after_start = pos + ".Touched:Connect(".len();
+        let patterns = [".Touched:Connect(", ".Touched:connect("];
+        for pat in &patterns {
+        for pos in visit::find_pattern_positions(source, pat) {
+            let after_start = pos + pat.len();
             let after_end = (after_start + 400).min(source.len());
             let callback = &source[after_start..after_end];
             let body: String = callback.lines().take(10).collect::<Vec<_>>().join("\n");
@@ -530,6 +532,7 @@ impl Rule for TouchedEventUnfiltered {
                     msg: ".Touched fires at physics rate (~240Hz) - ensure debounce/filtering in handler".into(),
                 });
             }
+        }
         }
         hits
     }
@@ -995,7 +998,8 @@ impl Rule for ChangedEventUnfiltered {
             "RayValue",
         ];
         let mut hits = Vec::new();
-        for pos in visit::find_pattern_positions(source, ".Changed:Connect(") {
+        for pat in &[".Changed:Connect(", ".Changed:connect("] {
+        for pos in visit::find_pattern_positions(source, pat) {
             let before = &source[..pos];
             let before_start = visit::floor_char(source, pos.saturating_sub(100));
             let near = &source[before_start..pos];
@@ -1094,6 +1098,7 @@ impl Rule for ChangedEventUnfiltered {
                 pos,
                 msg: ".Changed fires for ANY property change - use GetPropertyChangedSignal(\"Prop\") for specific properties".into(),
             });
+        }
         }
         hits
     }

@@ -369,6 +369,13 @@ pub fn find_pattern_positions(source: &str, pattern: &str) -> Vec<usize> {
     positions
 }
 
+pub fn find_connect_positions(source: &str) -> Vec<usize> {
+    let mut all = find_pattern_positions(source, ":Connect(");
+    all.extend(find_pattern_positions(source, ":connect("));
+    all.sort_unstable();
+    all
+}
+
 pub fn in_comment_range(ranges: &[(usize, usize)], pos: usize) -> bool {
     ranges.iter().any(|&(start, end)| pos >= start && pos < end)
 }
