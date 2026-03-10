@@ -676,3 +676,21 @@ fn test_fix_redundant_nil_eq() {
     result.replace_range(fix.start..fix.end, &fix.replacement);
     assert_eq!(result, "if not parent:FindFirstChild(\"Name\") then end");
 }
+
+#[test]
+fn test_fix_two_arg_instance_new() {
+    let src = "local p = Instance.new(\"Part\", workspace)";
+    let fix = compute_fix("instance::two_arg_instance_new", src, 10).unwrap();
+    let mut result = src.to_string();
+    result.replace_range(fix.start..fix.end, &fix.replacement);
+    assert_eq!(result, "local p = Instance.new(\"Part\")");
+}
+
+#[test]
+fn test_fix_two_arg_instance_new_complex_parent() {
+    let src = "Instance.new(\"Part\", game:GetService(\"Workspace\"))";
+    let fix = compute_fix("instance::two_arg_instance_new", src, 0).unwrap();
+    let mut result = src.to_string();
+    result.replace_range(fix.start..fix.end, &fix.replacement);
+    assert_eq!(result, "Instance.new(\"Part\")");
+}

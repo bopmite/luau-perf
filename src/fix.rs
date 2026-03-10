@@ -54,6 +54,7 @@ pub fn compute_fix(rule_id: &str, source: &str, pos: usize) -> Option<Fix> {
         "table::pairs_over_generalized" => fix_pairs_over_generalized(source, pos),
         "instance::classname_over_isa" => fix_classname_over_isa(source, pos),
         "instance::pairs_over_getchildren" => fix_pairs_over_getchildren(source, pos),
+        "instance::two_arg_instance_new" => fix_two_arg_instance_new(source, pos),
         "style::redundant_nil_check" => fix_redundant_nil_check(source, pos),
         _ => None,
     }
@@ -1033,6 +1034,49 @@ fn fix_classname_over_isa(source: &str, pos: usize) -> Option<Fix> {
         start: var_start,
         end,
         replacement: format!("{prefix}{var}:IsA({quote}{class_name}{quote})"),
+    })
+}
+
+fn fix_two_arg_instance_new(source: &str, pos: usize) -> Option<Fix> {
+    let rest = source.get(pos..)?;
+    let prefix = "Instance.new(";
+    if !rest.starts_with(prefix) {
+        return None;
+    }
+    let after = &rest[prefix.len()..];
+    let first_quote = after.chars().next()?;
+    if first_quote != '"' && first_quote != '\'' {
+        return None;
+    }
+    let close_quote = after[1..].find(first_quote)?;
+    let after_class = &after[close_quote + 2..];
+    let trimmed = after_class.trim_start();
+    if !trimmed.starts_with(',') {
+        return None;
+    }
+    let comma_pos = pos + prefix.len() + close_quote + 2
+        + (after_class.len() - trimmed.len());
+    let after_comma = &source[comma_pos + 1..];
+    let mut depth = 1i32;
+    let mut end = None;
+    for (i, c) in after_comma.char_indices() {
+        match c {
+            '(' => depth += 1,
+            ')' => {
+                depth -= 1;
+                if depth == 0 {
+                    end = Some(comma_pos + 1 + i);
+                    break;
+                }
+            }
+            _ => {}
+        }
+    }
+    let end = end?;
+    Some(Fix {
+        start: comma_pos,
+        end,
+        replacement: String::new(),
     })
 }
 

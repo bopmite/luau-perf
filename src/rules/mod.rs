@@ -730,6 +730,7 @@ pub fn is_fixable(id: &str) -> bool {
             | "table::pairs_over_generalized"
             | "instance::classname_over_isa"
             | "instance::pairs_over_getchildren"
+            | "instance::two_arg_instance_new"
             | "style::redundant_nil_check"
     )
 }
