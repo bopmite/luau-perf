@@ -812,7 +812,7 @@ fn on_close_comment_ok() {
 // DeprecatedUserId
 #[test]
 fn deprecated_userid_detected() {
-    let src = "local id = player.userId";
+    let src = "local id = Player.userId";
     let ast = parse(src);
     let hits = DeprecatedUserId.check(src, &ast);
     assert_eq!(hits.len(), 1);
@@ -856,6 +856,22 @@ fn userid_not_prefix() {
     let ast = parse(src);
     let hits = DeprecatedUserId.check(src, &ast);
     assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn userid_custom_object_ok() {
+    let src = "removePlayer(player.userId)";
+    let ast = parse(src);
+    let hits = DeprecatedUserId.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn userid_other_player_detected() {
+    let src = "local id = otherPlayer.userId";
+    let ast = parse(src);
+    let hits = DeprecatedUserId.check(src, &ast);
+    assert_eq!(hits.len(), 1);
 }
 
 // DirectServiceAccess

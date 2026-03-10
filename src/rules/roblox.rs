@@ -2327,10 +2327,8 @@ impl Rule for DeprecatedUserId {
                         .map(|i| i + 1)
                         .unwrap_or(0);
                     let ident = &before[ident_start..];
-                    let looks_like_player = ident.starts_with("Player")
-                        || ident.starts_with("Plr")
-                        || ident == "player"
-                        || ident == "plr";
+                    let looks_like_player =
+                        ident.ends_with("Player") || ident.ends_with("Plr");
                     if looks_like_player {
                         let line_start: usize =
                             source.lines().take(line_no).map(|l| l.len() + 1).sum();
