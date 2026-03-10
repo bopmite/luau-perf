@@ -319,7 +319,6 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(instance::PairsOverGetChildren),
         Box::new(instance::WaitForChildChain),
         // style
-        Box::new(style::ServiceLocatorAntiPattern),
         Box::new(style::EmptyFunctionBody),
         Box::new(style::DeprecatedGlobalCall),
         Box::new(style::TypeCheckInLoop),
@@ -654,7 +653,6 @@ pub fn rule_level(id: &str) -> crate::lint::Level {
         | "native::pcall_in_native"
 
         // style with real perf impact
-        | "style::duplicate_get_service"
         | "style::dot_method_call"
         | "style::print_in_hot_path"
         | "style::debug_in_hot_path"
