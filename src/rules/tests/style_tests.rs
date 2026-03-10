@@ -402,6 +402,29 @@ fn nil_check_in_return_not_flagged() {
 }
 
 #[test]
+fn deep_nesting_detected() {
+    std::thread::Builder::new()
+        .stack_size(4 * 1024 * 1024)
+        .spawn(|| {
+            let src = "function a()\nif true then\nif true then\nif true then\nif true then\nif true then\nif true then\nif true then\nif true then\nprint(1)\nend\nend\nend\nend\nend\nend\nend\nend\nend";
+            let ast = parse(src);
+            let hits = DeepNesting.check(src, &ast);
+            assert_eq!(hits.len(), 1);
+        })
+        .unwrap()
+        .join()
+        .unwrap();
+}
+
+#[test]
+fn shallow_nesting_ok() {
+    let src = "function a()\n  if true then\n    for i = 1, 10 do\n      print(i)\n    end\n  end\nend";
+    let ast = parse(src);
+    let hits = DeepNesting.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
 fn pairs_discard_value_detected() {
     let src = "for k, _ in pairs(t) do\n  print(k)\nend";
     let ast = parse(src);

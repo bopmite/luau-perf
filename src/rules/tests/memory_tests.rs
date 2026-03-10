@@ -429,3 +429,19 @@ fn circular_ref_actual_capture_detected() {
     let hits = CircularConnectionRef.check(src, &ast);
     assert_eq!(hits.len(), 1);
 }
+
+#[test]
+fn connect_in_connect_detected() {
+    let src = "event:Connect(function()\n  other:Connect(function()\n    print(\"nested\")\n  end)\nend)";
+    let ast = parse(src);
+    let hits = ConnectInConnect.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn single_connect_ok() {
+    let src = "event:Connect(function()\n  print(\"ok\")\nend)";
+    let ast = parse(src);
+    let hits = ConnectInConnect.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}

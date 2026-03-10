@@ -324,3 +324,27 @@ fn different_services_ok() {
     let hits = DuplicateGetService.check(src, &ast);
     assert_eq!(hits.len(), 0);
 }
+
+#[test]
+fn overlap_params_in_function_detected() {
+    let src = "function doOverlap()\n  local params = OverlapParams.new()\n  workspace:GetPartsInPart(part, params)\nend";
+    let ast = parse(src);
+    let hits = OverlapParamsInFunction.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn overlap_params_at_module_level_ok() {
+    let src = "local params = OverlapParams.new()";
+    let ast = parse(src);
+    let hits = OverlapParamsInFunction.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn overlap_params_factory_ok() {
+    let src = "function createParams()\n  local params = OverlapParams.new()\n  return params\nend";
+    let ast = parse(src);
+    let hits = OverlapParamsInFunction.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}

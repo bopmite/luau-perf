@@ -263,3 +263,43 @@ fn changed_non_value_detected() {
     assert_eq!(hits.len(), 1);
 }
 
+#[test]
+fn clear_all_children_loop_detected() {
+    let src = "for i = 1, 10 do\n  child:Destroy()\nend";
+    let ast = parse(src);
+    let hits = ClearAllChildrenLoop.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn destroy_with_isa_filter_ok() {
+    let src = "for i = 1, 10 do\n  if child:IsA(\"BasePart\") then\n    child:Destroy()\n  end\nend";
+    let ast = parse(src);
+    let hits = ClearAllChildrenLoop.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn set_parent_in_loop_detected() {
+    let src = "while true do\n  part.Parent = workspace\nend";
+    let ast = parse(src);
+    let hits = SetParentInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn set_parent_outside_loop_ok() {
+    let src = "part.Parent = workspace";
+    let ast = parse(src);
+    let hits = SetParentInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn set_parent_after_instance_new_ok() {
+    let src = "for i = 1, 10 do\n  local p = Instance.new(\"Part\")\n  p.Parent = workspace\nend";
+    let ast = parse(src);
+    let hits = SetParentInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+

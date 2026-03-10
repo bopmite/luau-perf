@@ -375,3 +375,35 @@ fn unnecessary_closure_in_block_comment_not_flagged() {
     let hits = UnnecessaryClosure.check(src, &ast);
     assert_eq!(hits.len(), 0);
 }
+
+#[test]
+fn string_format_in_loop_detected() {
+    let src = "for i = 1, 10 do\n  local s = string.format(\"%d\", i)\nend";
+    let ast = parse(src);
+    let hits = StringFormatInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn string_format_outside_loop_ok() {
+    let src = "local s = string.format(\"%d\", 42)";
+    let ast = parse(src);
+    let hits = StringFormatInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn tostring_in_loop_detected() {
+    let src = "for i = 1, 10 do\n  local s = tostring(i)\nend";
+    let ast = parse(src);
+    let hits = TostringInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn tostring_outside_loop_ok() {
+    let src = "local s = tostring(42)";
+    let ast = parse(src);
+    let hits = TostringInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}

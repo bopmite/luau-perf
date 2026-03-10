@@ -948,6 +948,70 @@ fn direct_service_comment_ok() {
 }
 
 #[test]
+fn pcall_in_loop_detected() {
+    let src = "for i = 1, 10 do\n  local ok, err = pcall(doWork, i)\nend";
+    let ast = parse(src);
+    let hits = PcallInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn pcall_outside_loop_ok() {
+    let src = "local ok, err = pcall(doWork)";
+    let ast = parse(src);
+    let hits = PcallInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn get_rank_in_group_uncached_detected() {
+    let src = "function checkRank(player)\n  local rank = player:GetRankInGroup(123)\nend";
+    let ast = parse(src);
+    let hits = GetRankInGroupUncached.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn get_rank_in_group_at_module_level_ok() {
+    let src = "local rank = player:GetRankInGroup(123)";
+    let ast = parse(src);
+    let hits = GetRankInGroupUncached.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn set_attribute_in_loop_detected() {
+    let src = "for i = 1, 10 do\n  part:SetAttribute(\"Speed\", i)\nend";
+    let ast = parse(src);
+    let hits = SetAttributeInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn set_attribute_outside_loop_ok() {
+    let src = "part:SetAttribute(\"Speed\", 10)";
+    let ast = parse(src);
+    let hits = SetAttributeInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn find_first_child_chain_detected() {
+    let src = "local x = obj:FindFirstChild(\"A\"):FindFirstChild(\"B\"):FindFirstChild(\"C\")";
+    let ast = parse(src);
+    let hits = FindFirstChildChain.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn single_find_first_child_ok() {
+    let src = "local x = obj:FindFirstChild(\"A\")";
+    let ast = parse(src);
+    let hits = FindFirstChildChain.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
 fn direct_service_not_prefix() {
     let src = "local x = game.HttpServiceExtra";
     let ast = parse(src);

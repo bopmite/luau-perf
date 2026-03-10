@@ -353,3 +353,67 @@ fn pairs_in_pairs_dependent_call_ok() {
     let hits = PairsInPairs.check(src, &ast);
     assert_eq!(hits.len(), 0);
 }
+
+#[test]
+fn get_descendants_in_loop_detected() {
+    let src = "while true do\n  local d = workspace:GetDescendants()\n  task.wait()\nend";
+    let ast = parse(src);
+    let hits = GetDescendantsInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn get_descendants_outside_loop_ok() {
+    let src = "local d = workspace:GetDescendants()";
+    let ast = parse(src);
+    let hits = GetDescendantsInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn get_players_in_loop_detected() {
+    let src = "while true do\n  local p = Players:GetPlayers()\n  task.wait()\nend";
+    let ast = parse(src);
+    let hits = GetPlayersInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn get_players_outside_loop_ok() {
+    let src = "local p = Players:GetPlayers()";
+    let ast = parse(src);
+    let hits = GetPlayersInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn clone_in_loop_detected() {
+    let src = "for i = 1, 10 do\n  local c = template:Clone()\nend";
+    let ast = parse(src);
+    let hits = CloneInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn clone_outside_loop_ok() {
+    let src = "local c = template:Clone()";
+    let ast = parse(src);
+    let hits = CloneInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn filter_then_first_detected() {
+    let src = "for _, desc in workspace:GetDescendants() do\n  if desc:IsA(\"BasePart\") then\n    return desc\n  end\nend";
+    let ast = parse(src);
+    let hits = FilterThenFirst.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn filter_collect_all_ok() {
+    let src = "for _, desc in workspace:GetDescendants() do\n  if desc:IsA(\"BasePart\") then\n    table.insert(parts, desc)\n  end\nend";
+    let ast = parse(src);
+    let hits = FilterThenFirst.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
