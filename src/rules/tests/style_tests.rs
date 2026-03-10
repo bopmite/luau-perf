@@ -424,3 +424,27 @@ fn pairs_using_value_ok() {
     let hits = PairsDiscardValue.check(src, &ast);
     assert_eq!(hits.len(), 0);
 }
+
+#[test]
+fn next_comma_iteration_detected() {
+    let src = "for k, v in next, t do\n  print(k, v)\nend";
+    let ast = parse(src);
+    let hits = NextCommaIteration.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn next_comma_iteration_pairs_ok() {
+    let src = "for k, v in pairs(t) do\n  print(k, v)\nend";
+    let ast = parse(src);
+    let hits = NextCommaIteration.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn next_comma_in_comment_ok() {
+    let src = "-- for k, v in next, t do";
+    let ast = parse(src);
+    let hits = NextCommaIteration.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
