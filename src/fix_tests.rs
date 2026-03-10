@@ -123,8 +123,16 @@ fn test_fix_getn_deprecated() {
 fn test_end_to_start_application() {
     let src = "local a = wait(1)\nlocal b = wait(2)\n";
     let fixes = vec![
-        Fix { start: 10, end: 14, replacement: "task.wait".into() },
-        Fix { start: 28, end: 32, replacement: "task.wait".into() },
+        Fix {
+            start: 10,
+            end: 14,
+            replacement: "task.wait".into(),
+        },
+        Fix {
+            start: 28,
+            end: 32,
+            replacement: "task.wait".into(),
+        },
     ];
 
     let mut result = src.to_string();
@@ -139,8 +147,16 @@ fn test_end_to_start_application() {
 #[test]
 fn test_overlap_detection() {
     let fixes = vec![
-        Fix { start: 10, end: 20, replacement: "x".into() },
-        Fix { start: 5, end: 15, replacement: "y".into() },
+        Fix {
+            start: 10,
+            end: 20,
+            replacement: "x".into(),
+        },
+        Fix {
+            start: 5,
+            end: 15,
+            replacement: "y".into(),
+        },
     ];
     assert!(has_overlaps(&fixes));
 }
@@ -148,8 +164,16 @@ fn test_overlap_detection() {
 #[test]
 fn test_no_overlap() {
     let fixes = vec![
-        Fix { start: 10, end: 15, replacement: "x".into() },
-        Fix { start: 0, end: 5, replacement: "y".into() },
+        Fix {
+            start: 10,
+            end: 15,
+            replacement: "x".into(),
+        },
+        Fix {
+            start: 0,
+            end: 5,
+            replacement: "y".into(),
+        },
     ];
     assert!(!has_overlaps(&fixes));
 }
@@ -157,8 +181,16 @@ fn test_no_overlap() {
 #[test]
 fn test_merge_same_position() {
     let mut fixes = vec![
-        Fix { start: 0, end: 0, replacement: "--!native\n".into() },
-        Fix { start: 0, end: 0, replacement: "--!strict\n".into() },
+        Fix {
+            start: 0,
+            end: 0,
+            replacement: "--!native\n".into(),
+        },
+        Fix {
+            start: 0,
+            end: 0,
+            replacement: "--!strict\n".into(),
+        },
     ];
     merge_same_position(&mut fixes);
     assert_eq!(fixes.len(), 1);
@@ -348,7 +380,6 @@ fn test_fix_redundant_tostring() {
     assert_eq!(result, r#"string.format("%s", val)"#);
 }
 
-
 #[test]
 fn test_fix_tostring_in_interpolation() {
     let src = "tostring(value)";
@@ -464,4 +495,79 @@ fn test_fix_unnecessary_closure_with_assignment() {
     let mut result = src.to_string();
     result.replace_range(fix.start..fix.end, &fix.replacement);
     assert_eq!(result, "local ok = pcall(doThing, x)");
+}
+
+#[test]
+fn test_fix_format_no_args() {
+    let src = "local s = string.format(\"hello world\")";
+    let fix = compute_fix("string::format_no_args", src, 10).unwrap();
+    let mut result = src.to_string();
+    result.replace_range(fix.start..fix.end, &fix.replacement);
+    assert_eq!(result, "local s = \"hello world\"");
+}
+
+#[test]
+fn test_fix_format_no_args_single_quote() {
+    let src = "local s = string.format('test')";
+    let fix = compute_fix("string::format_no_args", src, 10).unwrap();
+    let mut result = src.to_string();
+    result.replace_range(fix.start..fix.end, &fix.replacement);
+    assert_eq!(result, "local s = 'test'");
+}
+
+#[test]
+fn test_fix_format_with_args_returns_none() {
+    let src = "string.format(\"%d\", 42)";
+    assert!(compute_fix("string::format_no_args", src, 0).is_none());
+}
+
+#[test]
+fn test_fix_deprecated_version() {
+    let src = "local v = version()";
+    let fix = compute_fix("roblox::deprecated_version", src, 10).unwrap();
+    let mut result = src.to_string();
+    result.replace_range(fix.start..fix.end, &fix.replacement);
+    assert_eq!(result, "local v = game.PlaceVersion");
+}
+
+#[test]
+fn test_fix_unnecessary_tonumber() {
+    let src = "local x = tonumber(42)";
+    let fix = compute_fix("math::unnecessary_tonumber", src, 10).unwrap();
+    let mut result = src.to_string();
+    result.replace_range(fix.start..fix.end, &fix.replacement);
+    assert_eq!(result, "local x = 42");
+}
+
+#[test]
+fn test_fix_unnecessary_tonumber_float() {
+    let src = "local x = tonumber(3.14)";
+    let fix = compute_fix("math::unnecessary_tonumber", src, 10).unwrap();
+    let mut result = src.to_string();
+    result.replace_range(fix.start..fix.end, &fix.replacement);
+    assert_eq!(result, "local x = 3.14");
+}
+
+#[test]
+fn test_fix_unnecessary_tonumber_variable_returns_none() {
+    let src = "tonumber(x)";
+    assert!(compute_fix("math::unnecessary_tonumber", src, 0).is_none());
+}
+
+#[test]
+fn test_fix_tostring_on_string() {
+    let src = "local s = tostring(\"hello\")";
+    let fix = compute_fix("string::tostring_on_string", src, 10).unwrap();
+    let mut result = src.to_string();
+    result.replace_range(fix.start..fix.end, &fix.replacement);
+    assert_eq!(result, "local s = \"hello\"");
+}
+
+#[test]
+fn test_fix_tostring_on_string_single_quote() {
+    let src = "local s = tostring('hello')";
+    let fix = compute_fix("string::tostring_on_string", src, 10).unwrap();
+    let mut result = src.to_string();
+    result.replace_range(fix.start..fix.end, &fix.replacement);
+    assert_eq!(result, "local s = 'hello'");
 }

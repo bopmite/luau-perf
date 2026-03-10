@@ -714,6 +714,10 @@ pub fn is_fixable(id: &str) -> bool {
             | "roblox::deprecated_elapsed_time"
             | "memory::parent_nil_over_destroy"
             | "alloc::unnecessary_closure"
+            | "string::format_no_args"
+            | "roblox::deprecated_version"
+            | "math::unnecessary_tonumber"
+            | "string::tostring_on_string"
     )
 }
 

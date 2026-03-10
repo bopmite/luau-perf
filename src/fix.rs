@@ -46,6 +46,10 @@ pub fn compute_fix(rule_id: &str, source: &str, pos: usize) -> Option<Fix> {
         "roblox::deprecated_elapsed_time" => fix_deprecated_elapsed_time(source, pos),
         "memory::parent_nil_over_destroy" => fix_parent_nil_over_destroy(source, pos),
         "alloc::unnecessary_closure" => fix_unnecessary_closure(source, pos),
+        "string::format_no_args" => fix_format_no_args(source, pos),
+        "roblox::deprecated_version" => fix_deprecated_version(source, pos),
+        "math::unnecessary_tonumber" => fix_unnecessary_tonumber(source, pos),
+        "string::tostring_on_string" => fix_tostring_on_string(source, pos),
         _ => None,
     }
 }
@@ -101,7 +105,9 @@ fn fix_missing_header(source: &str, header: &str) -> Option<Fix> {
     let trimmed = source.trim_start();
     if trimmed.starts_with(other) {
         let other_start = source.find(other)?;
-        let line_end = source[other_start..].find('\n').map(|i| other_start + i + 1)?;
+        let line_end = source[other_start..]
+            .find('\n')
+            .map(|i| other_start + i + 1)?;
         Some(Fix {
             start: line_end,
             end: line_end,
@@ -134,7 +140,8 @@ fn fix_floor_division(source: &str, pos: usize) -> Option<Fix> {
     if slash_count != 1 {
         return None;
     }
-    if inside.contains('+') || inside.contains('-') || inside.contains('*') || inside.contains('%') {
+    if inside.contains('+') || inside.contains('-') || inside.contains('*') || inside.contains('%')
+    {
         return None;
     }
 
@@ -247,7 +254,9 @@ fn fix_fmod_over_modulo(source: &str, pos: usize) -> Option<Fix> {
 
 fn fix_missing_optimize(source: &str) -> Option<Fix> {
     if let Some(native_pos) = source.find("--!native") {
-        let line_end = source[native_pos..].find('\n').map(|i| native_pos + i + 1)?;
+        let line_end = source[native_pos..]
+            .find('\n')
+            .map(|i| native_pos + i + 1)?;
         Some(Fix {
             start: line_end,
             end: line_end,
@@ -265,7 +274,11 @@ fn fix_missing_optimize(source: &str) -> Option<Fix> {
 fn fix_foreach_deprecated(source: &str, pos: usize) -> Option<Fix> {
     // table.foreach(t, fn) → for k, v in pairs(t) do fn(k, v) end
     let is_foreachi = source.get(pos..)?.starts_with("table.foreachi(");
-    let prefix = if is_foreachi { "table.foreachi(" } else { "table.foreach(" };
+    let prefix = if is_foreachi {
+        "table.foreachi("
+    } else {
+        "table.foreach("
+    };
     if !source.get(pos..)?.starts_with(prefix) {
         return None;
     }
@@ -284,11 +297,17 @@ fn fix_foreach_deprecated(source: &str, pos: usize) -> Option<Fix> {
         return None;
     }
 
-    let (iter_fn, k_var) = if is_foreachi { ("ipairs", "i") } else { ("pairs", "k") };
+    let (iter_fn, k_var) = if is_foreachi {
+        ("ipairs", "i")
+    } else {
+        ("pairs", "k")
+    };
     Some(Fix {
         start: pos,
         end: close + 1,
-        replacement: format!("for {k_var}, v in {iter_fn}({table_arg}) do {func_arg}({k_var}, v) end"),
+        replacement: format!(
+            "for {k_var}, v in {iter_fn}({table_arg}) do {func_arg}({k_var}, v) end"
+        ),
     })
 }
 
@@ -379,9 +398,17 @@ fn fix_vector3_zero_constant(source: &str, pos: usize) -> Option<Fix> {
     let close = find_matching_paren(source, args_start)?;
     let args = source.get(args_start..close)?.replace(' ', "");
     if args == "0,0,0" {
-        Some(Fix { start: pos, end: close + 1, replacement: "Vector3.zero".into() })
+        Some(Fix {
+            start: pos,
+            end: close + 1,
+            replacement: "Vector3.zero".into(),
+        })
     } else if args == "1,1,1" {
-        Some(Fix { start: pos, end: close + 1, replacement: "Vector3.one".into() })
+        Some(Fix {
+            start: pos,
+            end: close + 1,
+            replacement: "Vector3.one".into(),
+        })
     } else {
         None
     }
@@ -397,9 +424,17 @@ fn fix_vector2_zero_constant(source: &str, pos: usize) -> Option<Fix> {
     let close = find_matching_paren(source, args_start)?;
     let args = source.get(args_start..close)?.replace(' ', "");
     if args == "0,0" {
-        Some(Fix { start: pos, end: close + 1, replacement: "Vector2.zero".into() })
+        Some(Fix {
+            start: pos,
+            end: close + 1,
+            replacement: "Vector2.zero".into(),
+        })
     } else if args == "1,1" {
-        Some(Fix { start: pos, end: close + 1, replacement: "Vector2.one".into() })
+        Some(Fix {
+            start: pos,
+            end: close + 1,
+            replacement: "Vector2.one".into(),
+        })
     } else {
         None
     }
@@ -411,7 +446,11 @@ fn fix_cframe_identity(source: &str, pos: usize) -> Option<Fix> {
     if slice != pattern {
         return None;
     }
-    Some(Fix { start: pos, end: pos + pattern.len(), replacement: "CFrame.identity".into() })
+    Some(Fix {
+        start: pos,
+        end: pos + pattern.len(),
+        replacement: "CFrame.identity".into(),
+    })
 }
 
 /// Find the matching closing ')' for an opening '(' at `after` (the position right after '(').
@@ -435,9 +474,7 @@ fn find_matching_paren(source: &str, after: usize) -> Option<usize> {
 
 /// Apply a set of fixes to a source string and write the result to disk.
 /// Returns (files_fixed_count, fixes_applied_count).
-pub fn apply_fixes(
-    fixes_by_file: HashMap<PathBuf, Vec<Fix>>,
-) -> (usize, usize) {
+pub fn apply_fixes(fixes_by_file: HashMap<PathBuf, Vec<Fix>>) -> (usize, usize) {
     let mut files_fixed = 0;
     let mut total_applied = 0;
 
@@ -471,12 +508,9 @@ pub fn apply_fixes(
 
         if applied > 0 && result != source {
             let tmp = tmp_path(&path);
-            if std::fs::write(&tmp, &result).is_ok() {
-                if std::fs::rename(&tmp, &path).is_err() {
-                    // Fallback: direct write
-                    let _ = std::fs::remove_file(&tmp);
-                    let _ = std::fs::write(&path, &result);
-                }
+            if std::fs::write(&tmp, &result).is_ok() && std::fs::rename(&tmp, &path).is_err() {
+                let _ = std::fs::remove_file(&tmp);
+                let _ = std::fs::write(&path, &result);
             }
             files_fixed += 1;
             total_applied += applied;
@@ -529,7 +563,9 @@ fn has_overlaps(fixes: &[Fix]) -> bool {
 
 fn fix_color3_new_misuse(source: &str, pos: usize) -> Option<Fix> {
     let pattern = "Color3.new(";
-    if source.get(pos..pos + pattern.len())? != pattern { return None; }
+    if source.get(pos..pos + pattern.len())? != pattern {
+        return None;
+    }
     Some(Fix {
         start: pos,
         end: pos + pattern.len(),
@@ -561,7 +597,8 @@ fn fix_getservice_workspace(source: &str, pos: usize) -> Option<Fix> {
     let p1 = ":GetService(\"Workspace\")";
     let p2 = ":GetService('Workspace')";
     let before = source[..pos].trim_end();
-    let var_start = before.rfind(|c: char| !c.is_alphanumeric() && c != '.' && c != '_')
+    let var_start = before
+        .rfind(|c: char| !c.is_alphanumeric() && c != '.' && c != '_')
         .map(|i| i + 1)
         .unwrap_or(0);
     if source.get(pos..pos + p1.len()) == Some(p1) {
@@ -583,7 +620,9 @@ fn fix_getservice_workspace(source: &str, pos: usize) -> Option<Fix> {
 
 fn fix_floor_round_manual(source: &str, pos: usize) -> Option<Fix> {
     let pattern = "math.floor(";
-    if source.get(pos..pos + pattern.len())? != pattern { return None; }
+    if source.get(pos..pos + pattern.len())? != pattern {
+        return None;
+    }
     let after = &source[pos + pattern.len()..];
     let close = after.find(')')?;
     let inner = &after[..close];
@@ -597,14 +636,19 @@ fn fix_floor_round_manual(source: &str, pos: usize) -> Option<Fix> {
 }
 
 fn fix_deprecated_tick(source: &str, pos: usize) -> Option<Fix> {
-    if source.get(pos..pos + 4)? != "tick" { return None; }
-    Some(Fix { start: pos, end: pos + 4, replacement: "os.clock".into() })
+    if source.get(pos..pos + 4)? != "tick" {
+        return None;
+    }
+    Some(Fix {
+        start: pos,
+        end: pos + 4,
+        replacement: "os.clock".into(),
+    })
 }
 
 fn fix_random_deprecated(source: &str, pos: usize) -> Option<Fix> {
     let slice = &source[pos..];
-    if slice.starts_with("math.random(") {
-        let after = &slice["math.random(".len()..];
+    if let Some(after) = slice.strip_prefix("math.random(") {
         let close = after.find(')')?;
         let args = &after[..close];
         if args.trim().is_empty() {
@@ -629,14 +673,20 @@ fn fix_random_deprecated(source: &str, pos: usize) -> Option<Fix> {
     }
     if slice.starts_with("math.randomseed") {
         let end = pos + slice.find(')')? + 1;
-        return Some(Fix { start: pos, end, replacement: String::new() });
+        return Some(Fix {
+            start: pos,
+            end,
+            replacement: String::new(),
+        });
     }
     None
 }
 
 fn fix_redundant_tostring(source: &str, pos: usize) -> Option<Fix> {
     let slice = &source[pos..];
-    if !slice.starts_with("tostring(") { return None; }
+    if !slice.starts_with("tostring(") {
+        return None;
+    }
     let after = &slice["tostring(".len()..];
     let mut depth = 1i32;
     let mut end_offset = 0;
@@ -645,7 +695,10 @@ fn fix_redundant_tostring(source: &str, pos: usize) -> Option<Fix> {
             '(' => depth += 1,
             ')' => {
                 depth -= 1;
-                if depth == 0 { end_offset = i; break; }
+                if depth == 0 {
+                    end_offset = i;
+                    break;
+                }
             }
             _ => {}
         }
@@ -660,8 +713,12 @@ fn fix_redundant_tostring(source: &str, pos: usize) -> Option<Fix> {
 
 fn fix_type_over_typeof(source: &str, pos: usize) -> Option<Fix> {
     let slice = source.get(pos..pos + 5)?;
-    if slice != "type(" { return None; }
-    if pos > 0 && source.as_bytes()[pos - 1].is_ascii_alphanumeric() { return None; }
+    if slice != "type(" {
+        return None;
+    }
+    if pos > 0 && source.as_bytes()[pos - 1].is_ascii_alphanumeric() {
+        return None;
+    }
     Some(Fix {
         start: pos,
         end: pos + 4,
@@ -671,7 +728,9 @@ fn fix_type_over_typeof(source: &str, pos: usize) -> Option<Fix> {
 
 fn fix_game_workspace(source: &str, pos: usize) -> Option<Fix> {
     let slice = source.get(pos..pos + "game.Workspace".len())?;
-    if slice != "game.Workspace" { return None; }
+    if slice != "game.Workspace" {
+        return None;
+    }
     Some(Fix {
         start: pos,
         end: pos + "game.Workspace".len(),
@@ -715,7 +774,9 @@ fn fix_wait_for_child_timeout(source: &str, pos: usize) -> Option<Fix> {
 
 fn fix_coroutine_resume_create(source: &str, pos: usize) -> Option<Fix> {
     let slice = &source[pos..];
-    if !slice.starts_with("coroutine.resume(coroutine.create(") { return None; }
+    if !slice.starts_with("coroutine.resume(coroutine.create(") {
+        return None;
+    }
     let inner_start = "coroutine.resume(coroutine.create(".len();
     let after = &slice[inner_start..];
     let mut depth = 2i32;
@@ -725,12 +786,17 @@ fn fix_coroutine_resume_create(source: &str, pos: usize) -> Option<Fix> {
             '(' => depth += 1,
             ')' => {
                 depth -= 1;
-                if depth == 0 { end_offset = i; break; }
+                if depth == 0 {
+                    end_offset = i;
+                    break;
+                }
             }
             _ => {}
         }
     }
-    if end_offset == 0 { return None; }
+    if end_offset == 0 {
+        return None;
+    }
     let inner = after[..end_offset].trim_end_matches(')').trim();
     Some(Fix {
         start: pos,
@@ -769,13 +835,18 @@ fn fix_deprecated_elapsed_time(source: &str, pos: usize) -> Option<Fix> {
 
 fn fix_parent_nil_over_destroy(source: &str, pos: usize) -> Option<Fix> {
     let pattern = ".Parent = nil";
-    if source.get(pos..pos + pattern.len())? != pattern { return None; }
+    if source.get(pos..pos + pattern.len())? != pattern {
+        return None;
+    }
     let before = &source[..pos];
-    let var_start = before.rfind(|c: char| !c.is_alphanumeric() && c != '_' && c != '.')
+    let var_start = before
+        .rfind(|c: char| !c.is_alphanumeric() && c != '_' && c != '.')
         .map(|i| i + 1)
         .unwrap_or(0);
     let varname = source.get(var_start..pos)?.trim();
-    if varname.is_empty() { return None; }
+    if varname.is_empty() {
+        return None;
+    }
     Some(Fix {
         start: var_start,
         end: pos + pattern.len(),
@@ -802,52 +873,84 @@ fn fix_unnecessary_closure(source: &str, pos: usize) -> Option<Fix> {
     let fix_start = pos + leading_ws + match_offset;
 
     let after_first_line = line_end + 1;
-    if after_first_line >= source.len() { return None; }
+    if after_first_line >= source.len() {
+        return None;
+    }
 
     let mut body_line_start = after_first_line;
     loop {
-        if body_line_start >= source.len() { return None; }
+        if body_line_start >= source.len() {
+            return None;
+        }
         let rest = source[body_line_start..].trim_start();
-        if rest.is_empty() { return None; }
-        if rest.starts_with('\n') { body_line_start += 1; continue; }
+        if rest.is_empty() {
+            return None;
+        }
+        if rest.starts_with('\n') {
+            body_line_start += 1;
+            continue;
+        }
         if rest.starts_with("--") {
-            body_line_start = source[body_line_start..].find('\n').map(|i| body_line_start + i + 1)?;
+            body_line_start = source[body_line_start..]
+                .find('\n')
+                .map(|i| body_line_start + i + 1)?;
             continue;
         }
         break;
     }
 
-    let body_line_end = source[body_line_start..].find('\n').map(|i| body_line_start + i).unwrap_or(source.len());
+    let body_line_end = source[body_line_start..]
+        .find('\n')
+        .map(|i| body_line_start + i)
+        .unwrap_or(source.len());
     let body = source[body_line_start..body_line_end].trim();
 
     let mut closer_line_start = body_line_end + 1;
     loop {
-        if closer_line_start >= source.len() { return None; }
+        if closer_line_start >= source.len() {
+            return None;
+        }
         let rest = source[closer_line_start..].trim_start();
-        if rest.is_empty() { return None; }
-        if rest.starts_with('\n') { closer_line_start += 1; continue; }
+        if rest.is_empty() {
+            return None;
+        }
+        if rest.starts_with('\n') {
+            closer_line_start += 1;
+            continue;
+        }
         if rest.starts_with("--") {
-            closer_line_start = source[closer_line_start..].find('\n').map(|i| closer_line_start + i + 1)?;
+            closer_line_start = source[closer_line_start..]
+                .find('\n')
+                .map(|i| closer_line_start + i + 1)?;
             continue;
         }
         break;
     }
     let closer_trimmed = source[closer_line_start..].trim_start();
-    if !closer_trimmed.starts_with("end)") { return None; }
-    let closer_content_start = closer_line_start + (source[closer_line_start..].len() - closer_trimmed.len());
+    if !closer_trimmed.starts_with("end)") {
+        return None;
+    }
+    let closer_content_start =
+        closer_line_start + (source[closer_line_start..].len() - closer_trimmed.len());
     let fix_end = if closer_trimmed.starts_with("end))") {
         closer_content_start + 5
     } else {
         closer_content_start + 4
     };
 
-    let call_str = if body.starts_with("return ") { &body[7..] } else { body };
+    let call_str = body.strip_prefix("return ").unwrap_or(body);
     let paren = call_str.find('(')?;
     let fn_name = &call_str[..paren];
-    if fn_name.is_empty() { return None; }
-    if fn_name.contains(':') { return None; }
+    if fn_name.is_empty() {
+        return None;
+    }
+    if fn_name.contains(':') {
+        return None;
+    }
     for ch in fn_name.chars() {
-        if !ch.is_alphanumeric() && ch != '_' && ch != '.' { return None; }
+        if !ch.is_alphanumeric() && ch != '_' && ch != '.' {
+            return None;
+        }
     }
 
     let args_start = paren + 1;
@@ -858,7 +961,10 @@ fn fix_unnecessary_closure(source: &str, pos: usize) -> Option<Fix> {
             b'(' => depth += 1,
             b')' => {
                 depth -= 1;
-                if depth == 0 { args_end = Some(args_start + i); break; }
+                if depth == 0 {
+                    args_end = Some(args_start + i);
+                    break;
+                }
             }
             _ => {}
         }
@@ -880,11 +986,98 @@ fn fix_unnecessary_closure(source: &str, pos: usize) -> Option<Fix> {
 
 fn fix_ypcall(source: &str, pos: usize) -> Option<Fix> {
     let slice = source.get(pos..pos + 6)?;
-    if slice != "ypcall" { return None; }
+    if slice != "ypcall" {
+        return None;
+    }
     Some(Fix {
         start: pos,
         end: pos + 6,
         replacement: "pcall".into(),
+    })
+}
+
+fn fix_format_no_args(source: &str, pos: usize) -> Option<Fix> {
+    let rest = source.get(pos..)?;
+    let prefix = if rest.starts_with("string.format(") {
+        "string.format("
+    } else {
+        return None;
+    };
+    let after = &rest[prefix.len()..];
+    let quote = after.chars().next()?;
+    if quote != '"' && quote != '\'' {
+        return None;
+    }
+    let close_quote = after[1..].find(quote)?;
+    let literal = &after[..close_quote + 2];
+    let remaining = &after[close_quote + 2..];
+    let trimmed = remaining.trim_start();
+    if !trimmed.starts_with(')') {
+        return None;
+    }
+    let end = pos + prefix.len() + close_quote + 2 + remaining.find(')')? + 1;
+    Some(Fix {
+        start: pos,
+        end,
+        replacement: literal.to_string(),
+    })
+}
+
+fn fix_deprecated_version(source: &str, pos: usize) -> Option<Fix> {
+    let slice = source.get(pos..pos + 9)?;
+    if slice != "version()" {
+        return None;
+    }
+    Some(Fix {
+        start: pos,
+        end: pos + 9,
+        replacement: "game.PlaceVersion".into(),
+    })
+}
+
+fn fix_unnecessary_tonumber(source: &str, pos: usize) -> Option<Fix> {
+    let rest = source.get(pos..)?;
+    if !rest.starts_with("tonumber(") {
+        return None;
+    }
+    let after = &rest["tonumber(".len()..];
+    let close = after.find(')')?;
+    let inner = &after[..close];
+    if !inner.chars().all(|c| c.is_ascii_digit() || c == '.' || c == '-' || c == 'e' || c == 'E') {
+        return None;
+    }
+    if inner.is_empty() {
+        return None;
+    }
+    Some(Fix {
+        start: pos,
+        end: pos + "tonumber(".len() + close + 1,
+        replacement: inner.to_string(),
+    })
+}
+
+fn fix_tostring_on_string(source: &str, pos: usize) -> Option<Fix> {
+    let rest = source.get(pos..)?;
+    if !rest.starts_with("tostring(") {
+        return None;
+    }
+    let after = &rest["tostring(".len()..];
+    let quote = after.chars().next()?;
+    if quote != '"' && quote != '\'' {
+        return None;
+    }
+    let close_quote = after[1..].find(quote)?;
+    let literal = &after[..close_quote + 2];
+    let remaining = &after[close_quote + 2..];
+    let trimmed = remaining.trim_start();
+    if !trimmed.starts_with(')') {
+        return None;
+    }
+    let end = pos + "tostring(".len() + close_quote + 2 + remaining.find(')')? + 1;
+    Some(Fix {
+        start: pos,
+        end,
+        replacement: literal.to_string(),
     })
 }
 
