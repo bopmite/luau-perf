@@ -55,6 +55,7 @@ pub struct BrickColorNewInLoop;
 pub struct RegionNewInLoop;
 pub struct RepeatedPropertyChain;
 pub struct LoadAnimationInLoop;
+pub struct DuplicateGetService;
 
 impl Rule for MagnitudeOverSquared {
     fn id(&self) -> &'static str {
@@ -978,6 +979,50 @@ impl Rule for RegionNewInLoop {
                 });
             }
         });
+        hits
+    }
+}
+
+impl Rule for DuplicateGetService {
+    fn id(&self) -> &'static str {
+        "cache::duplicate_get_service"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        use std::collections::HashMap;
+        let mut seen: HashMap<&str, usize> = HashMap::new();
+        let mut hits = Vec::new();
+        for pos in visit::find_pattern_positions(source, "GetService(") {
+            let before = &source[..pos];
+            if !before.ends_with(':') && !before.ends_with('.') {
+                continue;
+            }
+            let after = &source[pos + "GetService(".len()..];
+            let quote = after.trim_start();
+            if !quote.starts_with('"') && !quote.starts_with('\'') {
+                continue;
+            }
+            let delim = quote.as_bytes()[0];
+            let name_start = &quote[1..];
+            let name_end = match name_start.find(delim as char) {
+                Some(i) => i,
+                None => continue,
+            };
+            let service = &name_start[..name_end];
+            if let Some(&_first_pos) = seen.get(service) {
+                hits.push(Hit {
+                    pos,
+                    msg: format!(
+                        "GetService(\"{service}\") called multiple times - cache in a local at module level"
+                    ),
+                });
+            } else {
+                seen.insert(service, pos);
+            }
+        }
         hits
     }
 }

@@ -292,3 +292,27 @@ fn tween_create_outside_loop_ok() {
     let hits = TweenCreateInLoop.check(src, &ast);
     assert_eq!(hits.len(), 0);
 }
+
+#[test]
+fn duplicate_get_service_detected() {
+    let src = "local Players = game:GetService(\"Players\")\nlocal p2 = game:GetService(\"Players\")";
+    let ast = parse(src);
+    let hits = DuplicateGetService.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn single_get_service_ok() {
+    let src = "local Players = game:GetService(\"Players\")";
+    let ast = parse(src);
+    let hits = DuplicateGetService.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn different_services_ok() {
+    let src = "local Players = game:GetService(\"Players\")\nlocal RS = game:GetService(\"ReplicatedStorage\")";
+    let ast = parse(src);
+    let hits = DuplicateGetService.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
