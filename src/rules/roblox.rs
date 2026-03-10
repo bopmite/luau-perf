@@ -843,17 +843,23 @@ impl Rule for RequireInConnect {
                 continue;
             }
             let func_offset = pos + ":Connect(".len() + (after.len() - trimmed.len());
-            let body_end = [
+            let body_end = match [
                 "\nend)",
                 "\n\tend)",
                 "\n\t\tend)",
+                "\n\t\t\tend)",
+                "\n\t\t\t\tend)",
                 "\n    end)",
                 "\n        end)",
+                "\n            end)",
             ]
             .iter()
             .filter_map(|m| source[func_offset..].find(m))
             .min()
-            .unwrap_or(500.min(source.len() - func_offset));
+            {
+                Some(end) => end,
+                None => continue,
+            };
             let callback = &source[func_offset..func_offset + body_end];
             if let Some(require_pos) = visit::find_pattern_positions(callback, "require(")
                 .into_iter()
