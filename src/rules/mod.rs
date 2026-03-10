@@ -150,6 +150,7 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(roblox::DeprecatedYpcall),
         Box::new(roblox::DeprecatedElapsedTime),
         Box::new(roblox::CharacterAppearanceLoaded),
+        Box::new(roblox::GetDescendantsInHeartbeat),
         // alloc
         Box::new(alloc::StringConcatInLoop),
         Box::new(alloc::StringFormatInLoop),
@@ -185,6 +186,7 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(network::InvokeClientDangerous),
         Box::new(network::HttpServiceInLoop),
         Box::new(network::MarketplaceInfoInLoop),
+        Box::new(network::JsonDeepClone),
         // math
         Box::new(math::RandomDeprecated),
         Box::new(math::RandomNewInLoop),
@@ -225,6 +227,7 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(string::FormatRedundantTostring),
         Box::new(string::FormatSimpleConcat),
         Box::new(string::ToStringInInterpolation),
+        Box::new(string::SplitEmptySeparator),
         // table
         Box::new(table::ForeachDeprecated),
         Box::new(table::GetnDeprecated),
@@ -246,6 +249,7 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(table::RawsetInLoop),
         Box::new(table::NextTNilOverPairs),
         Box::new(table::MixedTableConstructor),
+        Box::new(table::TableInsertFrontInLoop),
         // native
         Box::new(native::GetfenvSetfenv),
         Box::new(native::DynamicRequire),
@@ -375,7 +379,11 @@ pub fn print_all() {
             crate::lint::Level::Strict => "\x1b[36m strict\x1b[0m ",
             crate::lint::Level::Pedantic => "\x1b[90mpedantic\x1b[0m",
         };
-        let fix_mark = if is_fixable(id) { " \x1b[32mfix\x1b[0m" } else { "" };
+        let fix_mark = if is_fixable(id) {
+            " \x1b[32mfix\x1b[0m"
+        } else {
+            ""
+        };
         println!("   {:<42} {sev}  {lvl}{fix_mark}", name);
     }
 
@@ -407,7 +415,14 @@ pub fn explain(rule_id: &str) {
             };
             println!(" severity: {sev}");
             println!(" level:    {lvl}");
-            println!(" fixable:  {}", if is_fixable(r.id()) { "yes (--fix)" } else { "no" });
+            println!(
+                " fixable:  {}",
+                if is_fixable(r.id()) {
+                    "yes (--fix)"
+                } else {
+                    "no"
+                }
+            );
             println!();
             println!(" {}", explain_text(r.id()));
             println!();
@@ -551,10 +566,10 @@ pub fn rule_level(id: &str) -> crate::lint::Level {
         | "memory::attribute_changed_in_loop"
 
         // network
-        // network (important)
         | "network::http_service_in_loop"
         | "network::marketplace_info_in_loop"
         | "network::fire_client_per_player"
+        | "network::json_deep_clone"
 
         // instance
         | "instance::property_change_signal_wrong"
@@ -614,6 +629,7 @@ pub fn rule_level(id: &str) -> crate::lint::Level {
         | "roblox::character_added_no_wait"
         | "roblox::find_first_child_no_check"
         | "roblox::bind_to_render_step_no_cleanup"
+        | "roblox::get_descendants_in_heartbeat"
         | "string::format_redundant_tostring"
 
         // native
@@ -636,6 +652,7 @@ pub fn rule_level(id: &str) -> crate::lint::Level {
         | "string::lower_upper_in_loop"
         | "string::tostring_on_string"
         | "string::pattern_backtracking"
+        | "string::split_empty_separator"
 
         // table
         | "table::freeze_in_loop"
@@ -643,6 +660,7 @@ pub fn rule_level(id: &str) -> crate::lint::Level {
         | "table::pack_over_literal"
         | "table::manual_copy_loop"
         | "table::concat_with_separator_loop"
+        | "table::table_insert_front_in_loop"
 
         // math
         | "math::random_new_in_loop"
@@ -660,30 +678,42 @@ pub fn rule_level(id: &str) -> crate::lint::Level {
 }
 
 pub fn is_fixable(id: &str) -> bool {
-    matches!(id,
-        "roblox::deprecated_wait" | "roblox::deprecated_spawn" |
-        "roblox::missing_native" | "roblox::missing_strict" |
-        "math::floor_division" | "string::len_over_hash" |
-        "table::getn_deprecated" | "math::fmod_over_modulo" |
-        "roblox::missing_optimize" | "table::foreach_deprecated" |
-        "table::maxn_deprecated" |
-        "style::udim2_prefer_from_offset" | "style::udim2_prefer_from_scale" |
-        "math::vector3_zero_constant" | "math::vector2_zero_constant" |
-        "math::cframe_identity_constant" |
-        "roblox::color3_new_misuse" | "roblox::raycast_filter_deprecated" |
-        "roblox::getservice_workspace" | "math::floor_round_manual" |
-        "roblox::deprecated_tick" | "math::random_deprecated" |
-        "string::format_redundant_tostring" | "roblox::game_workspace" |
-        "roblox::coroutine_resume_create" |
-        "style::type_over_typeof" |
-        "roblox::wait_for_child_no_timeout" |
-        "roblox::model_set_primary_part_cframe" |
-        "roblox::deprecated_delay" |
-        "roblox::deprecated_ypcall" |
-        "string::tostring_in_interpolation" |
-        "roblox::deprecated_elapsed_time" |
-        "memory::parent_nil_over_destroy" |
-        "alloc::unnecessary_closure"
+    matches!(
+        id,
+        "roblox::deprecated_wait"
+            | "roblox::deprecated_spawn"
+            | "roblox::missing_native"
+            | "roblox::missing_strict"
+            | "math::floor_division"
+            | "string::len_over_hash"
+            | "table::getn_deprecated"
+            | "math::fmod_over_modulo"
+            | "roblox::missing_optimize"
+            | "table::foreach_deprecated"
+            | "table::maxn_deprecated"
+            | "style::udim2_prefer_from_offset"
+            | "style::udim2_prefer_from_scale"
+            | "math::vector3_zero_constant"
+            | "math::vector2_zero_constant"
+            | "math::cframe_identity_constant"
+            | "roblox::color3_new_misuse"
+            | "roblox::raycast_filter_deprecated"
+            | "roblox::getservice_workspace"
+            | "math::floor_round_manual"
+            | "roblox::deprecated_tick"
+            | "math::random_deprecated"
+            | "string::format_redundant_tostring"
+            | "roblox::game_workspace"
+            | "roblox::coroutine_resume_create"
+            | "style::type_over_typeof"
+            | "roblox::wait_for_child_no_timeout"
+            | "roblox::model_set_primary_part_cframe"
+            | "roblox::deprecated_delay"
+            | "roblox::deprecated_ypcall"
+            | "string::tostring_in_interpolation"
+            | "roblox::deprecated_elapsed_time"
+            | "memory::parent_nil_over_destroy"
+            | "alloc::unnecessary_closure"
     )
 }
 
@@ -1029,6 +1059,11 @@ fn explain_text(id: &str) -> &'static str {
         "roblox::deprecated_ypcall" => "ypcall() is a legacy error-handling function from early Roblox. Use pcall() which is the standard Lua equivalent with identical behavior.",
         "roblox::deprecated_elapsed_time" => "elapsedTime() is a legacy global that returns time since the engine started. Use os.clock() for high-resolution elapsed time or workspace:GetServerTimeNow() for synchronized server time.",
         "roblox::character_appearance_loaded" => "CharacterAppearanceLoaded is being deprecated. Use CharacterAdded and check player:HasAppearanceLoaded() if you need to wait for the character model to be fully loaded.",
+
+        "network::json_deep_clone" => "JSONDecode(JSONEncode(x)) is a common pattern used as a deep clone workaround. It serializes the table to JSON then deserializes back, creating a string allocation plus full parse. Use table.clone() for shallow copies or write a recursive clone function for deep copies.",
+        "string::split_empty_separator" => "string.split(s, \"\") splits a string into individual characters, allocating a table and a string per character. For character iteration, use string.byte(s, 1, -1) to get byte values, or a manual for i = 1, #s loop with string.sub/byte.",
+        "roblox::get_descendants_in_heartbeat" => ":GetDescendants()/:GetChildren() in a RunService per-frame callback (Heartbeat, RenderStepped, Stepped) allocates a new table of all children/descendants every frame at 60Hz. Cache the list outside the callback and update it via ChildAdded/ChildRemoved events.",
+        "table::table_insert_front_in_loop" => "table.insert(t, 1, value) in a loop shifts all existing elements right on each call - O(n) per insertion. Over m iterations, total cost is O(n*m). Append to the end with table.insert(t, v) and reverse after the loop, or use a different data structure.",
 
         _ => "No detailed explanation available for this rule. Run --list-rules to see all rules.",
     }

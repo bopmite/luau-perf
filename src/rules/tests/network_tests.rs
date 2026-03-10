@@ -156,3 +156,35 @@ fn json_encode_in_hot_loop_detected() {
     let hits = HttpServiceInLoop.check(src, &ast);
     assert_eq!(hits.len(), 1);
 }
+
+#[test]
+fn json_deep_clone_detected() {
+    let src = "local copy = HttpService:JSONDecode(HttpService:JSONEncode(data))";
+    let ast = parse(src);
+    let hits = JsonDeepClone.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn json_deep_clone_short_var_detected() {
+    let src = "local copy = http:JSONDecode(http:JSONEncode(data))";
+    let ast = parse(src);
+    let hits = JsonDeepClone.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn json_decode_alone_ok() {
+    let src = "local data = HttpService:JSONDecode(jsonStr)";
+    let ast = parse(src);
+    let hits = JsonDeepClone.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn json_encode_alone_ok() {
+    let src = "local str = HttpService:JSONEncode(data)";
+    let ast = parse(src);
+    let hits = JsonDeepClone.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}

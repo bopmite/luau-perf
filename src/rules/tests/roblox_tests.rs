@@ -685,3 +685,35 @@ fn humanoid_move_to_outside_loop_ok() {
     let hits = HumanoidMoveToInLoop.check(src, &ast);
     assert_eq!(hits.len(), 0);
 }
+
+#[test]
+fn get_descendants_in_heartbeat_detected() {
+    let src = "RunService.Heartbeat:Connect(function()\n  local children = workspace:GetDescendants()\nend)";
+    let ast = parse(src);
+    let hits = GetDescendantsInHeartbeat.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn get_children_in_render_stepped_detected() {
+    let src = "RunService.RenderStepped:Connect(function()\n  local kids = folder:GetChildren()\nend)";
+    let ast = parse(src);
+    let hits = GetDescendantsInHeartbeat.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn get_descendants_outside_heartbeat_ok() {
+    let src = "local descendants = workspace:GetDescendants()";
+    let ast = parse(src);
+    let hits = GetDescendantsInHeartbeat.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn get_children_in_player_added_ok() {
+    let src = "Players.PlayerAdded:Connect(function(player)\n  local items = player:GetChildren()\nend)";
+    let ast = parse(src);
+    let hits = GetDescendantsInHeartbeat.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}

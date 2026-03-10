@@ -67,10 +67,15 @@ pub struct DeprecatedVersion;
 pub struct DeprecatedYpcall;
 pub struct DeprecatedElapsedTime;
 pub struct CharacterAppearanceLoaded;
+pub struct GetDescendantsInHeartbeat;
 
 impl Rule for DeprecatedWait {
-    fn id(&self) -> &'static str { "roblox::deprecated_wait" }
-    fn severity(&self) -> Severity { Severity::Error }
+    fn id(&self) -> &'static str {
+        "roblox::deprecated_wait"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Error
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -87,8 +92,12 @@ impl Rule for DeprecatedWait {
 }
 
 impl Rule for DeprecatedSpawn {
-    fn id(&self) -> &'static str { "roblox::deprecated_spawn" }
-    fn severity(&self) -> Severity { Severity::Error }
+    fn id(&self) -> &'static str {
+        "roblox::deprecated_spawn"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Error
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -105,8 +114,12 @@ impl Rule for DeprecatedSpawn {
 }
 
 impl Rule for DebrisAddItem {
-    fn id(&self) -> &'static str { "roblox::debris_add_item" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "roblox::debris_add_item"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -126,14 +139,21 @@ impl Rule for DebrisAddItem {
 }
 
 impl Rule for MissingNative {
-    fn id(&self) -> &'static str { "roblox::missing_native" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "roblox::missing_native"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         if source.contains("--!native") {
             return vec![];
         }
-        if !source.contains("game:") && !source.contains("workspace") && !source.contains("Instance") {
+        if !source.contains("game:")
+            && !source.contains("workspace")
+            && !source.contains("Instance")
+        {
             return vec![];
         }
         if source.lines().count() < 10 {
@@ -142,7 +162,10 @@ impl Rule for MissingNative {
         if is_test_file(source) {
             return vec![];
         }
-        let total_lines = source.lines().filter(|l| !l.trim().is_empty() && !l.trim().starts_with("--")).count();
+        let total_lines = source
+            .lines()
+            .filter(|l| !l.trim().is_empty() && !l.trim().starts_with("--"))
+            .count();
         if total_lines > 0 {
             let require_lines = source.lines().filter(|l| l.contains("require(")).count();
             if require_lines * 2 > total_lines {
@@ -157,8 +180,12 @@ impl Rule for MissingNative {
 }
 
 impl Rule for DeprecatedBodyMovers {
-    fn id(&self) -> &'static str { "roblox::deprecated_body_movers" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "roblox::deprecated_body_movers"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let deprecated = [
@@ -183,13 +210,19 @@ impl Rule for DeprecatedBodyMovers {
 }
 
 impl Rule for PcallInLoop {
-    fn id(&self) -> &'static str { "roblox::pcall_in_loop" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "roblox::pcall_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_hot_loop && (visit::is_bare_call(call, "pcall") || visit::is_bare_call(call, "xpcall")) {
+            if ctx.in_hot_loop
+                && (visit::is_bare_call(call, "pcall") || visit::is_bare_call(call, "xpcall"))
+            {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
                     msg: "pcall/xpcall in loop - not a FASTCALL builtin, significant per-call overhead".into(),
@@ -201,14 +234,21 @@ impl Rule for PcallInLoop {
 }
 
 impl Rule for MissingStrict {
-    fn id(&self) -> &'static str { "roblox::missing_strict" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "roblox::missing_strict"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         if source.contains("--!strict") {
             return vec![];
         }
-        if !source.contains("game:") && !source.contains("workspace") && !source.contains("Instance") {
+        if !source.contains("game:")
+            && !source.contains("workspace")
+            && !source.contains("Instance")
+        {
             return vec![];
         }
         if is_test_file(source) {
@@ -216,14 +256,19 @@ impl Rule for MissingStrict {
         }
         vec![Hit {
             pos: 0,
-            msg: "missing --!strict header - enables type checking for better native codegen".into(),
+            msg: "missing --!strict header - enables type checking for better native codegen"
+                .into(),
         }]
     }
 }
 
 impl Rule for WaitForChildNoTimeout {
-    fn id(&self) -> &'static str { "roblox::wait_for_child_no_timeout" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "roblox::wait_for_child_no_timeout"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -231,7 +276,8 @@ impl Rule for WaitForChildNoTimeout {
             if visit::is_method_call(call, "WaitForChild") && visit::call_arg_count(call) == 1 {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
-                    msg: "WaitForChild() without timeout - yields forever if child never appears".into(),
+                    msg: "WaitForChild() without timeout - yields forever if child never appears"
+                        .into(),
                 });
             }
         });
@@ -240,8 +286,12 @@ impl Rule for WaitForChildNoTimeout {
 }
 
 impl Rule for ModelSetPrimaryPartCFrame {
-    fn id(&self) -> &'static str { "roblox::model_set_primary_part_cframe" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "roblox::model_set_primary_part_cframe"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -258,8 +308,12 @@ impl Rule for ModelSetPrimaryPartCFrame {
 }
 
 impl Rule for GetRankInGroupUncached {
-    fn id(&self) -> &'static str { "roblox::get_rank_in_group_uncached" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "roblox::get_rank_in_group_uncached"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -267,7 +321,8 @@ impl Rule for GetRankInGroupUncached {
             if ctx.in_func && visit::is_method_call(call, "GetRankInGroup") {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
-                    msg: "GetRankInGroup() is an HTTP call - cache result per player at join time".into(),
+                    msg: "GetRankInGroup() is an HTTP call - cache result per player at join time"
+                        .into(),
                 });
             }
         });
@@ -276,8 +331,12 @@ impl Rule for GetRankInGroupUncached {
 }
 
 impl Rule for InsertServiceLoadAsset {
-    fn id(&self) -> &'static str { "roblox::insert_service_load_asset" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "roblox::insert_service_load_asset"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -294,8 +353,12 @@ impl Rule for InsertServiceLoadAsset {
 }
 
 impl Rule for DeprecatedPhysicsService {
-    fn id(&self) -> &'static str { "roblox::deprecated_physics_service" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "roblox::deprecated_physics_service"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let deprecated_methods = [
@@ -312,12 +375,14 @@ impl Rule for DeprecatedPhysicsService {
         let mut hits = Vec::new();
         for method in &deprecated_methods {
             let pattern = format!(":{method}(");
-            for pos in visit::find_pattern_positions(source, &pattern) {
+            if let Some(pos) = visit::find_pattern_positions(source, &pattern)
+                .into_iter()
+                .next()
+            {
                 hits.push(Hit {
                     pos,
                     msg: format!("PhysicsService:{method}() is deprecated - use BasePart.CollisionGroup property"),
                 });
-                break;
             }
         }
         hits
@@ -325,8 +390,12 @@ impl Rule for DeprecatedPhysicsService {
 }
 
 impl Rule for SetAttributeInLoop {
-    fn id(&self) -> &'static str { "roblox::set_attribute_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "roblox::set_attribute_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -334,7 +403,9 @@ impl Rule for SetAttributeInLoop {
             if ctx.in_hot_loop && visit::is_method_call(call, "SetAttribute") {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
-                    msg: "SetAttribute() in loop - triggers replication per call, consider batching".into(),
+                    msg:
+                        "SetAttribute() in loop - triggers replication per call, consider batching"
+                            .into(),
                 });
             }
         });
@@ -343,8 +414,12 @@ impl Rule for SetAttributeInLoop {
 }
 
 impl Rule for StringValueOverAttribute {
-    fn id(&self) -> &'static str { "roblox::string_value_over_attribute" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "roblox::string_value_over_attribute"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -358,18 +433,25 @@ impl Rule for StringValueOverAttribute {
                     let pos = visit::call_pos(call);
                     let line_start = source[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
                     let line_prefix = source[line_start..pos].trim();
-                    let var_name = line_prefix.strip_prefix("local ").unwrap_or(line_prefix)
-                        .split('=').next().unwrap_or("").trim();
+                    let var_name = line_prefix
+                        .strip_prefix("local ")
+                        .unwrap_or(line_prefix)
+                        .split('=')
+                        .next()
+                        .unwrap_or("")
+                        .trim();
                     let after_end = (pos + 1500).min(source.len());
                     let after = &source[pos..after_end];
-                    let is_tween_target = !var_name.is_empty() && after.contains("TweenService:Create(")
+                    let is_tween_target = !var_name.is_empty()
+                        && after.contains("TweenService:Create(")
                         && after.contains(&format!("TweenService:Create({var_name}"));
                     if is_tween_target {
                         return;
                     }
                     let func_window_start = pos.saturating_sub(500);
                     let func_context = &source[func_window_start..after_end];
-                    if func_context.contains("leaderstats") || func_context.contains("Leaderstats") {
+                    if func_context.contains("leaderstats") || func_context.contains("Leaderstats")
+                    {
                         return;
                     }
                     if var_name.starts_with("self.") || var_name.starts_with("self._") {
@@ -381,7 +463,8 @@ impl Rule for StringValueOverAttribute {
                     if !var_name.is_empty() {
                         let changed_pat = format!("{var_name}.Changed");
                         if after.contains(&changed_pat)
-                            || after.contains(&format!("{var_name}.Parent =")) || after.contains(&format!("{var_name}.Parent="))
+                            || after.contains(&format!("{var_name}.Parent ="))
+                            || after.contains(&format!("{var_name}.Parent="))
                         {
                             return;
                         }
@@ -389,9 +472,12 @@ impl Rule for StringValueOverAttribute {
                             || after.contains(&format!("({var_name},"))
                             || after.contains(&format!(", {var_name})"))
                             || after.contains(&format!(", {var_name},")))
-                            && (after.contains("Observe") || after.contains("Subscribe")
-                                || after.contains("Blend") || after.contains("Computed")
-                                || after.contains("Spring") || after.contains("Rx"));
+                            && (after.contains("Observe")
+                                || after.contains("Subscribe")
+                                || after.contains("Blend")
+                                || after.contains("Computed")
+                                || after.contains("Spring")
+                                || after.contains("Rx"));
                         if has_reactive_use {
                             return;
                         }
@@ -415,8 +501,12 @@ impl Rule for StringValueOverAttribute {
 }
 
 impl Rule for TouchedEventUnfiltered {
-    fn id(&self) -> &'static str { "roblox::touched_event_unfiltered" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "roblox::touched_event_unfiltered"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -445,8 +535,12 @@ impl Rule for TouchedEventUnfiltered {
 }
 
 impl Rule for DestroyChildrenManual {
-    fn id(&self) -> &'static str { "roblox::destroy_children_manual" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "roblox::destroy_children_manual"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let has_iteration = source.contains("GetChildren()") || source.contains("GetDescendants()");
@@ -459,7 +553,10 @@ impl Rule for DestroyChildrenManual {
             let context_start = visit::floor_char(source, pos.saturating_sub(200));
             let context = &source[context_start..pos];
             if context.contains("GetChildren") || context.contains("GetDescendants") {
-                if context.contains(":IsA(") || context.contains(".ClassName") || context.contains("if ") {
+                if context.contains(":IsA(")
+                    || context.contains(".ClassName")
+                    || context.contains("if ")
+                {
                     continue;
                 }
                 hits.push(Hit {
@@ -474,8 +571,12 @@ impl Rule for DestroyChildrenManual {
 }
 
 impl Rule for MissingOptimize {
-    fn id(&self) -> &'static str { "roblox::missing_optimize" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "roblox::missing_optimize"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         if !source.contains("--!native") {
@@ -492,13 +593,23 @@ impl Rule for MissingOptimize {
 }
 
 impl Rule for DeprecatedRegion3 {
-    fn id(&self) -> &'static str { "roblox::deprecated_region3" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "roblox::deprecated_region3"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let deprecated = [
-            ("FindPartsInRegion3WithWhiteList(", "FindPartsInRegion3WithWhiteList"),
-            ("FindPartsInRegion3WithIgnoreList(", "FindPartsInRegion3WithIgnoreList"),
+            (
+                "FindPartsInRegion3WithWhiteList(",
+                "FindPartsInRegion3WithWhiteList",
+            ),
+            (
+                "FindPartsInRegion3WithIgnoreList(",
+                "FindPartsInRegion3WithIgnoreList",
+            ),
             ("FindPartsInRegion3(", "FindPartsInRegion3"),
         ];
         let mut hits = Vec::new();
@@ -515,8 +626,12 @@ impl Rule for DeprecatedRegion3 {
 }
 
 impl Rule for BindableSameScript {
-    fn id(&self) -> &'static str { "roblox::bindable_same_script" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "roblox::bindable_same_script"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let has_fire = source.contains(":Fire(") || source.contains(":fire(");
@@ -529,7 +644,10 @@ impl Rule for BindableSameScript {
             if source.contains("self.") || source.contains("self:") {
                 return vec![];
             }
-            if source.contains("._event") || source.contains("._bindable") || source.contains("._observable") {
+            if source.contains("._event")
+                || source.contains("._bindable")
+                || source.contains("._observable")
+            {
                 return vec![];
             }
             let fire_positions = visit::find_pattern_positions(source, ":Fire(");
@@ -545,8 +663,12 @@ impl Rule for BindableSameScript {
 }
 
 impl Rule for ServerPropertyInHeartbeat {
-    fn id(&self) -> &'static str { "roblox::server_property_in_heartbeat" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "roblox::server_property_in_heartbeat"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let runservice_signals = ["Heartbeat:Connect(", "Stepped:Connect("];
@@ -562,8 +684,16 @@ impl Rule for ServerPropertyInHeartbeat {
             return vec![];
         }
 
-        let replicating_props = [".Position ", ".Position=", ".CFrame ", ".CFrame=",
-                                 ".Size ", ".Size=", ".Velocity ", ".Velocity="];
+        let replicating_props = [
+            ".Position ",
+            ".Position=",
+            ".CFrame ",
+            ".CFrame=",
+            ".Size ",
+            ".Size=",
+            ".Velocity ",
+            ".Velocity=",
+        ];
 
         let mut hits = Vec::new();
         for &pos in &connect_positions {
@@ -580,7 +710,11 @@ impl Rule for ServerPropertyInHeartbeat {
                 if t == "end" || t == "end)" || t.starts_with("end)") {
                     depth -= 1;
                     if depth <= 0 {
-                        body_end = callback.lines().take(i + 1).map(|l| l.len() + 1).sum::<usize>();
+                        body_end = callback
+                            .lines()
+                            .take(i + 1)
+                            .map(|l| l.len() + 1)
+                            .sum::<usize>();
                         break;
                     }
                 }
@@ -602,8 +736,12 @@ impl Rule for ServerPropertyInHeartbeat {
 }
 
 impl Rule for GameLoadedRace {
-    fn id(&self) -> &'static str { "roblox::game_loaded_race" }
-    fn severity(&self) -> Severity { Severity::Error }
+    fn id(&self) -> &'static str {
+        "roblox::game_loaded_race"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Error
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let game_is_loaded = visit::find_pattern_positions(source, "game:IsLoaded()");
@@ -627,8 +765,12 @@ impl Rule for GameLoadedRace {
 }
 
 impl Rule for HumanoidStatePolling {
-    fn id(&self) -> &'static str { "roblox::humanoid_state_polling" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "roblox::humanoid_state_polling"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -648,8 +790,12 @@ impl Rule for HumanoidStatePolling {
 }
 
 impl Rule for ServerSideTween {
-    fn id(&self) -> &'static str { "roblox::server_side_tween" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "roblox::server_side_tween"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         if !source.contains("TweenService") {
@@ -665,7 +811,10 @@ impl Rule for ServerSideTween {
         for pos in visit::find_pattern_positions(source, ":Create(") {
             let before_start = visit::floor_char(source, pos.saturating_sub(60));
             let before = &source[before_start..pos];
-            if before.contains("TweenService") || before.contains("tweenService") || before.contains("Tween") {
+            if before.contains("TweenService")
+                || before.contains("tweenService")
+                || before.contains("Tween")
+            {
                 hits.push(Hit {
                     pos,
                     msg: "TweenService:Create() on server - tweens replicate every property change, tween on client instead".into(),
@@ -677,8 +826,12 @@ impl Rule for ServerSideTween {
 }
 
 impl Rule for RequireInConnect {
-    fn id(&self) -> &'static str { "roblox::require_in_connect" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "roblox::require_in_connect"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -690,19 +843,27 @@ impl Rule for RequireInConnect {
                 continue;
             }
             let func_offset = pos + ":Connect(".len() + (after.len() - trimmed.len());
-            let body_end = ["\nend)", "\n\tend)", "\n\t\tend)", "\n    end)", "\n        end)"]
-                .iter()
-                .filter_map(|m| source[func_offset..].find(m))
-                .min()
-                .unwrap_or(500.min(source.len() - func_offset));
+            let body_end = [
+                "\nend)",
+                "\n\tend)",
+                "\n\t\tend)",
+                "\n    end)",
+                "\n        end)",
+            ]
+            .iter()
+            .filter_map(|m| source[func_offset..].find(m))
+            .min()
+            .unwrap_or(500.min(source.len() - func_offset));
             let callback = &source[func_offset..func_offset + body_end];
-            for require_pos in visit::find_pattern_positions(callback, "require(") {
+            if let Some(require_pos) = visit::find_pattern_positions(callback, "require(")
+                .into_iter()
+                .next()
+            {
                 let abs_pos = func_offset + require_pos;
                 hits.push(Hit {
                     pos: abs_pos,
                     msg: "require() inside :Connect() callback - runs on every event fire, move to module level".into(),
                 });
-                break;
             }
         }
         hits
@@ -710,8 +871,12 @@ impl Rule for RequireInConnect {
 }
 
 impl Rule for FindFirstChildChain {
-    fn id(&self) -> &'static str { "roblox::find_first_child_chain" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "roblox::find_first_child_chain"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -739,8 +904,12 @@ impl Rule for FindFirstChildChain {
 }
 
 impl Rule for OnceOverConnect {
-    fn id(&self) -> &'static str { "roblox::once_over_connect" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "roblox::once_over_connect"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -765,8 +934,12 @@ impl Rule for OnceOverConnect {
 }
 
 impl Rule for HealthPolling {
-    fn id(&self) -> &'static str { "roblox::health_polling" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "roblox::health_polling"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let loop_depth = build_hot_loop_depth_map(source);
@@ -794,13 +967,25 @@ impl Rule for HealthPolling {
 }
 
 impl Rule for ChangedEventUnfiltered {
-    fn id(&self) -> &'static str { "roblox::changed_event_unfiltered" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "roblox::changed_event_unfiltered"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let value_base_types = [
-            "BoolValue", "IntValue", "StringValue", "ObjectValue", "NumberValue",
-            "Color3Value", "Vector3Value", "CFrameValue", "BrickColorValue", "RayValue",
+            "BoolValue",
+            "IntValue",
+            "StringValue",
+            "ObjectValue",
+            "NumberValue",
+            "Color3Value",
+            "Vector3Value",
+            "CFrameValue",
+            "BrickColorValue",
+            "RayValue",
         ];
         let mut hits = Vec::new();
         for pos in visit::find_pattern_positions(source, ".Changed:Connect(") {
@@ -810,7 +995,10 @@ impl Rule for ChangedEventUnfiltered {
             if near.contains("GetPropertyChangedSignal") || near.contains("AttributeChanged") {
                 continue;
             }
-            let word_start = before.rfind(|c: char| !c.is_alphanumeric() && c != '_' && c != '.').map(|i| i + 1).unwrap_or(0);
+            let word_start = before
+                .rfind(|c: char| !c.is_alphanumeric() && c != '_' && c != '.')
+                .map(|i| i + 1)
+                .unwrap_or(0);
             let accessor = &source[word_start..pos];
             if accessor == "self" || accessor.contains("self.") || accessor.contains("self._") {
                 continue;
@@ -820,8 +1008,11 @@ impl Rule for ChangedEventUnfiltered {
             }
             let last_word = accessor.rsplit('.').next().unwrap_or(accessor);
             let lw = last_word.to_lowercase();
-            if lw.ends_with("value") || lw.ends_with("action") || lw.ends_with("state")
-                || lw.ends_with("object") || lw.ends_with("signal")
+            if lw.ends_with("value")
+                || lw.ends_with("action")
+                || lw.ends_with("state")
+                || lw.ends_with("object")
+                || lw.ends_with("signal")
             {
                 continue;
             }
@@ -837,11 +1028,16 @@ impl Rule for ChangedEventUnfiltered {
                 let assign_pat = format!("{var_name} = Instance.new(\"");
                 if let Some(apos) = context.rfind(&assign_pat) {
                     let after = &context[apos + assign_pat.len()..];
-                    after.starts_with("Bool") || after.starts_with("Int")
-                        || after.starts_with("String") || after.starts_with("Object")
-                        || after.starts_with("Number") || after.starts_with("Color3")
-                        || after.starts_with("Vector3") || after.starts_with("CFrame")
-                        || after.starts_with("BrickColor") || after.starts_with("Ray")
+                    after.starts_with("Bool")
+                        || after.starts_with("Int")
+                        || after.starts_with("String")
+                        || after.starts_with("Object")
+                        || after.starts_with("Number")
+                        || after.starts_with("Color3")
+                        || after.starts_with("Vector3")
+                        || after.starts_with("CFrame")
+                        || after.starts_with("BrickColor")
+                        || after.starts_with("Ray")
                 } else {
                     false
                 }
@@ -851,11 +1047,34 @@ impl Rule for ChangedEventUnfiltered {
             }
             if !accessor.contains('.') {
                 let first_char = accessor.chars().next().unwrap_or('A');
-                if first_char.is_ascii_lowercase() && !matches!(accessor, "part" | "gui" | "button" | "frame" | "label" | "instance" | "inst" | "obj" | "descendant" | "child" | "player" | "character" | "humanoid" | "camera" | "sound" | "model" | "tool" | "workspace") {
+                if first_char.is_ascii_lowercase()
+                    && !matches!(
+                        accessor,
+                        "part"
+                            | "gui"
+                            | "button"
+                            | "frame"
+                            | "label"
+                            | "instance"
+                            | "inst"
+                            | "obj"
+                            | "descendant"
+                            | "child"
+                            | "player"
+                            | "character"
+                            | "humanoid"
+                            | "camera"
+                            | "sound"
+                            | "model"
+                            | "tool"
+                            | "workspace"
+                    )
+                {
                     continue;
                 }
             }
-            let after_connect = &source[pos..visit::ceil_char(source, (pos + 500).min(source.len()))];
+            let after_connect =
+                &source[pos..visit::ceil_char(source, (pos + 500).min(source.len()))];
             let has_property_filter = after_connect.contains("property ==")
                 || after_connect.contains("property ==\"")
                 || after_connect.contains("prop ==")
@@ -874,8 +1093,12 @@ impl Rule for ChangedEventUnfiltered {
 }
 
 impl Rule for PivotToInLoop {
-    fn id(&self) -> &'static str { "roblox::pivot_to_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "roblox::pivot_to_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -892,8 +1115,12 @@ impl Rule for PivotToInLoop {
 }
 
 impl Rule for DescendantEventWorkspace {
-    fn id(&self) -> &'static str { "roblox::descendant_event_workspace" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "roblox::descendant_event_workspace"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -916,8 +1143,12 @@ impl Rule for DescendantEventWorkspace {
 }
 
 impl Rule for GetAttributeInHeartbeat {
-    fn id(&self) -> &'static str { "roblox::get_attribute_in_heartbeat" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "roblox::get_attribute_in_heartbeat"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -947,8 +1178,12 @@ impl Rule for GetAttributeInHeartbeat {
 }
 
 impl Rule for DeprecatedTick {
-    fn id(&self) -> &'static str { "roblox::deprecated_tick" }
-    fn severity(&self) -> Severity { Severity::Error }
+    fn id(&self) -> &'static str {
+        "roblox::deprecated_tick"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Error
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -965,16 +1200,24 @@ impl Rule for DeprecatedTick {
 }
 
 impl Rule for DeprecatedFindPartOnRay {
-    fn id(&self) -> &'static str { "roblox::deprecated_find_part_on_ray" }
-    fn severity(&self) -> Severity { Severity::Error }
+    fn id(&self) -> &'static str {
+        "roblox::deprecated_find_part_on_ray"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Error
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, _ctx| {
-            if visit::is_method_call(call, "FindPartOnRay") || visit::is_method_call(call, "FindPartOnRayWithWhitelist") || visit::is_method_call(call, "FindPartOnRayWithIgnoreList") {
+            if visit::is_method_call(call, "FindPartOnRay")
+                || visit::is_method_call(call, "FindPartOnRayWithWhitelist")
+                || visit::is_method_call(call, "FindPartOnRayWithIgnoreList")
+            {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
-                    msg: "FindPartOnRay is deprecated - use workspace:Raycast() with RaycastParams".into(),
+                    msg: "FindPartOnRay is deprecated - use workspace:Raycast() with RaycastParams"
+                        .into(),
                 });
             }
         });
@@ -983,8 +1226,12 @@ impl Rule for DeprecatedFindPartOnRay {
 }
 
 impl Rule for WhileWaitDo {
-    fn id(&self) -> &'static str { "roblox::while_wait_do" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "roblox::while_wait_do"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -1005,8 +1252,12 @@ impl Rule for WhileWaitDo {
 }
 
 impl Rule for GetPropertyChangedInLoop {
-    fn id(&self) -> &'static str { "roblox::get_property_changed_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "roblox::get_property_changed_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -1025,9 +1276,13 @@ impl Rule for GetPropertyChangedInLoop {
 fn find_callback_end(s: &str) -> Option<usize> {
     let mut depth = 0i32;
     for (i, c) in s.char_indices() {
-        if c == '(' { depth += 1; }
+        if c == '(' {
+            depth += 1;
+        }
         if c == ')' {
-            if depth == 0 { return Some(i); }
+            if depth == 0 {
+                return Some(i);
+            }
             depth -= 1;
         }
     }
@@ -1047,7 +1302,9 @@ fn find_inner_positions(s: &str, pattern: &str) -> Vec<usize> {
 fn line_start_offsets(source: &str) -> Vec<usize> {
     let mut starts = vec![0];
     for (i, b) in source.bytes().enumerate() {
-        if b == b'\n' { starts.push(i + 1); }
+        if b == b'\n' {
+            starts.push(i + 1);
+        }
     }
     starts
 }
@@ -1076,13 +1333,18 @@ fn build_hot_loop_depth_map(source: &str) -> Vec<u32> {
             depths.push(depth);
             continue;
         }
-        if trimmed.starts_with("while ") || trimmed.starts_with("repeat") {
-            depth += 1;
-        } else if trimmed.starts_with("for ") && !trimmed.contains(" in ") {
+        if trimmed.starts_with("while ")
+            || trimmed.starts_with("repeat")
+            || (trimmed.starts_with("for ") && !trimmed.contains(" in "))
+        {
             depth += 1;
         }
         depths.push(depth);
-        if trimmed == "end" || trimmed.starts_with("end ") || trimmed.starts_with("until ") || trimmed == "until" {
+        if trimmed == "end"
+            || trimmed.starts_with("end ")
+            || trimmed.starts_with("until ")
+            || trimmed == "until"
+        {
             depth = depth.saturating_sub(1);
         }
     }
@@ -1090,14 +1352,22 @@ fn build_hot_loop_depth_map(source: &str) -> Vec<u32> {
 }
 
 impl Rule for RenderSteppedOnServer {
-    fn id(&self) -> &'static str { "roblox::render_stepped_on_server" }
-    fn severity(&self) -> Severity { Severity::Error }
+    fn id(&self) -> &'static str {
+        "roblox::render_stepped_on_server"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Error
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         for pos in visit::find_pattern_positions(source, "RenderStepped") {
             let line_start = source[..pos].rfind('\n').map(|p| p + 1).unwrap_or(0);
-            let line = &source[line_start..source[pos..].find('\n').map(|p| pos + p).unwrap_or(source.len())];
+            let line = &source[line_start
+                ..source[pos..]
+                    .find('\n')
+                    .map(|p| pos + p)
+                    .unwrap_or(source.len())];
             if line.contains("Server") || line.contains("server") {
                 continue;
             }
@@ -1117,8 +1387,12 @@ impl Rule for RenderSteppedOnServer {
 }
 
 impl Rule for TaskWaitNoArg {
-    fn id(&self) -> &'static str { "roblox::task_wait_no_arg" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "roblox::task_wait_no_arg"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -1133,8 +1407,12 @@ impl Rule for TaskWaitNoArg {
 }
 
 impl Rule for DeprecatedDelay {
-    fn id(&self) -> &'static str { "roblox::deprecated_delay" }
-    fn severity(&self) -> Severity { Severity::Error }
+    fn id(&self) -> &'static str {
+        "roblox::deprecated_delay"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Error
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -1151,37 +1429,54 @@ impl Rule for DeprecatedDelay {
 }
 
 impl Rule for CloneSetParent {
-    fn id(&self) -> &'static str { "roblox::clone_set_parent" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "roblox::clone_set_parent"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         let lines: Vec<&str> = source.lines().collect();
         for (i, line) in lines.iter().enumerate() {
             let trimmed = line.trim();
-            if !trimmed.contains(":Clone()") { continue; }
+            if !trimmed.contains(":Clone()") {
+                continue;
+            }
             if let Some(eq_pos) = trimmed.find(" = ") {
                 let var = trimmed[..eq_pos].trim().trim_start_matches("local ");
                 let prefix = format!("{var}.");
                 let parent_pat = format!("{var}.Parent");
                 let mut parent_line = None;
                 let mut props_after = 0;
-                for j in (i + 1)..lines.len().min(i + 12) {
-                    let jt = lines[j].trim();
-                    if jt.is_empty() || jt.starts_with("--") { continue; }
-                    if !jt.starts_with(&prefix) || !jt.contains(" = ") { break; }
+                for (j, jline) in lines
+                    .iter()
+                    .enumerate()
+                    .take(lines.len().min(i + 12))
+                    .skip(i + 1)
+                {
+                    let jt = jline.trim();
+                    if jt.is_empty() || jt.starts_with("--") {
+                        continue;
+                    }
+                    if !jt.starts_with(&prefix) || !jt.contains(" = ") {
+                        break;
+                    }
                     if jt.starts_with(&parent_pat) {
                         parent_line = Some(j);
                     } else if parent_line.is_some() {
                         props_after += 1;
                     }
                 }
-                if parent_line.is_some() && props_after > 0 {
-                    let byte_pos: usize = lines[..parent_line.unwrap()].iter().map(|l| l.len() + 1).sum();
-                    hits.push(Hit {
-                        pos: byte_pos,
-                        msg: "Clone(): .Parent set before other properties - set .Parent last to batch replication".into(),
-                    });
+                if let Some(pl) = parent_line {
+                    if props_after > 0 {
+                        let byte_pos: usize = lines[..pl].iter().map(|l| l.len() + 1).sum();
+                        hits.push(Hit {
+                            pos: byte_pos,
+                            msg: "Clone(): .Parent set before other properties - set .Parent last to batch replication".into(),
+                        });
+                    }
                 }
             }
         }
@@ -1190,8 +1485,12 @@ impl Rule for CloneSetParent {
 }
 
 impl Rule for YieldInConnectCallback {
-    fn id(&self) -> &'static str { "roblox::yield_in_connect_callback" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "roblox::yield_in_connect_callback"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -1204,14 +1503,17 @@ impl Rule for YieldInConnectCallback {
             let mut depth: i32 = 0;
             for j in (i + 1)..lines.len().min(i + 50) {
                 let inner = lines[j].trim();
-                let opens = inner.matches("function(").count() + inner.matches("function ()").count();
+                let opens =
+                    inner.matches("function(").count() + inner.matches("function ()").count();
                 let closes = inner.matches("end)").count() + inner.matches("end,").count();
                 if depth == 0 && closes > 0 && opens == 0 {
                     break;
                 }
                 depth += opens as i32;
                 depth -= closes as i32;
-                if depth > 0 { continue; }
+                if depth > 0 {
+                    continue;
+                }
                 if inner.contains("task.wait(") || inner.contains(":WaitForChild(") {
                     let byte_pos: usize = lines[..j].iter().map(|l| l.len() + 1).sum();
                     hits.push(Hit {
@@ -1227,8 +1529,12 @@ impl Rule for YieldInConnectCallback {
 }
 
 impl Rule for DeprecatedUdim {
-    fn id(&self) -> &'static str { "roblox::deprecated_udim" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "roblox::deprecated_udim"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -1246,7 +1552,9 @@ impl Rule for DeprecatedUdim {
             }
         }
         for pos in visit::find_pattern_positions(source, "UDim2.new(") {
-            if source[pos..].starts_with("UDim2.new(0,") { continue; }
+            if source[pos..].starts_with("UDim2.new(0,") {
+                continue;
+            }
             let after = &source[pos + "UDim2.new(".len()..];
             if let Some(close) = after.find(')') {
                 let args = after[..close].trim();
@@ -1264,8 +1572,12 @@ impl Rule for DeprecatedUdim {
 }
 
 impl Rule for TeleportServiceRace {
-    fn id(&self) -> &'static str { "roblox::teleport_service_race" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "roblox::teleport_service_race"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -1292,8 +1604,12 @@ impl Rule for TeleportServiceRace {
 }
 
 impl Rule for Color3NewMisuse {
-    fn id(&self) -> &'static str { "roblox::color3_new_misuse" }
-    fn severity(&self) -> Severity { Severity::Error }
+    fn id(&self) -> &'static str {
+        "roblox::color3_new_misuse"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Error
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -1305,8 +1621,13 @@ impl Rule for Color3NewMisuse {
                 for (i, ch) in after.char_indices() {
                     match ch {
                         '(' => depth += 1,
-                        ')' if depth > 0 => { depth -= 1; }
-                        ')' => { found = Some(i); break; }
+                        ')' if depth > 0 => {
+                            depth -= 1;
+                        }
+                        ')' => {
+                            found = Some(i);
+                            break;
+                        }
                         _ => {}
                     }
                 }
@@ -1317,7 +1638,9 @@ impl Rule for Color3NewMisuse {
             };
             let args = &after[..close];
             let parts: Vec<&str> = args.split(',').collect();
-            if parts.len() != 3 { continue; }
+            if parts.len() != 3 {
+                continue;
+            }
             let any_over_1 = parts.iter().any(|p| {
                 let t = p.trim();
                 t.parse::<f64>().map(|v| v > 1.0).unwrap_or(false)
@@ -1325,7 +1648,9 @@ impl Rule for Color3NewMisuse {
             if any_over_1 {
                 hits.push(Hit {
                     pos,
-                    msg: "Color3.new() takes values 0-1, not 0-255 - did you mean Color3.fromRGB()?".into(),
+                    msg:
+                        "Color3.new() takes values 0-1, not 0-255 - did you mean Color3.fromRGB()?"
+                            .into(),
                 });
             }
         }
@@ -1334,8 +1659,12 @@ impl Rule for Color3NewMisuse {
 }
 
 impl Rule for RaycastFilterDeprecated {
-    fn id(&self) -> &'static str { "roblox::raycast_filter_deprecated" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "roblox::raycast_filter_deprecated"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -1356,32 +1685,43 @@ impl Rule for RaycastFilterDeprecated {
 }
 
 impl Rule for PlayerAddedRace {
-    fn id(&self) -> &'static str { "roblox::player_added_race" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "roblox::player_added_race"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
-        let has_player_added = source.contains("PlayerAdded:Connect") || source.contains("PlayerAdded:Once");
-        if !has_player_added { return hits; }
+        let has_player_added =
+            source.contains("PlayerAdded:Connect") || source.contains("PlayerAdded:Once");
+        if !has_player_added {
+            return hits;
+        }
 
-        let has_existing_check = source.contains(":GetPlayers()")
-            || source.contains("Players:GetChildren()");
+        let has_existing_check =
+            source.contains(":GetPlayers()") || source.contains("Players:GetChildren()");
 
         if !has_existing_check {
-            for pos in visit::find_pattern_positions(source, "PlayerAdded:Connect") {
+            if let Some(pos) = visit::find_pattern_positions(source, "PlayerAdded:Connect")
+                .into_iter()
+                .next()
+            {
                 hits.push(Hit {
                     pos,
                     msg: "PlayerAdded without :GetPlayers() loop - players who joined before this script runs will be missed".into(),
                 });
-                break;
             }
             if hits.is_empty() {
-                for pos in visit::find_pattern_positions(source, "PlayerAdded:Once") {
+                if let Some(pos) = visit::find_pattern_positions(source, "PlayerAdded:Once")
+                    .into_iter()
+                    .next()
+                {
                     hits.push(Hit {
                         pos,
                         msg: "PlayerAdded without :GetPlayers() check - the event may have already fired before this script runs".into(),
                     });
-                    break;
                 }
             }
         }
@@ -1390,15 +1730,21 @@ impl Rule for PlayerAddedRace {
 }
 
 impl Rule for GameWorkspace {
-    fn id(&self) -> &'static str { "roblox::game_workspace" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "roblox::game_workspace"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         for pos in visit::find_pattern_positions(source, "game.Workspace") {
             let after_pos = pos + "game.Workspace".len();
             let next_char = source[after_pos..].chars().next().unwrap_or(' ');
-            if next_char.is_alphanumeric() || next_char == '_' { continue; }
+            if next_char.is_alphanumeric() || next_char == '_' {
+                continue;
+            }
             hits.push(Hit {
                 pos,
                 msg: "game.Workspace crosses the Lua-C++ bridge - use the global `workspace` (direct reference)".into(),
@@ -1409,8 +1755,12 @@ impl Rule for GameWorkspace {
 }
 
 impl Rule for CoroutineResumeCreate {
-    fn id(&self) -> &'static str { "roblox::coroutine_resume_create" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "roblox::coroutine_resume_create"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -1425,20 +1775,29 @@ impl Rule for CoroutineResumeCreate {
 }
 
 impl Rule for CharacterAddedNoWait {
-    fn id(&self) -> &'static str { "roblox::character_added_no_wait" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "roblox::character_added_no_wait"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
-        let has_char_added = source.contains("CharacterAdded:Connect") || source.contains("CharacterAdded:Once");
-        if !has_char_added { return hits; }
+        let has_char_added =
+            source.contains("CharacterAdded:Connect") || source.contains("CharacterAdded:Once");
+        if !has_char_added {
+            return hits;
+        }
 
         let has_char_ref = source.match_indices(".Character").any(|(i, _)| {
             let after = &source[i + ".Character".len()..];
             let next = after.chars().next().unwrap_or(' ');
             !next.is_ascii_alphabetic()
         });
-        if has_char_ref { return hits; }
+        if has_char_ref {
+            return hits;
+        }
 
         for pos in visit::find_pattern_positions(source, "CharacterAdded:Connect") {
             let before = &source[..pos];
@@ -1456,8 +1815,12 @@ impl Rule for CharacterAddedNoWait {
 }
 
 impl Rule for GetServiceWorkspace {
-    fn id(&self) -> &'static str { "roblox::getservice_workspace" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "roblox::getservice_workspace"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -1470,7 +1833,9 @@ impl Rule for GetServiceWorkspace {
         for pos in visit::find_pattern_positions(source, ":GetService('Workspace')") {
             hits.push(Hit {
                 pos,
-                msg: ":GetService('Workspace') is unnecessary - use the global `workspace` directly".into(),
+                msg:
+                    ":GetService('Workspace') is unnecessary - use the global `workspace` directly"
+                        .into(),
             });
         }
         hits
@@ -1478,8 +1843,12 @@ impl Rule for GetServiceWorkspace {
 }
 
 impl Rule for FindFirstChildNoCheck {
-    fn id(&self) -> &'static str { "roblox::find_first_child_no_check" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "roblox::find_first_child_no_check"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -1493,15 +1862,35 @@ impl Rule for FindFirstChildNoCheck {
             let next = after_close.chars().next().unwrap_or(' ');
             if next == '.' || next == ':' {
                 let chained = &after_close[1..];
-                let prop_end = chained.find(|c: char| !c.is_alphanumeric() && c != '_').unwrap_or(chained.len());
+                let prop_end = chained
+                    .find(|c: char| !c.is_alphanumeric() && c != '_')
+                    .unwrap_or(chained.len());
                 let prop = &chained[..prop_end];
-                if prop.is_empty() { continue; }
+                if prop.is_empty() {
+                    continue;
+                }
                 let line_start = source[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
-                let line = &source[line_start..source[line_start..].find('\n').map(|i| line_start + i).unwrap_or(source.len())];
-                if line.contains("if ") || line.contains("and ") || line.contains("or ") { continue; }
-                if line.contains("require") || line.contains("loader") || line.contains("bootstrap") || line.contains("expect(") || line.contains("assert(") { continue; }
-                let call_args = &source[pos + ":FindFirstChild(".len()..pos + ":FindFirstChild(".len() + close];
-                if call_args.contains("Loader") || call_args.contains("loader") { continue; }
+                let line = &source[line_start
+                    ..source[line_start..]
+                        .find('\n')
+                        .map(|i| line_start + i)
+                        .unwrap_or(source.len())];
+                if line.contains("if ") || line.contains("and ") || line.contains("or ") {
+                    continue;
+                }
+                if line.contains("require")
+                    || line.contains("loader")
+                    || line.contains("bootstrap")
+                    || line.contains("expect(")
+                    || line.contains("assert(")
+                {
+                    continue;
+                }
+                let call_args =
+                    &source[pos + ":FindFirstChild(".len()..pos + ":FindFirstChild(".len() + close];
+                if call_args.contains("Loader") || call_args.contains("loader") {
+                    continue;
+                }
                 let accessor = if next == ':' { ":" } else { "." };
                 hits.push(Hit {
                     pos,
@@ -1514,8 +1903,12 @@ impl Rule for FindFirstChildNoCheck {
 }
 
 impl Rule for GetFullNameInLoop {
-    fn id(&self) -> &'static str { "roblox::get_full_name_in_loop" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "roblox::get_full_name_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -1532,8 +1925,12 @@ impl Rule for GetFullNameInLoop {
 }
 
 impl Rule for CFrameOldConstructor {
-    fn id(&self) -> &'static str { "roblox::cframe_old_constructor" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "roblox::cframe_old_constructor"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -1546,12 +1943,17 @@ impl Rule for CFrameOldConstructor {
                     '(' => depth += 1,
                     ')' => {
                         depth -= 1;
-                        if depth == 0 { end = i; break; }
+                        if depth == 0 {
+                            end = i;
+                            break;
+                        }
                     }
                     _ => {}
                 }
             }
-            if end == 0 { continue; }
+            if end == 0 {
+                continue;
+            }
             let args = &after[..end];
             let comma_count = args.chars().filter(|&c| c == ',').count();
             if comma_count == 11 {
@@ -1566,13 +1968,19 @@ impl Rule for CFrameOldConstructor {
 }
 
 impl Rule for BindToRenderStepNoCleanup {
-    fn id(&self) -> &'static str { "roblox::bind_to_render_step_no_cleanup" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "roblox::bind_to_render_step_no_cleanup"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         let has_unbind = source.contains("UnbindFromRenderStep");
-        if has_unbind { return hits; }
+        if has_unbind {
+            return hits;
+        }
 
         for pos in visit::find_pattern_positions(source, ":BindToRenderStep(") {
             hits.push(Hit {
@@ -1585,8 +1993,12 @@ impl Rule for BindToRenderStepNoCleanup {
 }
 
 impl Rule for ApplyDescriptionInLoop {
-    fn id(&self) -> &'static str { "roblox::apply_description_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "roblox::apply_description_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -1603,8 +2015,12 @@ impl Rule for ApplyDescriptionInLoop {
 }
 
 impl Rule for HumanoidMoveToInLoop {
-    fn id(&self) -> &'static str { "roblox::humanoid_move_to_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "roblox::humanoid_move_to_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -1624,13 +2040,18 @@ impl Rule for HumanoidMoveToInLoop {
 }
 
 impl Rule for DeprecatedElapsedTime {
-    fn id(&self) -> &'static str { "roblox::deprecated_elapsed_time" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "roblox::deprecated_elapsed_time"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, _ctx| {
-            if visit::is_bare_call(call, "elapsedTime") || visit::is_bare_call(call, "ElapsedTime") {
+            if visit::is_bare_call(call, "elapsedTime") || visit::is_bare_call(call, "ElapsedTime")
+            {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
                     msg: "elapsedTime() is deprecated - use os.clock() for elapsed time or workspace:GetServerTimeNow() for server time".into(),
@@ -1642,8 +2063,12 @@ impl Rule for DeprecatedElapsedTime {
 }
 
 impl Rule for CharacterAppearanceLoaded {
-    fn id(&self) -> &'static str { "roblox::character_appearance_loaded" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "roblox::character_appearance_loaded"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -1658,8 +2083,12 @@ impl Rule for CharacterAppearanceLoaded {
 }
 
 impl Rule for DeprecatedVersion {
-    fn id(&self) -> &'static str { "roblox::deprecated_version" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "roblox::deprecated_version"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -1676,8 +2105,12 @@ impl Rule for DeprecatedVersion {
 }
 
 impl Rule for DeprecatedYpcall {
-    fn id(&self) -> &'static str { "roblox::deprecated_ypcall" }
-    fn severity(&self) -> Severity { Severity::Error }
+    fn id(&self) -> &'static str {
+        "roblox::deprecated_ypcall"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Error
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -1689,6 +2122,47 @@ impl Rule for DeprecatedYpcall {
                 });
             }
         });
+        hits
+    }
+}
+
+impl Rule for GetDescendantsInHeartbeat {
+    fn id(&self) -> &'static str {
+        "roblox::get_descendants_in_heartbeat"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        let callbacks = [
+            ".Heartbeat:Connect(",
+            ".RenderStepped:Connect(",
+            ".Stepped:Connect(",
+            ".Heartbeat:Once(",
+            ".RenderStepped:Once(",
+        ];
+        let targets = [":GetDescendants()", ":GetChildren()"];
+        for cb in &callbacks {
+            for cb_pos in visit::find_pattern_positions(source, cb) {
+                let after_start = cb_pos + cb.len();
+                let rest = &source[after_start..];
+                let body_end = find_callback_end(rest).unwrap_or(rest.len().min(2000));
+                let body = &rest[..body_end];
+                for target in &targets {
+                    if let Some(offset) = body.find(target) {
+                        hits.push(Hit {
+                            pos: after_start + offset,
+                            msg: format!(
+                                "{} in per-frame callback allocates a new table every frame at 60Hz - cache outside or use CollectionService tags",
+                                target
+                            ),
+                        });
+                    }
+                }
+            }
+        }
         hits
     }
 }

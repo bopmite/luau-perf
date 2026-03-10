@@ -332,3 +332,43 @@ fn tostring_in_comment_ok() {
     let hits = ToStringInInterpolation.check(src, &ast);
     assert_eq!(hits.len(), 0);
 }
+
+#[test]
+fn split_empty_separator_method_detected() {
+    let src = "local chars = str:split(\"\")";
+    let ast = parse(src);
+    let hits = SplitEmptySeparator.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn split_empty_separator_single_quote_detected() {
+    let src = "local chars = str:split('')";
+    let ast = parse(src);
+    let hits = SplitEmptySeparator.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn split_empty_separator_function_form_detected() {
+    let src = "local chars = string.split(str, \"\")";
+    let ast = parse(src);
+    let hits = SplitEmptySeparator.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn split_normal_separator_ok() {
+    let src = "local parts = str:split(\",\")";
+    let ast = parse(src);
+    let hits = SplitEmptySeparator.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn split_function_form_normal_separator_ok() {
+    let src = "local parts = string.split(str, \",\")";
+    let ast = parse(src);
+    let hits = SplitEmptySeparator.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}

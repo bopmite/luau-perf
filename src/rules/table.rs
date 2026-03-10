@@ -21,6 +21,7 @@ pub struct NilFieldInConstructor;
 pub struct RawsetInLoop;
 pub struct NextTNilOverPairs;
 pub struct MixedTableConstructor;
+pub struct TableInsertFrontInLoop;
 
 impl Rule for ForeachDeprecated {
     fn id(&self) -> &'static str {
@@ -853,6 +854,42 @@ impl Rule for MixedTableConstructor {
                 });
             }
         }
+        hits
+    }
+}
+
+impl Rule for TableInsertFrontInLoop {
+    fn id(&self) -> &'static str {
+        "table::table_insert_front_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
+
+    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        visit::each_call(ast, |call, ctx| {
+            if !ctx.in_loop_direct {
+                return;
+            }
+            if !visit::is_dot_call(call, "table", "insert") {
+                return;
+            }
+            let src = format!("{call}");
+            if let Some(paren) = src.find('(') {
+                let args = &src[paren + 1..];
+                let parts: Vec<&str> = args.splitn(3, ',').collect();
+                if parts.len() == 3 {
+                    let second = parts[1].trim();
+                    if second == "1" {
+                        hits.push(Hit {
+                            pos: visit::call_pos(call),
+                            msg: "table.insert(t, 1, v) in loop shifts all elements each iteration (O(n) per call) - append and reverse, or use a linked list".into(),
+                        });
+                    }
+                }
+            }
+        });
         hits
     }
 }

@@ -253,3 +253,35 @@ fn list_only_constructor_ok() {
     let hits = MixedTableConstructor.check(src, &ast);
     assert_eq!(hits.len(), 0);
 }
+
+#[test]
+fn table_insert_front_in_loop_detected() {
+    let src = "for i = 1, 10 do\n  table.insert(result, 1, items[i])\nend";
+    let ast = parse(src);
+    let hits = TableInsertFrontInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn table_insert_front_outside_loop_ok() {
+    let src = "table.insert(result, 1, firstItem)";
+    let ast = parse(src);
+    let hits = TableInsertFrontInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn table_insert_append_in_loop_ok() {
+    let src = "for i = 1, 10 do\n  table.insert(result, items[i])\nend";
+    let ast = parse(src);
+    let hits = TableInsertFrontInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn table_insert_position_2_in_loop_ok() {
+    let src = "for i = 1, 10 do\n  table.insert(result, 2, items[i])\nend";
+    let ast = parse(src);
+    let hits = TableInsertFrontInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}

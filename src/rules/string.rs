@@ -20,6 +20,7 @@ pub struct FormatNoArgs;
 pub struct FormatRedundantTostring;
 pub struct FormatSimpleConcat;
 pub struct ToStringInInterpolation;
+pub struct SplitEmptySeparator;
 
 impl Rule for LenOverHash {
     fn id(&self) -> &'static str {
@@ -789,6 +790,42 @@ impl Rule for ToStringInInterpolation {
                 continue;
             }
             i += 1;
+        }
+        hits
+    }
+}
+
+impl Rule for SplitEmptySeparator {
+    fn id(&self) -> &'static str {
+        "string::split_empty_separator"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        let patterns = [":split(\"\")", ":split('')", "string.split("];
+        for pat in &patterns {
+            for pos in visit::find_pattern_positions(source, pat) {
+                if pat == &"string.split(" {
+                    let after = &source[pos + pat.len()..];
+                    let close = match after.find(')') {
+                        Some(i) => i,
+                        None => continue,
+                    };
+                    let args = &after[..close];
+                    if !(args.ends_with(", \"\"") || args.ends_with(", ''")
+                        || args.ends_with(",\"\"") || args.ends_with(",''"))
+                    {
+                        continue;
+                    }
+                }
+                hits.push(Hit {
+                    pos,
+                    msg: "string.split with empty separator allocates a table of single characters - use string.byte(s, 1, -1) for character codes or a manual loop for character iteration".into(),
+                });
+            }
         }
         hits
     }
