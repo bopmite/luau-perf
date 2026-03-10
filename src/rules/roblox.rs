@@ -2222,7 +2222,7 @@ impl Rule for DeprecatedLowercaseMethod {
                         .rfind('.')
                         .map(|dot| {
                             let name = &before[dot + 1..];
-                            name.chars().next().map_or(false, |c| c.is_ascii_uppercase())
+                            name.chars().next().is_some_and(|c| c.is_ascii_uppercase())
                         })
                         .unwrap_or(false);
                     if is_event {
