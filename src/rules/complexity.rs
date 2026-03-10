@@ -62,6 +62,20 @@ fn is_structured_traversal(source: &str, pos: usize) -> bool {
                 if vars.contains(&root) {
                     return true;
                 }
+                for var in &vars {
+                    if inner_arg.contains(var) {
+                        let check = |c: char| c.is_alphanumeric() || c == '_';
+                        for (i, _) in inner_arg.match_indices(var) {
+                            let before_ok =
+                                i == 0 || !check(inner_arg.as_bytes()[i - 1] as char);
+                            let after_ok = i + var.len() >= inner_arg.len()
+                                || !check(inner_arg.as_bytes()[i + var.len()] as char);
+                            if before_ok && after_ok {
+                                return true;
+                            }
+                        }
+                    }
+                }
             }
             break;
         }

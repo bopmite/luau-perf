@@ -345,3 +345,11 @@ fn string_concat_no_accumulate_ok() {
     let hits = QuadraticStringBuild.check(src, &ast);
     assert_eq!(hits.len(), 0);
 }
+
+#[test]
+fn pairs_in_pairs_dependent_call_ok() {
+    let src = "for tag, comp in pairs(boundTags) do\n  for _, inst in ipairs(CollectionService:GetTagged(tag)) do\n    spawn(inst, comp)\n  end\nend";
+    let ast = parse(src);
+    let hits = PairsInPairs.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
