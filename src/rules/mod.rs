@@ -152,6 +152,7 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(roblox::DeprecatedElapsedTime),
         Box::new(roblox::CharacterAppearanceLoaded),
         Box::new(roblox::GetDescendantsInHeartbeat),
+        Box::new(roblox::DeprecatedLowercaseMethod),
         // alloc
         Box::new(alloc::StringConcatInLoop),
         Box::new(alloc::StringFormatInLoop),
@@ -500,6 +501,7 @@ pub fn rule_level(id: &str) -> crate::lint::Level {
 
         // more deprecated
         | "roblox::deprecated_delay"
+        | "roblox::deprecated_lowercase_method"
 
         // correctness
         | "roblox::render_stepped_on_server"
@@ -739,6 +741,7 @@ pub fn is_fixable(id: &str) -> bool {
             | "math::floor_to_multiple"
             | "style::redundant_bool_return"
             | "style::pairs_discard_value"
+            | "roblox::deprecated_lowercase_method"
     )
 }
 
@@ -1097,6 +1100,8 @@ fn explain_text(id: &str) -> &'static str {
         "style::pairs_discard_value" => "for k, _ in pairs(t) captures a value that is immediately discarded. Luau allows omitting unused loop variables - use `for k in pairs(t)` instead. Cleaner and avoids the unused variable binding.",
         "instance::pairs_over_getchildren" => "pairs(obj:GetChildren()) and ipairs(obj:GetChildren()) wrap an already-iterable table in an unnecessary function call. Luau generalized iteration handles tables directly - just use for i, child in obj:GetChildren() do.",
         "instance::wait_for_child_chain" => "Chained :WaitForChild() calls like parent:WaitForChild(\"A\"):WaitForChild(\"B\") yield independently on each call. If the first child exists but the second doesn't, this silently hangs. Cache intermediate references and handle nil checks.",
+
+        "roblox::deprecated_lowercase_method" => "Roblox API methods like :connect(), :disconnect(), and :wait() are deprecated lowercase aliases. Use the PascalCase versions :Connect(), :Disconnect(), :Wait() instead. The lowercase forms still work but are not documented and may be removed in future.",
 
         _ => "No detailed explanation available for this rule. Run --list-rules to see all rules.",
     }

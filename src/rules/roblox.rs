@@ -68,6 +68,7 @@ pub struct DeprecatedYpcall;
 pub struct DeprecatedElapsedTime;
 pub struct CharacterAppearanceLoaded;
 pub struct GetDescendantsInHeartbeat;
+pub struct DeprecatedLowercaseMethod;
 
 impl Rule for DeprecatedWait {
     fn id(&self) -> &'static str {
@@ -2166,6 +2167,77 @@ impl Rule for GetDescendantsInHeartbeat {
                             ),
                         });
                     }
+                }
+            }
+        }
+        hits
+    }
+}
+
+impl Rule for DeprecatedLowercaseMethod {
+    fn id(&self) -> &'static str {
+        "roblox::deprecated_lowercase_method"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        let deprecated = [
+            (":connect(", "Connect"),
+            (":disconnect(", "Disconnect"),
+            (":wait(", "Wait"),
+        ];
+        let mut in_block = false;
+        for (line_no, line) in source.lines().enumerate() {
+            let trimmed = line.trim();
+            if !in_block && (trimmed.starts_with("--[[") || trimmed.starts_with("--[=[")) {
+                if !trimmed.contains("]]") && !trimmed.contains("]=]") {
+                    in_block = true;
+                }
+                continue;
+            }
+            if in_block {
+                if trimmed.contains("]=]") || trimmed.contains("]]") {
+                    in_block = false;
+                }
+                continue;
+            }
+            if trimmed.starts_with("--") {
+                continue;
+            }
+            let code = match line.find("--") {
+                Some(i) => &line[..i],
+                None => line,
+            };
+            for &(pat, replacement) in &deprecated {
+                let mut search_from = 0;
+                while let Some(rel) = code[search_from..].find(pat) {
+                    let abs = search_from + rel;
+                    // Check that preceding char is an uppercase letter (event name)
+                    // e.g. .Changed:connect( or .Touched:connect(
+                    let before = &line[..abs];
+                    let is_event = before
+                        .rfind('.')
+                        .map(|dot| {
+                            let name = &before[dot + 1..];
+                            name.chars().next().map_or(false, |c| c.is_ascii_uppercase())
+                        })
+                        .unwrap_or(false);
+                    if is_event {
+                        let line_start: usize =
+                            source.lines().take(line_no).map(|l| l.len() + 1).sum();
+                        hits.push(Hit {
+                            pos: line_start + abs + 1, // +1 to skip the ':'
+                            msg: format!(
+                                "{}() is deprecated - use :{}() (PascalCase)",
+                                &pat[1..pat.len() - 1],
+                                replacement
+                            ),
+                        });
+                    }
+                    search_from = abs + pat.len();
                 }
             }
         }

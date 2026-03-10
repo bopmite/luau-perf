@@ -717,3 +717,61 @@ fn get_children_in_player_added_ok() {
     let hits = GetDescendantsInHeartbeat.check(src, &ast);
     assert_eq!(hits.len(), 0);
 }
+
+#[test]
+fn deprecated_lowercase_connect_detected() {
+    let src = "game.Players.PlayerAdded:connect(function(p) end)";
+    let ast = parse(src);
+    let hits = DeprecatedLowercaseMethod.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+    assert!(hits[0].msg.contains("Connect"));
+}
+
+#[test]
+fn deprecated_lowercase_wait_detected() {
+    let src = "game.Players.ChildAdded:wait()";
+    let ast = parse(src);
+    let hits = DeprecatedLowercaseMethod.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+    assert!(hits[0].msg.contains("Wait"));
+}
+
+#[test]
+fn deprecated_lowercase_disconnect_detected() {
+    let src = "conn.Disconnecting:disconnect()";
+    let ast = parse(src);
+    let hits = DeprecatedLowercaseMethod.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn uppercase_connect_ok() {
+    let src = "game.Players.PlayerAdded:Connect(function(p) end)";
+    let ast = parse(src);
+    let hits = DeprecatedLowercaseMethod.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn user_defined_connect_ok() {
+    let src = "self._eventBridge:connect(instance, event, handler)";
+    let ast = parse(src);
+    let hits = DeprecatedLowercaseMethod.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn lowercase_connect_in_comment_ok() {
+    let src = "-- game.Players.PlayerAdded:connect(function(p) end)";
+    let ast = parse(src);
+    let hits = DeprecatedLowercaseMethod.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn lowercase_connect_in_block_comment_ok() {
+    let src = "--[[\ngame.Players.PlayerAdded:connect(function(p) end)\n]]";
+    let ast = parse(src);
+    let hits = DeprecatedLowercaseMethod.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}

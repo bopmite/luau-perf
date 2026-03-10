@@ -59,6 +59,7 @@ pub fn compute_fix(rule_id: &str, source: &str, pos: usize) -> Option<Fix> {
         "math::floor_to_multiple" => fix_floor_to_multiple(source, pos),
         "style::redundant_bool_return" => fix_redundant_bool_return(source, pos),
         "style::pairs_discard_value" => fix_pairs_discard_value(source, pos),
+        "roblox::deprecated_lowercase_method" => fix_deprecated_lowercase_method(source, pos),
         _ => None,
     }
 }
@@ -1432,6 +1433,24 @@ fn fix_floor_to_multiple(source: &str, pos: usize) -> Option<Fix> {
         end: pos + total_len,
         replacement: format!("{x} - {x} % {step}"),
     })
+}
+
+fn fix_deprecated_lowercase_method(source: &str, pos: usize) -> Option<Fix> {
+    let methods = [
+        ("connect(", "Connect("),
+        ("disconnect(", "Disconnect("),
+        ("wait(", "Wait("),
+    ];
+    for &(old, new) in &methods {
+        if source.get(pos..pos + old.len()) == Some(old) {
+            return Some(Fix {
+                start: pos,
+                end: pos + old.len(),
+                replacement: new.into(),
+            });
+        }
+    }
+    None
 }
 
 #[cfg(test)]

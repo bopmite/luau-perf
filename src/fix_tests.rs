@@ -812,3 +812,33 @@ fn test_fix_floor_to_multiple_with_number() {
     result.replace_range(fix.start..fix.end, &fix.replacement);
     assert_eq!(result, "seconds - seconds % DAY");
 }
+
+#[test]
+fn test_fix_deprecated_lowercase_connect() {
+    let src = "game.Players.PlayerAdded:connect(function(p) end)";
+    let pos = src.find("connect(").unwrap();
+    let fix = compute_fix("roblox::deprecated_lowercase_method", src, pos).unwrap();
+    let mut result = src.to_string();
+    result.replace_range(fix.start..fix.end, &fix.replacement);
+    assert_eq!(result, "game.Players.PlayerAdded:Connect(function(p) end)");
+}
+
+#[test]
+fn test_fix_deprecated_lowercase_wait() {
+    let src = "event.Changed:wait()";
+    let pos = src.find("wait(").unwrap();
+    let fix = compute_fix("roblox::deprecated_lowercase_method", src, pos).unwrap();
+    let mut result = src.to_string();
+    result.replace_range(fix.start..fix.end, &fix.replacement);
+    assert_eq!(result, "event.Changed:Wait()");
+}
+
+#[test]
+fn test_fix_deprecated_lowercase_disconnect() {
+    let src = "conn.Event:disconnect()";
+    let pos = src.find("disconnect(").unwrap();
+    let fix = compute_fix("roblox::deprecated_lowercase_method", src, pos).unwrap();
+    let mut result = src.to_string();
+    result.replace_range(fix.start..fix.end, &fix.replacement);
+    assert_eq!(result, "conn.Event:Disconnect()");
+}
