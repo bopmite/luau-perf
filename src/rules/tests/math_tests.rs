@@ -356,3 +356,27 @@ fn floor_no_multiply_ok() {
     let hits = FloorToMultiple.check(src, &ast);
     assert_eq!(hits.len(), 0);
 }
+
+#[test]
+fn random_deprecated_detected() {
+    let src = "local x = math.random(1, 10)";
+    let ast = parse(src);
+    let hits = RandomDeprecated.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn math_random_no_args_detected() {
+    let src = "local x = math.random()";
+    let ast = parse(src);
+    let hits = RandomDeprecated.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn random_new_ok() {
+    let src = "local rng = Random.new()";
+    let ast = parse(src);
+    let hits = RandomDeprecated.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}

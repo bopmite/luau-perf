@@ -954,3 +954,72 @@ fn direct_service_not_prefix() {
     let hits = DirectServiceAccess.check(src, &ast);
     assert_eq!(hits.len(), 0);
 }
+
+// DeprecatedWait
+#[test]
+fn deprecated_wait_detected() {
+    let src = "wait(1)";
+    let ast = parse(src);
+    let hits = DeprecatedWait.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn task_wait_ok_not_deprecated() {
+    let src = "task.wait(1)";
+    let ast = parse(src);
+    let hits = DeprecatedWait.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+// DeprecatedSpawn
+#[test]
+fn deprecated_spawn_detected() {
+    let src = "spawn(function() print(\"hi\") end)";
+    let ast = parse(src);
+    let hits = DeprecatedSpawn.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn task_spawn_not_deprecated() {
+    let src = "task.spawn(function() print(\"hi\") end)";
+    let ast = parse(src);
+    let hits = DeprecatedSpawn.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+// WaitForChildNoTimeout
+#[test]
+fn wait_for_child_no_timeout_detected() {
+    let src = "local child = parent:WaitForChild(\"Part\")";
+    let ast = parse(src);
+    let hits = WaitForChildNoTimeout.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn wait_for_child_with_timeout_ok() {
+    let src = "local child = parent:WaitForChild(\"Part\", 5)";
+    let ast = parse(src);
+    let hits = WaitForChildNoTimeout.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+// ModelSetPrimaryPartCFrame
+#[test]
+fn model_set_primary_part_cframe_detected() {
+    let src = "model:SetPrimaryPartCFrame(cf)";
+    let ast = parse(src);
+    let hits = ModelSetPrimaryPartCFrame.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn model_pivot_to_ok() {
+    let src = "model:PivotTo(cf)";
+    let ast = parse(src);
+    let hits = ModelSetPrimaryPartCFrame.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+

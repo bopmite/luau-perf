@@ -188,3 +188,19 @@ fn json_encode_alone_ok() {
     let hits = JsonDeepClone.check(src, &ast);
     assert_eq!(hits.len(), 0);
 }
+
+#[test]
+fn invoke_server_in_loop_detected() {
+    let src = "for i = 1, 10 do\n  remote:InvokeServer(i)\nend";
+    let ast = parse(src);
+    let hits = InvokeServerInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn invoke_server_outside_loop_ok() {
+    let src = "remote:InvokeServer(data)";
+    let ast = parse(src);
+    let hits = InvokeServerInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}

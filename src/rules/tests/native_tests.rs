@@ -237,3 +237,27 @@ fn non_fastcall_no_native_ok() {
     let hits = NonFastcallInHotLoop.check(src, &ast);
     assert_eq!(hits.len(), 0);
 }
+
+#[test]
+fn getfenv_detected() {
+    let src = "local env = getfenv()";
+    let ast = parse(src);
+    let hits = GetfenvSetfenv.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn setfenv_detected() {
+    let src = "setfenv(1, newenv)";
+    let ast = parse(src);
+    let hits = GetfenvSetfenv.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn getfenv_method_ok() {
+    let src = "obj:getfenv()";
+    let ast = parse(src);
+    let hits = GetfenvSetfenv.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}

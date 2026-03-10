@@ -285,3 +285,59 @@ fn table_insert_position_2_in_loop_ok() {
     let hits = TableInsertFrontInLoop.check(src, &ast);
     assert_eq!(hits.len(), 0);
 }
+
+#[test]
+fn getn_deprecated_detected() {
+    let src = "local n = table.getn(t)";
+    let ast = parse(src);
+    let hits = GetnDeprecated.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn hash_length_ok() {
+    let src = "local n = #t";
+    let ast = parse(src);
+    let hits = GetnDeprecated.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn maxn_deprecated_detected() {
+    let src = "local n = table.maxn(t)";
+    let ast = parse(src);
+    let hits = MaxnDeprecated.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn foreach_deprecated_detected() {
+    let src = "table.foreach(t, print)";
+    let ast = parse(src);
+    let hits = ForeachDeprecated.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn foreachi_deprecated_detected() {
+    let src = "table.foreachi(t, print)";
+    let ast = parse(src);
+    let hits = ForeachDeprecated.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn remove_in_ipairs_detected() {
+    let src = "for i, v in ipairs(t) do\n  if v == 0 then table.remove(t, i) end\nend";
+    let ast = parse(src);
+    let hits = RemoveInIpairs.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn remove_outside_ipairs_ok() {
+    let src = "table.remove(t, idx)";
+    let ast = parse(src);
+    let hits = RemoveInIpairs.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}

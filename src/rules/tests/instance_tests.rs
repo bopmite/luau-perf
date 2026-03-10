@@ -230,3 +230,20 @@ fn single_wait_for_child_ok() {
     let hits = WaitForChildChain.check(src, &ast);
     assert_eq!(hits.len(), 0);
 }
+
+#[test]
+fn two_arg_instance_new_detected() {
+    let src = "local p = Instance.new(\"Part\", workspace)";
+    let ast = parse(src);
+    let hits = TwoArgInstanceNew.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn one_arg_instance_new_ok() {
+    let src = "local p = Instance.new(\"Part\")";
+    let ast = parse(src);
+    let hits = TwoArgInstanceNew.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+

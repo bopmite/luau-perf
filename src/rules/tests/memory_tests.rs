@@ -397,3 +397,19 @@ fn untracked_connection_on_client_event_ok() {
     let hits = UntrackedConnection.check(src, &ast);
     assert_eq!(hits.len(), 0);
 }
+
+#[test]
+fn missing_player_removing_detected() {
+    let src = "Players.PlayerAdded:Connect(function(player)\n  connections[player] = event:Connect(function() end)\nend)";
+    let ast = parse(src);
+    let hits = MissingPlayerRemoving.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn player_removing_present_ok() {
+    let src = "Players.PlayerAdded:Connect(function(player)\n  connections[player] = event:Connect(function() end)\nend)\nPlayers.PlayerRemoving:Connect(function(player)\n  connections[player]:Disconnect()\nend)";
+    let ast = parse(src);
+    let hits = MissingPlayerRemoving.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
