@@ -320,3 +320,35 @@ fn task_spawn_ok() {
     let hits = CoroutineCreateOverTaskSpawn.check(src, &ast);
     assert_eq!(hits.len(), 0);
 }
+
+#[test]
+fn redundant_bool_return_detected() {
+    let src = "if x > 5 then\n    return true\nelse\n    return false\nend";
+    let ast = parse(src);
+    let hits = RedundantBoolReturn.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn redundant_bool_return_inverse_detected() {
+    let src = "if x > 5 then\n    return false\nelse\n    return true\nend";
+    let ast = parse(src);
+    let hits = RedundantBoolReturn.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn normal_if_return_ok() {
+    let src = "if x > 5 then\n    return x\nelse\n    return nil\nend";
+    let ast = parse(src);
+    let hits = RedundantBoolReturn.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn if_return_true_no_else_ok() {
+    let src = "if x > 5 then\n    return true\nend";
+    let ast = parse(src);
+    let hits = RedundantBoolReturn.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}

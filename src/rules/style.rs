@@ -30,6 +30,7 @@ pub struct ErrorNoLevel;
 pub struct MatchForExistence;
 pub struct NestedStringFormat;
 pub struct CoroutineCreateOverTaskSpawn;
+pub struct RedundantBoolReturn;
 
 impl Rule for ServiceLocatorAntiPattern {
     fn id(&self) -> &'static str {
@@ -1078,6 +1079,43 @@ impl Rule for CoroutineCreateOverTaskSpawn {
                 });
             }
         });
+        hits
+    }
+}
+
+impl Rule for RedundantBoolReturn {
+    fn id(&self) -> &'static str {
+        "style::redundant_bool_return"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        let lines: Vec<&str> = source.lines().collect();
+        for (i, line) in lines.iter().enumerate() {
+            let trimmed = line.trim();
+            if !trimmed.starts_with("if ") || !trimmed.ends_with(" then") {
+                continue;
+            }
+            if i + 4 >= lines.len() {
+                continue;
+            }
+            let body1 = lines[i + 1].trim();
+            let else_line = lines[i + 2].trim();
+            let body2 = lines[i + 3].trim();
+            let end_line = lines[i + 4].trim();
+            if (body1 == "return true" && else_line == "else" && body2 == "return false" && end_line == "end")
+                || (body1 == "return false" && else_line == "else" && body2 == "return true" && end_line == "end")
+            {
+                let byte_pos: usize = lines[..i].iter().map(|l| l.len() + 1).sum();
+                hits.push(Hit {
+                    pos: byte_pos,
+                    msg: "if/else returning true/false - simplify to return <condition>".into(),
+                });
+            }
+        }
         hits
     }
 }

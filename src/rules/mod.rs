@@ -340,6 +340,7 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(style::MatchForExistence),
         Box::new(style::NestedStringFormat),
         Box::new(style::CoroutineCreateOverTaskSpawn),
+        Box::new(style::RedundantBoolReturn),
     ]
 }
 
@@ -1070,6 +1071,7 @@ fn explain_text(id: &str) -> &'static str {
         "string::split_empty_separator" => "string.split(s, \"\") splits a string into individual characters, allocating a table and a string per character. For character iteration, use string.byte(s, 1, -1) to get byte values, or a manual for i = 1, #s loop with string.sub/byte.",
         "roblox::get_descendants_in_heartbeat" => ":GetDescendants()/:GetChildren() in a RunService per-frame callback (Heartbeat, RenderStepped, Stepped) allocates a new table of all children/descendants every frame at 60Hz. Cache the list outside the callback and update it via ChildAdded/ChildRemoved events.",
         "table::table_insert_front_in_loop" => "table.insert(t, 1, value) in a loop shifts all existing elements right on each call - O(n) per insertion. Over m iterations, total cost is O(n*m). Append to the end with table.insert(t, v) and reverse after the loop, or use a different data structure.",
+        "style::redundant_bool_return" => "if condition then return true else return false end is equivalent to return condition. The simplified form is clearer and avoids unnecessary branching.",
 
         _ => "No detailed explanation available for this rule. Run --list-rules to see all rules.",
     }
