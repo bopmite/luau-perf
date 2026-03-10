@@ -1038,7 +1038,7 @@ fn fix_classname_over_isa(source: &str, pos: usize) -> Option<Fix> {
 
 fn fix_pairs_over_getchildren(source: &str, pos: usize) -> Option<Fix> {
     let rest = source.get(pos..)?;
-    let (func, func_len) = if rest.starts_with("ipairs(") {
+    let (_func, func_len) = if rest.starts_with("ipairs(") {
         ("ipairs(", "ipairs(".len())
     } else if rest.starts_with("pairs(") {
         ("pairs(", "pairs(".len())
