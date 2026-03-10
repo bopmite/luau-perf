@@ -749,7 +749,7 @@ impl Rule for WaitForChildChain {
         for pos in visit::find_pattern_positions(source, ":WaitForChild(") {
             let after_start = pos + ":WaitForChild(".len();
             let rest = &source[after_start..];
-            let close = match find_balanced_paren(rest) {
+            let close = match visit::find_balanced_paren(rest) {
                 Some(c) => c,
                 None => continue,
             };
@@ -763,23 +763,6 @@ impl Rule for WaitForChildChain {
         }
         hits
     }
-}
-
-fn find_balanced_paren(s: &str) -> Option<usize> {
-    let mut depth = 1u32;
-    for (i, c) in s.char_indices() {
-        match c {
-            '(' => depth += 1,
-            ')' => {
-                depth -= 1;
-                if depth == 0 {
-                    return Some(i);
-                }
-            }
-            _ => {}
-        }
-    }
-    None
 }
 
 #[cfg(test)]

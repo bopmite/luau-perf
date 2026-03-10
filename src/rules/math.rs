@@ -20,6 +20,7 @@ pub struct ExpOverPow;
 pub struct FloorRoundManual;
 pub struct MaxMinSingleArg;
 pub struct PowSlowExponent;
+pub struct FloorToMultiple;
 
 impl Rule for RandomDeprecated {
     fn id(&self) -> &'static str {
@@ -370,6 +371,11 @@ impl Rule for Vector3ZeroConstant {
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         for pos in visit::find_pattern_positions(source, "Vector3.new(") {
+            let line_start = source[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
+            let before = source[line_start..pos].trim();
+            if before.ends_with("Vector3.zero =") || before.ends_with("Vector3.one =") {
+                continue;
+            }
             let after = &source[pos + "Vector3.new(".len()..];
             let close = match after.find(')') {
                 Some(i) => i,
@@ -405,6 +411,11 @@ impl Rule for Vector2ZeroConstant {
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         for pos in visit::find_pattern_positions(source, "Vector2.new(") {
+            let line_start = source[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
+            let before = source[line_start..pos].trim();
+            if before.ends_with("Vector2.zero =") || before.ends_with("Vector2.one =") {
+                continue;
+            }
             let after = &source[pos + "Vector2.new(".len()..];
             let close = match after.find(')') {
                 Some(i) => i,
@@ -713,6 +724,50 @@ impl Rule for MaxMinSingleArg {
                 });
             }
         });
+        hits
+    }
+}
+
+impl Rule for FloorToMultiple {
+    fn id(&self) -> &'static str {
+        "math::floor_to_multiple"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        for pos in visit::find_pattern_positions(source, "math.floor(") {
+            let after = &source[pos + "math.floor(".len()..];
+            let close = match visit::find_balanced_paren(after) {
+                Some(i) => i,
+                None => continue,
+            };
+            let inner = after[..close].trim();
+            let slash = match inner.find('/') {
+                Some(i) => i,
+                None => continue,
+            };
+            let divisor = inner[slash + 1..].trim();
+            let end_of_expr = source[pos + "math.floor(".len() + close + 1..].trim_start();
+            if !end_of_expr.starts_with('*') {
+                continue;
+            }
+            let multiplier_src = end_of_expr[1..].trim_start();
+            let mult_end = multiplier_src
+                .find(|c: char| !c.is_alphanumeric() && c != '_' && c != '.')
+                .unwrap_or(multiplier_src.len());
+            let multiplier = &multiplier_src[..mult_end];
+            if !divisor.is_empty() && divisor == multiplier {
+                hits.push(Hit {
+                    pos,
+                    msg: format!(
+                        "math.floor(x / {divisor}) * {divisor} - use `x - x % {divisor}` (fewer operations, same result)"
+                    ),
+                });
+            }
+        }
         hits
     }
 }

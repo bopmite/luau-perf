@@ -498,3 +498,20 @@ pub fn ceil_char(s: &str, i: usize) -> usize {
     }
     i
 }
+
+pub fn find_balanced_paren(s: &str) -> Option<usize> {
+    let mut depth = 1u32;
+    for (i, c) in s.char_indices() {
+        match c {
+            '(' => depth += 1,
+            ')' => {
+                depth -= 1;
+                if depth == 0 {
+                    return Some(i);
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}

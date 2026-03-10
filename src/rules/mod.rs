@@ -207,6 +207,7 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(math::FloorRoundManual),
         Box::new(math::MaxMinSingleArg),
         Box::new(math::PowSlowExponent),
+        Box::new(math::FloorToMultiple),
         // string
         Box::new(string::LenOverHash),
         Box::new(string::RepInLoop),
@@ -881,7 +882,7 @@ fn explain_text(id: &str) -> &'static str {
         "memory::connect_in_connect" => ":Connect() inside another :Connect() callback creates a new inner connection every time the outer event fires. The inner connections are never disconnected, leaking memory.",
         "memory::character_added_no_cleanup" => "CharacterAdded fires on each respawn. Connections made to character descendants leak if not disconnected when the character is destroyed. Use CharacterRemoving or Destroying for cleanup.",
         "memory::heartbeat_allocation" => "Table/object allocation inside Heartbeat/RenderStepped callbacks runs at 60Hz, creating ~60 garbage tables per second. Pre-allocate outside the callback and reuse.",
-        "memory::circular_connection_ref" => "When a :Connect() callback captures a reference to the object whose event it listens to, it creates a cycle: Instance → Connection → Closure → Instance. Luau's GC can't collect cycles through C++ connections.",
+        "memory::circular_connection_ref" => "When a :Connect() callback captures a reference to the object whose event it listens to, it creates a cycle: Instance -> Connection -> Closure -> Instance. Luau's GC can't collect cycles through C++ connections.",
         "memory::weak_table_no_shrink" => "Weak tables (__mode = 'v' or 'k') don't shrink their internal array when entries are collected. Add 's' to the mode string (__mode = 'vs') to enable shrinking.",
         "memory::runservice_no_disconnect" => "RunService.Heartbeat/RenderStepped/Stepped:Connect() fires every frame. Without storing the connection, you can never :Disconnect() it, causing the callback to run forever.",
 
@@ -979,7 +980,8 @@ fn explain_text(id: &str) -> &'static str {
 
         // batch 1 additions
         "math::pow_two" => "math.pow(x, 2) is a function call. x * x is a single MUL instruction - faster and avoids call overhead. The VM has special-cased x^2 in POWK, but x * x is still clearer.",
-        "math::pow_slow_exponent" => "The Luau VM only fast-paths ^2 (x*x), ^0.5 (sqrt), and ^3 (x*x*x) in the POWK opcode. All other constant exponents call libc pow() which is ~50-100x slower. Common fixes: ^4 → local x2=x*x; x2*x2, ^(-1) → 1/x, ^0.25 → math.sqrt(math.sqrt(x)).",
+        "math::pow_slow_exponent" => "The Luau VM only fast-paths ^2 (x*x), ^0.5 (sqrt), and ^3 (x*x*x) in the POWK opcode. All other constant exponents call libc pow() which is ~50-100x slower. Common fixes: ^4 -> local x2=x*x; x2*x2, ^(-1) -> 1/x, ^0.25 -> math.sqrt(math.sqrt(x)).",
+        "math::floor_to_multiple" => "math.floor(x / step) * step rounds down to a multiple. The equivalent `x - x % step` achieves the same result with fewer operations (one modulo vs divide + floor + multiply).",
         "math::vector_normalize_manual" => "v / v.Magnitude manually normalizes a vector. v.Unit is a built-in property that computes the unit vector natively - no Lua-side division needed.",
         "math::unnecessary_tonumber" => "tonumber() on a numeric literal is a no-op. The value is already a number - remove the unnecessary function call.",
         "math::lerp_manual" => "a + (b - a) * t is a manual linear interpolation. Use Vector3:Lerp(target, alpha), CFrame:Lerp(target, alpha), or a dedicated lerp utility for clarity and potential optimization.",

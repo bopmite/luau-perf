@@ -174,6 +174,22 @@ fn vector3_nonzero_not_flagged() {
 }
 
 #[test]
+fn vector3_constant_definition_not_flagged() {
+    let src = "Vector3.one = Vector3.new(1, 1, 1)";
+    let ast = parse(src);
+    let hits = Vector3ZeroConstant.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn vector3_zero_definition_not_flagged() {
+    let src = "Vector3.zero = Vector3.new(0, 0, 0)";
+    let ast = parse(src);
+    let hits = Vector3ZeroConstant.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
 fn cframe_identity_detected() {
     let src = "local cf = CFrame.new()";
     let ast = parse(src);
@@ -246,6 +262,14 @@ fn vector2_other_not_flagged() {
 }
 
 #[test]
+fn vector2_constant_definition_not_flagged() {
+    let src = "Vector2.one = Vector2.new(1, 1)";
+    let ast = parse(src);
+    let hits = Vector2ZeroConstant.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
 fn floor_round_manual_detected() {
     let src = "local rounded = math.floor(health + 0.5)";
     let ast = parse(src);
@@ -306,5 +330,29 @@ fn pow_fast_exponents_ok() {
     let src = "local a = x ^ 2\nlocal b = x ^ 0.5\nlocal c = x ^ 3";
     let ast = parse(src);
     let hits = PowSlowExponent.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn floor_to_multiple_detected() {
+    let src = "local snapped = math.floor(x / step) * step";
+    let ast = parse(src);
+    let hits = FloorToMultiple.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn floor_to_multiple_different_vars_ok() {
+    let src = "local v = math.floor(x / a) * b";
+    let ast = parse(src);
+    let hits = FloorToMultiple.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn floor_no_multiply_ok() {
+    let src = "local v = math.floor(x / step)";
+    let ast = parse(src);
+    let hits = FloorToMultiple.check(src, &ast);
     assert_eq!(hits.len(), 0);
 }

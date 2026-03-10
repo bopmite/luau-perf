@@ -688,8 +688,7 @@ fn fix_random_deprecated(source: &str, pos: usize) -> Option<Fix> {
             replacement: format!("Random.new():NextInteger(1, {args})"),
         });
     }
-    if slice.starts_with("math.randomseed(") {
-        let after = &slice["math.randomseed(".len()..];
+    if let Some(after) = slice.strip_prefix("math.randomseed(") {
         let mut depth = 1i32;
         let mut close = None;
         for (i, c) in after.char_indices() {
