@@ -749,6 +749,7 @@ pub fn is_fixable(id: &str) -> bool {
             | "roblox::deprecated_lowercase_method"
             | "style::next_comma_iteration"
             | "roblox::deprecated_userid"
+            | "roblox::direct_service_access"
     )
 }
 

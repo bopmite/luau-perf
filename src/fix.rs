@@ -62,6 +62,7 @@ pub fn compute_fix(rule_id: &str, source: &str, pos: usize) -> Option<Fix> {
         "roblox::deprecated_lowercase_method" => fix_deprecated_lowercase_method(source, pos),
         "style::next_comma_iteration" => fix_next_comma_iteration(source, pos),
         "roblox::deprecated_userid" => fix_deprecated_userid(source, pos),
+        "roblox::direct_service_access" => fix_direct_service_access(source, pos),
         _ => None,
     }
 }
@@ -1480,6 +1481,26 @@ fn fix_deprecated_lowercase_method(source: &str, pos: usize) -> Option<Fix> {
         }
     }
     None
+}
+
+fn fix_direct_service_access(source: &str, pos: usize) -> Option<Fix> {
+    if source.get(pos..pos + 5) != Some("game.") {
+        return None;
+    }
+    let after_dot = pos + 5;
+    let end = source[after_dot..]
+        .find(|c: char| !c.is_ascii_alphanumeric() && c != '_')
+        .map(|i| after_dot + i)
+        .unwrap_or(source.len());
+    let service = &source[after_dot..end];
+    if service.is_empty() {
+        return None;
+    }
+    Some(Fix {
+        start: pos,
+        end,
+        replacement: format!("game:GetService(\"{service}\")"),
+    })
 }
 
 fn fix_deprecated_userid(source: &str, pos: usize) -> Option<Fix> {

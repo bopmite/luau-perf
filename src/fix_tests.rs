@@ -882,3 +882,23 @@ fn test_fix_deprecated_userid_in_expression() {
     result.replace_range(fix.start..fix.end, &fix.replacement);
     assert_eq!(result, r#"store:SetAsync("key" .. Player.UserId, data)"#);
 }
+
+#[test]
+fn test_fix_direct_service_access() {
+    let src = "game.HttpService:JSONEncode(data)";
+    let pos = 0;
+    let fix = compute_fix("roblox::direct_service_access", src, pos).unwrap();
+    let mut result = src.to_string();
+    result.replace_range(fix.start..fix.end, &fix.replacement);
+    assert_eq!(result, r#"game:GetService("HttpService"):JSONEncode(data)"#);
+}
+
+#[test]
+fn test_fix_direct_service_access_debris() {
+    let src = "game.Debris:AddItem(part, 5)";
+    let pos = 0;
+    let fix = compute_fix("roblox::direct_service_access", src, pos).unwrap();
+    let mut result = src.to_string();
+    result.replace_range(fix.start..fix.end, &fix.replacement);
+    assert_eq!(result, r#"game:GetService("Debris"):AddItem(part, 5)"#);
+}
