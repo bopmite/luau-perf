@@ -182,3 +182,51 @@ fn isa_ok() {
     let hits = ClassNameOverIsA.check(src, &ast);
     assert_eq!(hits.len(), 0);
 }
+
+#[test]
+fn pairs_over_getchildren_detected() {
+    let src = "for i, child in pairs(folder:GetChildren()) do end";
+    let ast = parse(src);
+    let hits = PairsOverGetChildren.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn ipairs_over_getchildren_detected() {
+    let src = "for i, child in ipairs(folder:GetChildren()) do end";
+    let ast = parse(src);
+    let hits = PairsOverGetChildren.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn pairs_over_getdescendants_detected() {
+    let src = "for _, desc in pairs(model:GetDescendants()) do end";
+    let ast = parse(src);
+    let hits = PairsOverGetChildren.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn getchildren_direct_ok() {
+    let src = "for i, child in folder:GetChildren() do end";
+    let ast = parse(src);
+    let hits = PairsOverGetChildren.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn wait_for_child_chain_detected() {
+    let src = "local gun = player:WaitForChild(\"Backpack\"):WaitForChild(\"Gun\")";
+    let ast = parse(src);
+    let hits = WaitForChildChain.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn single_wait_for_child_ok() {
+    let src = "local backpack = player:WaitForChild(\"Backpack\")";
+    let ast = parse(src);
+    let hits = WaitForChildChain.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}

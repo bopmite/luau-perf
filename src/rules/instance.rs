@@ -14,6 +14,8 @@ pub struct NameIndexingInLoop;
 pub struct DestroyInLoop;
 pub struct GetChildrenInLoop;
 pub struct ClassNameOverIsA;
+pub struct PairsOverGetChildren;
+pub struct WaitForChildChain;
 
 impl Rule for TwoArgInstanceNew {
     fn id(&self) -> &'static str {
@@ -691,6 +693,93 @@ impl Rule for ClassNameOverIsA {
         }
         hits
     }
+}
+
+impl Rule for PairsOverGetChildren {
+    fn id(&self) -> &'static str {
+        "instance::pairs_over_getchildren"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        let suffixes = [":GetChildren())", ":GetDescendants())"];
+        for suffix in &suffixes {
+            for pos in visit::find_pattern_positions(source, suffix) {
+                let before = &source[..pos];
+                let line_start = before.rfind('\n').map(|i| i + 1).unwrap_or(0);
+                let line_before = &source[line_start..pos];
+                let func = if line_before.contains("ipairs(") {
+                    "ipairs"
+                } else if line_before.contains("pairs(") {
+                    "pairs"
+                } else {
+                    continue;
+                };
+                let method = if suffix.contains("GetDescendants") {
+                    "GetDescendants()"
+                } else {
+                    "GetChildren()"
+                };
+                let func_pos = source[line_start..pos].rfind(func).unwrap_or(0) + line_start;
+                hits.push(Hit {
+                    pos: func_pos,
+                    msg: format!(
+                        "{func}() around :{method} is unnecessary - use generalized iteration directly"
+                    ),
+                });
+            }
+        }
+        hits
+    }
+}
+
+impl Rule for WaitForChildChain {
+    fn id(&self) -> &'static str {
+        "instance::wait_for_child_chain"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        for pos in visit::find_pattern_positions(source, ":WaitForChild(") {
+            let after_start = pos + ":WaitForChild(".len();
+            let rest = &source[after_start..];
+            let close = match find_balanced_paren(rest) {
+                Some(c) => c,
+                None => continue,
+            };
+            let after_close = &source[after_start + close + 1..];
+            if after_close.starts_with(":WaitForChild(") {
+                hits.push(Hit {
+                    pos,
+                    msg: "chained :WaitForChild() calls - each yields independently; use a single FindFirstChild path or cache intermediate references".into(),
+                });
+            }
+        }
+        hits
+    }
+}
+
+fn find_balanced_paren(s: &str) -> Option<usize> {
+    let mut depth = 1u32;
+    for (i, c) in s.char_indices() {
+        match c {
+            '(' => depth += 1,
+            ')' => {
+                depth -= 1;
+                if depth == 0 {
+                    return Some(i);
+                }
+            }
+            _ => {}
+        }
+    }
+    None
 }
 
 #[cfg(test)]

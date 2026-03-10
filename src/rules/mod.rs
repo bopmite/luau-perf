@@ -313,6 +313,8 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(instance::DestroyInLoop),
         Box::new(instance::GetChildrenInLoop),
         Box::new(instance::ClassNameOverIsA),
+        Box::new(instance::PairsOverGetChildren),
+        Box::new(instance::WaitForChildChain),
         // style
         Box::new(style::ServiceLocatorAntiPattern),
         Box::new(style::EmptyFunctionBody),
@@ -585,6 +587,8 @@ pub fn rule_level(id: &str) -> crate::lint::Level {
         | "instance::destroy_in_loop"
         | "instance::get_children_in_loop"
         | "instance::classname_over_isa"
+        | "instance::pairs_over_getchildren"
+        | "instance::wait_for_child_chain"
 
         // physics
         | "physics::spatial_query_in_loop"
@@ -1078,6 +1082,8 @@ fn explain_text(id: &str) -> &'static str {
         "style::redundant_bool_return" => "if condition then return true else return false end is equivalent to return condition. The simplified form is clearer and avoids unnecessary branching.",
         "instance::classname_over_isa" => ".ClassName == \"Part\" only matches the exact class, not subclasses. :IsA(\"Part\") correctly handles inheritance - MeshPart, WedgePart, etc. are all BaseParts. :IsA() is also a native C++ method that avoids Lua string comparison.",
         "style::redundant_nil_check" => "FindFirstChild() and similar methods return nil when no match is found. Comparing the result to nil (~= nil or == nil) is redundant since nil is already falsy in Luau. Just use if obj:FindFirstChild(\"X\") then directly.",
+        "instance::pairs_over_getchildren" => "pairs(obj:GetChildren()) and ipairs(obj:GetChildren()) wrap an already-iterable table in an unnecessary function call. Luau generalized iteration handles tables directly - just use for i, child in obj:GetChildren() do.",
+        "instance::wait_for_child_chain" => "Chained :WaitForChild() calls like parent:WaitForChild(\"A\"):WaitForChild(\"B\") yield independently on each call. If the first child exists but the second doesn't, this silently hangs. Cache intermediate references and handle nil checks.",
 
         _ => "No detailed explanation available for this rule. Run --list-rules to see all rules.",
     }
