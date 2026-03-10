@@ -945,14 +945,22 @@ impl Rule for UnnecessaryClosure {
             let mut matched_wrapper = None;
             for w in &wrappers {
                 if trimmed.contains(w) {
-                    matched_wrapper = Some(&w[..w.len() - 11]);
+                    matched_wrapper = Some(*w);
                     break;
                 }
             }
-            let wrapper = match matched_wrapper {
+            let full_wrapper = match matched_wrapper {
                 Some(w) => w,
                 None => continue,
             };
+            let wrapper = &full_wrapper[..full_wrapper.len() - 11];
+
+            if let Some(after_idx) = trimmed.find(full_wrapper) {
+                let after = trimmed[after_idx + full_wrapper.len()..].trim();
+                if !after.is_empty() && !after.starts_with("--") {
+                    continue;
+                }
+            }
 
             let j = match Self::next_code_line(&lines, i + 1) {
                 Some(j) => j,

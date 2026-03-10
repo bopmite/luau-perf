@@ -1,6 +1,31 @@
 use crate::lint::{Hit, Rule, Severity};
 use crate::visit;
 
+fn is_flatten_pattern(source: &str, pos: usize) -> bool {
+    let after = &source[pos..];
+    let do_idx = match after.find(" do\n").or_else(|| after.find(" do\r\n")) {
+        Some(i) => i,
+        None => return false,
+    };
+    let body_start = do_idx + " do\n".len();
+    let remaining = &after[body_start..];
+    let end_idx = match remaining.find("\n") {
+        Some(first_newline) => {
+            let after_first = &remaining[first_newline + 1..];
+            let next_line = after_first.lines().next().unwrap_or("");
+            let next_trimmed = next_line.trim();
+            if next_trimmed == "end" || next_trimmed.starts_with("end)") {
+                first_newline
+            } else {
+                return false;
+            }
+        }
+        None => return false,
+    };
+    let body_line = remaining[..end_idx].trim();
+    body_line.starts_with("table.insert(") || body_line.ends_with("[#") || body_line.contains("] = ")
+}
+
 fn is_structured_traversal(source: &str, pos: usize) -> bool {
     let before = &source[..pos];
     let inner_line_start = before.rfind('\n').map(|i| i + 1).unwrap_or(0);
@@ -365,6 +390,9 @@ impl Rule for PairsInPairs {
                 if is_iter {
                     let pos = visit::call_pos(call);
                     if is_structured_traversal(source, pos) {
+                        return;
+                    }
+                    if is_flatten_pattern(source, pos) {
                         return;
                     }
                     hits.push(Hit {

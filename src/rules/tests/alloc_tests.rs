@@ -335,3 +335,27 @@ fn unnecessary_closure_dotted_call_detected() {
     let hits = UnnecessaryClosure.check(src, &ast);
     assert_eq!(hits.len(), 1);
 }
+
+#[test]
+fn unnecessary_closure_single_call_detected() {
+    let src = "task.spawn(function()\n  doSomething()\nend)";
+    let ast = parse(src);
+    let hits = UnnecessaryClosure.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn unnecessary_closure_code_on_wrapper_line_not_flagged() {
+    let src = "task.spawn(function()  loadBaseAvatar()\n  populateAllViewports()\nend)";
+    let ast = parse(src);
+    let hits = UnnecessaryClosure.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn unnecessary_closure_multi_statement_not_flagged() {
+    let src = "pcall(function()\n  local x = getValue()\n  process(x)\nend)";
+    let ast = parse(src);
+    let hits = UnnecessaryClosure.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}

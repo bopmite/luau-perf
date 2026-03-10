@@ -126,6 +126,14 @@ fn pairs_structured_traversal_ok() {
 }
 
 #[test]
+fn pairs_flatten_table_insert_ok() {
+    let src = "for _, list in ipairs(lists) do\n  for _, item in ipairs(list) do\n    table.insert(result, item)\n  end\nend";
+    let ast = parse(src);
+    let hits = PairsInPairs.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
 fn pairs_in_numeric_for_ok() {
     let src = "for i = 1, select(\"#\", ...) do\n  for k, v in pairs(sources[i]) do\n    t[k] = v\n  end\nend";
     let ast = parse(src);
