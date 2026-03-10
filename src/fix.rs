@@ -53,6 +53,8 @@ pub fn compute_fix(rule_id: &str, source: &str, pos: usize) -> Option<Fix> {
         "math::pow_two" => fix_pow_two(source, pos),
         "table::pairs_over_generalized" => fix_pairs_over_generalized(source, pos),
         "instance::classname_over_isa" => fix_classname_over_isa(source, pos),
+        "instance::pairs_over_getchildren" => fix_pairs_over_getchildren(source, pos),
+        "style::redundant_nil_check" => fix_redundant_nil_check(source, pos),
         _ => None,
     }
 }
@@ -1032,6 +1034,73 @@ fn fix_classname_over_isa(source: &str, pos: usize) -> Option<Fix> {
         end,
         replacement: format!("{prefix}{var}:IsA({quote}{class_name}{quote})"),
     })
+}
+
+fn fix_pairs_over_getchildren(source: &str, pos: usize) -> Option<Fix> {
+    let rest = source.get(pos..)?;
+    let (func, func_len) = if rest.starts_with("ipairs(") {
+        ("ipairs(", "ipairs(".len())
+    } else if rest.starts_with("pairs(") {
+        ("pairs(", "pairs(".len())
+    } else {
+        return None;
+    };
+    let after = &rest[func_len..];
+    let mut depth = 1u32;
+    let mut close = None;
+    for (i, c) in after.char_indices() {
+        match c {
+            '(' => depth += 1,
+            ')' => {
+                depth -= 1;
+                if depth == 0 {
+                    close = Some(i);
+                    break;
+                }
+            }
+            _ => {}
+        }
+    }
+    let close = close?;
+    let inner = &after[..close];
+    Some(Fix {
+        start: pos,
+        end: pos + func_len + close + 1,
+        replacement: inner.to_string(),
+    })
+}
+
+fn fix_redundant_nil_check(source: &str, pos: usize) -> Option<Fix> {
+    let line_start = source[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
+    let line_end = source[pos..].find('\n').map(|i| pos + i).unwrap_or(source.len());
+    let line = &source[line_start..line_end];
+    if let Some(idx) = line.find(" ~= nil") {
+        Some(Fix {
+            start: line_start + idx,
+            end: line_start + idx + " ~= nil".len(),
+            replacement: String::new(),
+        })
+    } else if let Some(idx) = line.find(" == nil") {
+        let before_eq = &line[..idx];
+        let mut depth = 0i32;
+        let mut expr_start = 0;
+        for (i, c) in before_eq.char_indices() {
+            match c {
+                '(' => depth += 1,
+                ')' => depth -= 1,
+                ' ' | '\t' if depth == 0 => expr_start = i + 1,
+                _ => {}
+            }
+        }
+        let expr = &line[expr_start..idx];
+        Some(Fix {
+            start: line_start + expr_start,
+            end: line_start + idx + " == nil".len(),
+            replacement: format!("not {expr}"),
+        })
+    } else {
+        None
+    }
 }
 
 fn fix_pairs_over_generalized(source: &str, pos: usize) -> Option<Fix> {

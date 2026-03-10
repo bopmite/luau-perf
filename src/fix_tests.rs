@@ -640,3 +640,39 @@ fn test_fix_pairs_nested_call() {
     result.replace_range(fix.start..fix.end, &fix.replacement);
     assert_eq!(result, "for k, v in getTable() do");
 }
+
+#[test]
+fn test_fix_pairs_over_getchildren() {
+    let src = "for i, child in pairs(folder:GetChildren()) do end";
+    let fix = compute_fix("instance::pairs_over_getchildren", src, 16).unwrap();
+    let mut result = src.to_string();
+    result.replace_range(fix.start..fix.end, &fix.replacement);
+    assert_eq!(result, "for i, child in folder:GetChildren() do end");
+}
+
+#[test]
+fn test_fix_ipairs_over_getchildren() {
+    let src = "for i, child in ipairs(folder:GetChildren()) do end";
+    let fix = compute_fix("instance::pairs_over_getchildren", src, 16).unwrap();
+    let mut result = src.to_string();
+    result.replace_range(fix.start..fix.end, &fix.replacement);
+    assert_eq!(result, "for i, child in folder:GetChildren() do end");
+}
+
+#[test]
+fn test_fix_redundant_nil_neq() {
+    let src = "if parent:FindFirstChild(\"Name\") ~= nil then end";
+    let fix = compute_fix("style::redundant_nil_check", src, 3).unwrap();
+    let mut result = src.to_string();
+    result.replace_range(fix.start..fix.end, &fix.replacement);
+    assert_eq!(result, "if parent:FindFirstChild(\"Name\") then end");
+}
+
+#[test]
+fn test_fix_redundant_nil_eq() {
+    let src = "if parent:FindFirstChild(\"Name\") == nil then end";
+    let fix = compute_fix("style::redundant_nil_check", src, 3).unwrap();
+    let mut result = src.to_string();
+    result.replace_range(fix.start..fix.end, &fix.replacement);
+    assert_eq!(result, "if not parent:FindFirstChild(\"Name\") then end");
+}

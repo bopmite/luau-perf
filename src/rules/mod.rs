@@ -729,6 +729,8 @@ pub fn is_fixable(id: &str) -> bool {
             | "math::pow_two"
             | "table::pairs_over_generalized"
             | "instance::classname_over_isa"
+            | "instance::pairs_over_getchildren"
+            | "style::redundant_nil_check"
     )
 }
 
