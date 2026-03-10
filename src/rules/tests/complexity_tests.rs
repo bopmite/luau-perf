@@ -190,6 +190,34 @@ fn datastore_xpcall_closure_ok() {
 }
 
 #[test]
+fn datastore_large_pcall_closure_ok() {
+    let mut src = String::from("pcall(function()\n");
+    for i in 0..50 {
+        src.push_str(&format!("    local x{i} = compute({i})\n"));
+    }
+    src.push_str("    dataStore:UpdateAsync(key, function(old)\n        return old + 1\n    end)\nend)");
+    let ast = parse(&src);
+    let hits = DataStoreNoPcall.check(&src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn datastore_nested_calls_in_pcall_ok() {
+    let src = "pcall(function()\n    local ds = DataStoreService:GetDataStore(\"test\")\n    ds:GetAsync(\"key\")\nend)";
+    let ast = parse(src);
+    let hits = DataStoreNoPcall.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn datastore_pcall_two_lines_above_ok() {
+    let src = "pcall(function()\n    -- comment\n    dataStore:SetAsync(key, value)\nend)";
+    let ast = parse(src);
+    let hits = DataStoreNoPcall.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
 fn datastore_mock_file_skipped() {
     let rule = DataStoreNoPcall;
     assert!(rule.skip_path(std::path::Path::new("MockDataStore.lua")));

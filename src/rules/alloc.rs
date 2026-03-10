@@ -936,8 +936,21 @@ impl Rule for UnnecessaryClosure {
             "task.spawn(function()",
         ];
 
+        let mut in_block_comment = false;
         for (i, line) in lines.iter().enumerate() {
             let trimmed = line.trim();
+            if in_block_comment {
+                if trimmed.contains("]=]") || trimmed.contains("]]") {
+                    in_block_comment = false;
+                }
+                continue;
+            }
+            if trimmed.starts_with("--[") && (trimmed.contains("--[=[") || trimmed.contains("--[[")) {
+                if !trimmed.contains("]=]") && !trimmed.contains("]]") {
+                    in_block_comment = true;
+                }
+                continue;
+            }
             if trimmed.starts_with("--") {
                 continue;
             }

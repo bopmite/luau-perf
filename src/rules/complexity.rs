@@ -474,20 +474,26 @@ impl Rule for DataStoreNoPcall {
                 if line.contains("pcall(") || line.contains("xpcall(") || line.contains("pcall ") {
                     continue;
                 }
-                let prev_line_start = if line_start > 1 {
-                    source[..line_start - 1]
+                let mut scan = line_start;
+                for _ in 0..3 {
+                    if scan == 0 {
+                        break;
+                    }
+                    let prev_start = source[..scan.saturating_sub(1)]
                         .rfind('\n')
                         .map(|i| i + 1)
-                        .unwrap_or(0)
-                } else {
-                    0
-                };
-                let prev_line = &source[prev_line_start..line_start];
-                if prev_line.contains("pcall(") || prev_line.contains("xpcall(") {
+                        .unwrap_or(0);
+                    let prev = &source[prev_start..scan];
+                    if prev.contains("pcall(") || prev.contains("xpcall(") {
+                        scan = 0;
+                        break;
+                    }
+                    scan = prev_start;
+                }
+                if scan == 0 && line_start > 0 {
                     continue;
                 }
-                let context = &source[before_start..pos];
-                if self.is_inside_pcall_closure(context) {
+                if Self::is_inside_pcall_closure(&source[..pos]) {
                     continue;
                 }
                 hits.push(Hit {
@@ -501,28 +507,26 @@ impl Rule for DataStoreNoPcall {
 }
 
 impl DataStoreNoPcall {
-    fn is_inside_pcall_closure(&self, before: &str) -> bool {
+    fn is_inside_pcall_closure(before: &str) -> bool {
+        let lines: Vec<&str> = before.lines().collect();
         let mut depth: i32 = 0;
-        let bytes = before.as_bytes();
-        let len = bytes.len();
-        let mut i = len;
-        while i > 0 {
-            i -= 1;
-            if bytes[i] == b')' {
-                depth += 1;
-            } else if bytes[i] == b'(' {
-                depth -= 1;
-                if depth < 0 {
-                    let preceding = before[..i].trim_end();
-                    if preceding.ends_with("function") {
-                        let fn_start = preceding.len() - "function".len();
-                        let before_fn = preceding[..fn_start].trim_end();
-                        if before_fn.ends_with("pcall(") || before_fn.ends_with("xpcall(") {
-                            return true;
-                        }
-                    }
-                    return false;
+        for line in lines.iter().rev() {
+            let trimmed = line.trim();
+            if trimmed.starts_with("--") {
+                continue;
+            }
+            for ch in trimmed.chars().rev() {
+                match ch {
+                    ')' => depth += 1,
+                    '(' => depth -= 1,
+                    _ => {}
                 }
+            }
+            if depth < 0 {
+                if trimmed.contains("pcall(function") || trimmed.contains("xpcall(function") {
+                    return true;
+                }
+                return false;
             }
         }
         false

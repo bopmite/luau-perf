@@ -359,3 +359,11 @@ fn unnecessary_closure_multi_statement_not_flagged() {
     let hits = UnnecessaryClosure.check(src, &ast);
     assert_eq!(hits.len(), 0);
 }
+
+#[test]
+fn unnecessary_closure_in_block_comment_not_flagged() {
+    let src = "--[=[\npcall(function()\n  doWork()\nend)\n]=]";
+    let ast = parse(src);
+    let hits = UnnecessaryClosure.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
