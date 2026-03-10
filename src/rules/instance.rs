@@ -61,7 +61,11 @@ impl Rule for PropertyChangeSignalWrong {
             "RayValue",
         ];
         let mut hits = Vec::new();
-        for pos in visit::find_pattern_positions(source, ".Changed:Connect") {
+        let mut positions = visit::find_pattern_positions(source, ".Changed:Connect");
+        positions.extend(visit::find_pattern_positions(source, ".Changed:connect"));
+        positions.sort_unstable();
+        positions.dedup();
+        for pos in positions {
             let before = &source[..pos];
             if before.ends_with("GetPropertyChangedSignal") || before.ends_with("Humanoid") {
                 continue;
@@ -396,7 +400,11 @@ impl Rule for ChangedOnMovingPart {
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
-        for pos in visit::find_pattern_positions(source, ".Changed:Connect") {
+        let mut positions = visit::find_pattern_positions(source, ".Changed:Connect");
+        positions.extend(visit::find_pattern_positions(source, ".Changed:connect"));
+        positions.sort_unstable();
+        positions.dedup();
+        for pos in positions {
             let before = &source[..pos];
             let word_start = before
                 .rfind(|c: char| !c.is_alphanumeric() && c != '_' && c != '.')

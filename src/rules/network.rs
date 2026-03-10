@@ -241,8 +241,11 @@ impl Rule for DictKeysInRemoteData {
                     let callback_check =
                         &source[visit::floor_char_boundary(source, pos.saturating_sub(200))..pos];
                     if callback_check.contains("Heartbeat:Connect")
+                        || callback_check.contains("Heartbeat:connect")
                         || callback_check.contains("RenderStepped:Connect")
+                        || callback_check.contains("RenderStepped:connect")
                         || callback_check.contains("Stepped:Connect")
+                        || callback_check.contains("Stepped:connect")
                     {
                         hits.push(Hit {
                             pos,
@@ -272,8 +275,11 @@ impl Rule for UnreliableRemotePreferred {
                 let before =
                     &source[visit::floor_char_boundary(source, pos.saturating_sub(300))..pos];
                 let is_in_heartbeat = before.contains("Heartbeat:Connect")
+                    || before.contains("Heartbeat:connect")
                     || before.contains("RenderStepped:Connect")
-                    || before.contains("Stepped:Connect");
+                    || before.contains("RenderStepped:connect")
+                    || before.contains("Stepped:Connect")
+                    || before.contains("Stepped:connect");
                 if is_in_heartbeat {
                     let line_start = source[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
                     let line = &source[line_start..pos];

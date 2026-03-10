@@ -332,8 +332,11 @@ impl Rule for GuiPropertyInHeartbeat {
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let signals = [
             "Heartbeat:Connect(",
+            "Heartbeat:connect(",
             "RenderStepped:Connect(",
+            "RenderStepped:connect(",
             "Stepped:Connect(",
+            "Stepped:connect(",
         ];
         let mut connect_positions: Vec<usize> = Vec::new();
         for sig in &signals {

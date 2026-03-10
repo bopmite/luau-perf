@@ -432,8 +432,11 @@ impl Rule for SpatialQueryPerFrame {
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let connect_patterns = [
             "Heartbeat:Connect(",
+            "Heartbeat:connect(",
             "RenderStepped:Connect(",
+            "RenderStepped:connect(",
             ".Stepped:Connect(",
+            ".Stepped:connect(",
         ];
         let spatial_methods = [
             ":Raycast(",
