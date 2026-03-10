@@ -743,6 +743,12 @@ impl Rule for CircularConnectionRef {
                 let mut matched = false;
                 for &kw in &words {
                     if remaining.starts_with(kw) {
+                        let before_ok = i == 0
+                            || !body_src.as_bytes()[i - 1].is_ascii_alphanumeric()
+                                && body_src.as_bytes()[i - 1] != b'_';
+                        if !before_ok {
+                            continue;
+                        }
                         let after_kw = remaining.get(kw.len()..kw.len() + 1).unwrap_or(" ");
                         let is_boundary = after_kw
                             .chars()
