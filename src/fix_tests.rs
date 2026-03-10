@@ -681,6 +681,42 @@ fn test_fix_redundant_nil_eq() {
 }
 
 #[test]
+fn test_fix_random_no_args() {
+    let src = "math.random()";
+    let fix = compute_fix("math::random_deprecated", src, 0).unwrap();
+    let mut result = src.to_string();
+    result.replace_range(fix.start..fix.end, &fix.replacement);
+    assert_eq!(result, "Random.new():NextNumber()");
+}
+
+#[test]
+fn test_fix_random_two_args() {
+    let src = "math.random(1, 10)";
+    let fix = compute_fix("math::random_deprecated", src, 0).unwrap();
+    let mut result = src.to_string();
+    result.replace_range(fix.start..fix.end, &fix.replacement);
+    assert_eq!(result, "Random.new():NextInteger(1, 10)");
+}
+
+#[test]
+fn test_fix_random_one_arg() {
+    let src = "math.random(100)";
+    let fix = compute_fix("math::random_deprecated", src, 0).unwrap();
+    let mut result = src.to_string();
+    result.replace_range(fix.start..fix.end, &fix.replacement);
+    assert_eq!(result, "Random.new():NextInteger(1, 100)");
+}
+
+#[test]
+fn test_fix_randomseed_simple() {
+    let src = "math.randomseed(42)";
+    let fix = compute_fix("math::random_deprecated", src, 0).unwrap();
+    let mut result = src.to_string();
+    result.replace_range(fix.start..fix.end, &fix.replacement);
+    assert_eq!(result, "");
+}
+
+#[test]
 fn test_fix_randomseed_nested_parens() {
     let src = "math.randomseed(os.time())";
     let fix = compute_fix("math::random_deprecated", src, 0).unwrap();
