@@ -32,6 +32,7 @@ pub struct NestedStringFormat;
 pub struct CoroutineCreateOverTaskSpawn;
 pub struct RedundantBoolReturn;
 pub struct RedundantNilCheck;
+pub struct PairsDiscardValue;
 
 impl Rule for ServiceLocatorAntiPattern {
     fn id(&self) -> &'static str {
@@ -1158,6 +1159,40 @@ impl Rule for RedundantNilCheck {
                 hits.push(Hit {
                     pos,
                     msg: "FindFirstChild result already returns nil on failure - the ~= nil / == nil comparison is redundant".into(),
+                });
+            }
+        }
+        hits
+    }
+}
+
+impl Rule for PairsDiscardValue {
+    fn id(&self) -> &'static str {
+        "style::pairs_discard_value"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        for pos in visit::find_pattern_positions(source, ", _ in pairs(") {
+            let line_start = source[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
+            let before = source[line_start..pos].trim();
+            if before.starts_with("for ") {
+                hits.push(Hit {
+                    pos: line_start + source[line_start..].find("for ").unwrap_or(0),
+                    msg: "for k, _ in pairs(t) - omit unused value: for k in pairs(t)".into(),
+                });
+            }
+        }
+        for pos in visit::find_pattern_positions(source, ", _ in ipairs(") {
+            let line_start = source[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
+            let before = source[line_start..pos].trim();
+            if before.starts_with("for ") {
+                hits.push(Hit {
+                    pos: line_start + source[line_start..].find("for ").unwrap_or(0),
+                    msg: "for i, _ in ipairs(t) - omit unused value: for i in ipairs(t)".into(),
                 });
             }
         }

@@ -347,6 +347,7 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(style::CoroutineCreateOverTaskSpawn),
         Box::new(style::RedundantBoolReturn),
         Box::new(style::RedundantNilCheck),
+        Box::new(style::PairsDiscardValue),
     ]
 }
 
@@ -737,6 +738,7 @@ pub fn is_fixable(id: &str) -> bool {
             | "style::redundant_nil_check"
             | "math::floor_to_multiple"
             | "style::redundant_bool_return"
+            | "style::pairs_discard_value"
     )
 }
 
@@ -1092,6 +1094,7 @@ fn explain_text(id: &str) -> &'static str {
         "style::redundant_bool_return" => "if condition then return true else return false end is equivalent to return condition. The simplified form is clearer and avoids unnecessary branching.",
         "instance::classname_over_isa" => ".ClassName == \"Part\" only matches the exact class, not subclasses. :IsA(\"Part\") correctly handles inheritance - MeshPart, WedgePart, etc. are all BaseParts. :IsA() is also a native C++ method that avoids Lua string comparison.",
         "style::redundant_nil_check" => "FindFirstChild() and similar methods return nil when no match is found. Comparing the result to nil (~= nil or == nil) is redundant since nil is already falsy in Luau. Just use if obj:FindFirstChild(\"X\") then directly.",
+        "style::pairs_discard_value" => "for k, _ in pairs(t) captures a value that is immediately discarded. Luau allows omitting unused loop variables - use `for k in pairs(t)` instead. Cleaner and avoids the unused variable binding.",
         "instance::pairs_over_getchildren" => "pairs(obj:GetChildren()) and ipairs(obj:GetChildren()) wrap an already-iterable table in an unnecessary function call. Luau generalized iteration handles tables directly - just use for i, child in obj:GetChildren() do.",
         "instance::wait_for_child_chain" => "Chained :WaitForChild() calls like parent:WaitForChild(\"A\"):WaitForChild(\"B\") yield independently on each call. If the first child exists but the second doesn't, this silently hangs. Cache intermediate references and handle nil checks.",
 

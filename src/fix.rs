@@ -58,6 +58,7 @@ pub fn compute_fix(rule_id: &str, source: &str, pos: usize) -> Option<Fix> {
         "style::redundant_nil_check" => fix_redundant_nil_check(source, pos),
         "math::floor_to_multiple" => fix_floor_to_multiple(source, pos),
         "style::redundant_bool_return" => fix_redundant_bool_return(source, pos),
+        "style::pairs_discard_value" => fix_pairs_discard_value(source, pos),
         _ => None,
     }
 }
@@ -1334,6 +1335,24 @@ fn fix_tostring_on_string(source: &str, pos: usize) -> Option<Fix> {
         start: pos,
         end,
         replacement: literal.to_string(),
+    })
+}
+
+fn fix_pairs_discard_value(source: &str, pos: usize) -> Option<Fix> {
+    let slice = source.get(pos..)?;
+    let trimmed = slice.trim_start();
+    if !trimmed.starts_with("for ") {
+        return None;
+    }
+    let for_offset = slice.len() - trimmed.len();
+    let rest = &trimmed["for ".len()..];
+    let discard = rest.find(", _ in ")?;
+    let start = pos + for_offset + "for ".len() + discard;
+    let end = start + ", _".len();
+    Some(Fix {
+        start,
+        end,
+        replacement: String::new(),
     })
 }
 

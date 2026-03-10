@@ -400,3 +400,27 @@ fn nil_check_in_return_not_flagged() {
     let hits = RedundantNilCheck.check(src, &ast);
     assert_eq!(hits.len(), 0);
 }
+
+#[test]
+fn pairs_discard_value_detected() {
+    let src = "for k, _ in pairs(t) do\n  print(k)\nend";
+    let ast = parse(src);
+    let hits = PairsDiscardValue.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn ipairs_discard_value_detected() {
+    let src = "for i, _ in ipairs(t) do\n  print(i)\nend";
+    let ast = parse(src);
+    let hits = PairsDiscardValue.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn pairs_using_value_ok() {
+    let src = "for k, v in pairs(t) do\n  print(k, v)\nend";
+    let ast = parse(src);
+    let hits = PairsDiscardValue.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}

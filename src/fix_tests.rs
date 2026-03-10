@@ -762,6 +762,24 @@ fn test_fix_floor_to_multiple() {
 }
 
 #[test]
+fn test_fix_pairs_discard_value() {
+    let src = "for k, _ in pairs(t) do\n  print(k)\nend";
+    let fix = compute_fix("style::pairs_discard_value", src, 0).unwrap();
+    let mut result = src.to_string();
+    result.replace_range(fix.start..fix.end, &fix.replacement);
+    assert_eq!(result, "for k in pairs(t) do\n  print(k)\nend");
+}
+
+#[test]
+fn test_fix_ipairs_discard_value() {
+    let src = "for i, _ in ipairs(t) do\n  print(i)\nend";
+    let fix = compute_fix("style::pairs_discard_value", src, 0).unwrap();
+    let mut result = src.to_string();
+    result.replace_range(fix.start..fix.end, &fix.replacement);
+    assert_eq!(result, "for i in ipairs(t) do\n  print(i)\nend");
+}
+
+#[test]
 fn test_fix_redundant_bool_return_true() {
     let src = "if x > 0 then\n  return true\nelse\n  return false\nend";
     let fix = compute_fix("style::redundant_bool_return", src, 0).unwrap();
