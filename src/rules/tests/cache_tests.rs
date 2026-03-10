@@ -71,10 +71,18 @@ fn current_camera_single_ok() {
 
 #[test]
 fn local_player_uncached_detected() {
+    let src = "local p = Players.LocalPlayer\nlocal n = Players.LocalPlayer.Name\nlocal c = Players.LocalPlayer.Character";
+    let ast = parse(src);
+    let hits = LocalPlayerUncached.check(src, &ast);
+    assert_eq!(hits.len(), 2);
+}
+
+#[test]
+fn local_player_two_refs_ok() {
     let src = "local p = Players.LocalPlayer\nlocal n = Players.LocalPlayer.Name";
     let ast = parse(src);
     let hits = LocalPlayerUncached.check(src, &ast);
-    assert_eq!(hits.len(), 1);
+    assert_eq!(hits.len(), 0);
 }
 
 #[test]

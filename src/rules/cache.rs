@@ -670,7 +670,7 @@ impl Rule for LocalPlayerUncached {
                 true
             })
             .collect();
-        if positions.len() < 2 {
+        if positions.len() < 3 {
             return vec![];
         }
         positions[1..]
