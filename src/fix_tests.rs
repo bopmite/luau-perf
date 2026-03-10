@@ -834,6 +834,26 @@ fn test_fix_deprecated_lowercase_wait() {
 }
 
 #[test]
+fn test_fix_next_comma_simple() {
+    let src = "for k, v in next, tbl do";
+    let pos = src.find("next,").unwrap();
+    let fix = compute_fix("style::next_comma_iteration", src, pos).unwrap();
+    let mut result = src.to_string();
+    result.replace_range(fix.start..fix.end, &fix.replacement);
+    assert_eq!(result, "for k, v in tbl do");
+}
+
+#[test]
+fn test_fix_next_comma_expression() {
+    let src = "for i, v in next, obj:GetChildren() do";
+    let pos = src.find("next,").unwrap();
+    let fix = compute_fix("style::next_comma_iteration", src, pos).unwrap();
+    let mut result = src.to_string();
+    result.replace_range(fix.start..fix.end, &fix.replacement);
+    assert_eq!(result, "for i, v in obj:GetChildren() do");
+}
+
+#[test]
 fn test_fix_deprecated_lowercase_disconnect() {
     let src = "conn.Event:disconnect()";
     let pos = src.find("disconnect(").unwrap();

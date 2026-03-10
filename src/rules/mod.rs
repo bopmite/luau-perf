@@ -743,6 +743,7 @@ pub fn is_fixable(id: &str) -> bool {
             | "style::redundant_bool_return"
             | "style::pairs_discard_value"
             | "roblox::deprecated_lowercase_method"
+            | "style::next_comma_iteration"
     )
 }
 

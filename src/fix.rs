@@ -60,6 +60,7 @@ pub fn compute_fix(rule_id: &str, source: &str, pos: usize) -> Option<Fix> {
         "style::redundant_bool_return" => fix_redundant_bool_return(source, pos),
         "style::pairs_discard_value" => fix_pairs_discard_value(source, pos),
         "roblox::deprecated_lowercase_method" => fix_deprecated_lowercase_method(source, pos),
+        "style::next_comma_iteration" => fix_next_comma_iteration(source, pos),
         _ => None,
     }
 }
@@ -1432,6 +1433,33 @@ fn fix_floor_to_multiple(source: &str, pos: usize) -> Option<Fix> {
         start: pos,
         end: pos + total_len,
         replacement: format!("{x} - {x} % {step}"),
+    })
+}
+
+fn fix_next_comma_iteration(source: &str, pos: usize) -> Option<Fix> {
+    // pos points at "next" in " in next, t do"
+    // We want to replace "next, t" with just "t"
+    let rest = source.get(pos..)?;
+    if !rest.starts_with("next,") && !rest.starts_with("next, ") {
+        return None;
+    }
+    let after_next = &rest["next".len()..];
+    let comma_rest = after_next.trim_start();
+    if !comma_rest.starts_with(',') {
+        return None;
+    }
+    let after_comma = comma_rest[1..].trim_start();
+    // Find the end of the iterator expression (before "do" or end of line)
+    let expr_end = after_comma.find(" do").unwrap_or(after_comma.len());
+    let expr = after_comma[..expr_end].trim_end();
+    if expr.is_empty() {
+        return None;
+    }
+    let total_len = "next".len() + (after_comma.as_ptr() as usize - rest.as_ptr() as usize - "next".len()) + expr_end;
+    Some(Fix {
+        start: pos,
+        end: pos + total_len,
+        replacement: expr.to_string(),
     })
 }
 
