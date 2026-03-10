@@ -775,3 +775,126 @@ fn lowercase_connect_in_block_comment_ok() {
     let hits = DeprecatedLowercaseMethod.check(src, &ast);
     assert_eq!(hits.len(), 0);
 }
+
+// DeprecatedOnClose
+#[test]
+fn deprecated_on_close_detected() {
+    let src = "game.OnClose = function()\n  save()\nend";
+    let ast = parse(src);
+    let hits = DeprecatedOnClose.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn deprecated_on_close_spaced() {
+    let src = "game.OnClose  =  function() end";
+    let ast = parse(src);
+    let hits = DeprecatedOnClose.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn on_close_read_ok() {
+    let src = "local f = game.OnClose";
+    let ast = parse(src);
+    let hits = DeprecatedOnClose.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn on_close_comment_ok() {
+    let src = "-- game.OnClose = function() end";
+    let ast = parse(src);
+    let hits = DeprecatedOnClose.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+// DeprecatedUserId
+#[test]
+fn deprecated_userid_detected() {
+    let src = "local id = player.userId";
+    let ast = parse(src);
+    let hits = DeprecatedUserId.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn deprecated_userid_in_concat() {
+    let src = r#"store:SetAsync("key" .. Player.userId, data)"#;
+    let ast = parse(src);
+    let hits = DeprecatedUserId.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn userid_pascal_case_ok() {
+    let src = "local id = player.UserId";
+    let ast = parse(src);
+    let hits = DeprecatedUserId.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn userid_comment_ok() {
+    let src = "-- player.userId is deprecated";
+    let ast = parse(src);
+    let hits = DeprecatedUserId.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn userid_inline_comment_ok() {
+    let src = "local id = player.UserId -- not player.userId";
+    let ast = parse(src);
+    let hits = DeprecatedUserId.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn userid_not_prefix() {
+    let src = "local x = obj.userIdent";
+    let ast = parse(src);
+    let hits = DeprecatedUserId.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+// DirectServiceAccess
+#[test]
+fn direct_service_access_detected() {
+    let src = "game.HttpService:JSONEncode(data)";
+    let ast = parse(src);
+    let hits = DirectServiceAccess.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn direct_service_access_multiple() {
+    let src = "game.HttpService:JSONEncode(game.MarketplaceService:GetProductInfo(id))";
+    let ast = parse(src);
+    let hits = DirectServiceAccess.check(src, &ast);
+    assert_eq!(hits.len(), 2);
+}
+
+#[test]
+fn get_service_ok() {
+    let src = r#"local HttpService = game:GetService("HttpService")"#;
+    let ast = parse(src);
+    let hits = DirectServiceAccess.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn direct_service_comment_ok() {
+    let src = "-- game.HttpService is the HTTP service";
+    let ast = parse(src);
+    let hits = DirectServiceAccess.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn direct_service_not_prefix() {
+    let src = "local x = game.HttpServiceExtra";
+    let ast = parse(src);
+    let hits = DirectServiceAccess.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}

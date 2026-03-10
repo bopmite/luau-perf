@@ -3,7 +3,6 @@ use std::collections::HashMap;
 use crate::lint::{Hit, Rule, Severity};
 use crate::visit;
 
-pub struct ServiceLocatorAntiPattern;
 pub struct EmptyFunctionBody;
 pub struct DeprecatedGlobalCall;
 pub struct TypeCheckInLoop;
@@ -34,45 +33,6 @@ pub struct RedundantBoolReturn;
 pub struct RedundantNilCheck;
 pub struct PairsDiscardValue;
 pub struct NextCommaIteration;
-
-impl Rule for ServiceLocatorAntiPattern {
-    fn id(&self) -> &'static str {
-        "style::duplicate_get_service"
-    }
-    fn severity(&self) -> Severity {
-        Severity::Warn
-    }
-
-    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
-        let mut service_calls: HashMap<String, Vec<usize>> = HashMap::new();
-        visit::each_call(ast, |call, _ctx| {
-            if !visit::is_method_call(call, "GetService") {
-                return;
-            }
-            if let Some(name) = visit::first_string_arg(call) {
-                service_calls
-                    .entry(name)
-                    .or_default()
-                    .push(visit::call_pos(call));
-            }
-        });
-
-        let mut hits = Vec::new();
-        for (name, positions) in &service_calls {
-            if positions.len() > 1 {
-                for &pos in &positions[1..] {
-                    hits.push(Hit {
-                        pos,
-                        msg: format!(
-                            "duplicate GetService(\"{name}\") - cache in a module-level local"
-                        ),
-                    });
-                }
-            }
-        }
-        hits
-    }
-}
 
 impl Rule for EmptyFunctionBody {
     fn id(&self) -> &'static str {

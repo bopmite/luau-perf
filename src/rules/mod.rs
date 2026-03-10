@@ -153,6 +153,9 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(roblox::CharacterAppearanceLoaded),
         Box::new(roblox::GetDescendantsInHeartbeat),
         Box::new(roblox::DeprecatedLowercaseMethod),
+        Box::new(roblox::DeprecatedOnClose),
+        Box::new(roblox::DeprecatedUserId),
+        Box::new(roblox::DirectServiceAccess),
         // alloc
         Box::new(alloc::StringConcatInLoop),
         Box::new(alloc::StringFormatInLoop),
@@ -502,6 +505,8 @@ pub fn rule_level(id: &str) -> crate::lint::Level {
         // more deprecated
         | "roblox::deprecated_delay"
         | "roblox::deprecated_lowercase_method"
+        | "roblox::deprecated_on_close"
+        | "roblox::deprecated_userid"
 
         // correctness
         | "roblox::render_stepped_on_server"
@@ -644,6 +649,7 @@ pub fn rule_level(id: &str) -> crate::lint::Level {
         | "roblox::find_first_child_no_check"
         | "roblox::bind_to_render_step_no_cleanup"
         | "roblox::get_descendants_in_heartbeat"
+        | "roblox::direct_service_access"
         | "string::format_redundant_tostring"
 
         // native
@@ -742,6 +748,7 @@ pub fn is_fixable(id: &str) -> bool {
             | "style::pairs_discard_value"
             | "roblox::deprecated_lowercase_method"
             | "style::next_comma_iteration"
+            | "roblox::deprecated_userid"
     )
 }
 
@@ -1103,6 +1110,9 @@ fn explain_text(id: &str) -> &'static str {
         "instance::wait_for_child_chain" => "Chained :WaitForChild() calls like parent:WaitForChild(\"A\"):WaitForChild(\"B\") yield independently on each call. If the first child exists but the second doesn't, this silently hangs. Cache intermediate references and handle nil checks.",
 
         "roblox::deprecated_lowercase_method" => "Roblox API methods like :connect(), :disconnect(), and :wait() are deprecated lowercase aliases. Use the PascalCase versions :Connect(), :Disconnect(), :Wait() instead. The lowercase forms still work but are not documented and may be removed in future.",
+        "roblox::deprecated_on_close" => "game.OnClose is deprecated. Use game:BindToClose(fn) instead, which supports multiple callbacks, has a 30-second timeout, and works reliably with DataStore saves during shutdown.",
+        "roblox::deprecated_userid" => ".userId is a deprecated lowercase alias for .UserId. Use the PascalCase form .UserId which matches the official Roblox API naming convention.",
+        "roblox::direct_service_access" => "Accessing services via game.ServiceName (e.g. game.HttpService) uses property syntax instead of the service locator. game:GetService(\"ServiceName\") is the recommended approach - it's explicit, consistent, and works even if the service hasn't been loaded yet.",
 
         _ => "No detailed explanation available for this rule. Run --list-rules to see all rules.",
     }

@@ -69,6 +69,9 @@ pub struct DeprecatedElapsedTime;
 pub struct CharacterAppearanceLoaded;
 pub struct GetDescendantsInHeartbeat;
 pub struct DeprecatedLowercaseMethod;
+pub struct DeprecatedOnClose;
+pub struct DeprecatedUserId;
+pub struct DirectServiceAccess;
 
 impl Rule for DeprecatedWait {
     fn id(&self) -> &'static str {
@@ -2243,6 +2246,198 @@ impl Rule for DeprecatedLowercaseMethod {
                         });
                     }
                     search_from = abs + pat.len();
+                }
+            }
+        }
+        hits
+    }
+}
+
+impl Rule for DeprecatedOnClose {
+    fn id(&self) -> &'static str {
+        "roblox::deprecated_on_close"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Error
+    }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        for pos in visit::find_pattern_positions(source, "game.OnClose") {
+            let rest = &source[pos + "game.OnClose".len()..];
+            let next = rest.trim_start().chars().next();
+            if next == Some('=') {
+                hits.push(Hit {
+                    pos,
+                    msg: "game.OnClose is deprecated - use game:BindToClose(fn) instead"
+                        .into(),
+                });
+            }
+        }
+        hits
+    }
+}
+
+impl Rule for DeprecatedUserId {
+    fn id(&self) -> &'static str {
+        "roblox::deprecated_userid"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        let mut in_block = false;
+        for (line_no, line) in source.lines().enumerate() {
+            let trimmed = line.trim();
+            if !in_block && (trimmed.starts_with("--[[") || trimmed.starts_with("--[=[")) {
+                if !trimmed.contains("]]") && !trimmed.contains("]=]") {
+                    in_block = true;
+                }
+                continue;
+            }
+            if in_block {
+                if trimmed.contains("]=]") || trimmed.contains("]]") {
+                    in_block = false;
+                }
+                continue;
+            }
+            if trimmed.starts_with("--") {
+                continue;
+            }
+            let code = match line.find("--") {
+                Some(i) => &line[..i],
+                None => line,
+            };
+            let mut search_from = 0;
+            while let Some(rel) = code[search_from..].find(".userId") {
+                let abs = search_from + rel;
+                let after = abs + ".userId".len();
+                let next_ch = code.get(after..after + 1);
+                let is_boundary = next_ch.is_none()
+                    || matches!(
+                        next_ch,
+                        Some(" " | ")" | "," | "]" | "}" | "\t" | "\n")
+                    );
+                if is_boundary {
+                    let before = &code[..abs];
+                    let ident_start = before
+                        .rfind(|c: char| !c.is_ascii_alphanumeric() && c != '_')
+                        .map(|i| i + 1)
+                        .unwrap_or(0);
+                    let ident = &before[ident_start..];
+                    let looks_like_player = ident.starts_with("Player")
+                        || ident.starts_with("Plr")
+                        || ident == "player"
+                        || ident == "plr";
+                    if looks_like_player {
+                        let line_start: usize =
+                            source.lines().take(line_no).map(|l| l.len() + 1).sum();
+                        hits.push(Hit {
+                            pos: line_start + abs + 1,
+                            msg: ".userId is deprecated - use .UserId (PascalCase)"
+                                .into(),
+                        });
+                    }
+                }
+                search_from = after;
+            }
+        }
+        hits
+    }
+}
+
+impl Rule for DirectServiceAccess {
+    fn id(&self) -> &'static str {
+        "roblox::direct_service_access"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let services = [
+            "HttpService",
+            "MarketplaceService",
+            "BadgeService",
+            "TeleportService",
+            "PolicyService",
+            "GroupService",
+            "AssetService",
+            "InsertService",
+            "GamePassService",
+            "TextService",
+            "LocalizationService",
+            "ContextActionService",
+            "UserInputService",
+            "GuiService",
+            "RunService",
+            "TweenService",
+            "Debris",
+            "CollectionService",
+            "PhysicsService",
+            "PathfindingService",
+            "MessagingService",
+            "MemoryStoreService",
+            "DataStoreService",
+            "SocialService",
+            "VoiceChatService",
+            "ProximityPromptService",
+            "ContentProvider",
+            "Chat",
+            "SoundService",
+            "StarterGui",
+            "StarterPack",
+            "StarterPlayer",
+            "TestService",
+            "AnimationClipProvider",
+        ];
+        let mut hits = Vec::new();
+        let mut in_block = false;
+        for (line_no, line) in source.lines().enumerate() {
+            let trimmed = line.trim();
+            if !in_block && (trimmed.starts_with("--[[") || trimmed.starts_with("--[=[")) {
+                if !trimmed.contains("]]") && !trimmed.contains("]=]") {
+                    in_block = true;
+                }
+                continue;
+            }
+            if in_block {
+                if trimmed.contains("]=]") || trimmed.contains("]]") {
+                    in_block = false;
+                }
+                continue;
+            }
+            if trimmed.starts_with("--") {
+                continue;
+            }
+            let code = match line.find("--") {
+                Some(i) => &line[..i],
+                None => line,
+            };
+            for &svc in &services {
+                let pat = format!("game.{svc}");
+                let mut search_from = 0;
+                while let Some(rel) = code[search_from..].find(&pat) {
+                    let abs = search_from + rel;
+                    let after = abs + pat.len();
+                    let next_ch = code.as_bytes().get(after);
+                    let is_boundary = match next_ch {
+                        None => true,
+                        Some(b) => !b.is_ascii_alphanumeric() && *b != b'_',
+                    };
+                    if is_boundary {
+                        let line_start: usize =
+                            source.lines().take(line_no).map(|l| l.len() + 1).sum();
+                        hits.push(Hit {
+                            pos: line_start + abs,
+                            msg: format!(
+                                "game.{svc} accesses service by property - use game:GetService(\"{svc}\") for consistency and reliability"
+                            ),
+                        });
+                    }
+                    search_from = after;
                 }
             }
         }

@@ -862,3 +862,23 @@ fn test_fix_deprecated_lowercase_disconnect() {
     result.replace_range(fix.start..fix.end, &fix.replacement);
     assert_eq!(result, "conn.Event:Disconnect()");
 }
+
+#[test]
+fn test_fix_deprecated_userid() {
+    let src = "local id = player.userId";
+    let pos = src.find("userId").unwrap();
+    let fix = compute_fix("roblox::deprecated_userid", src, pos).unwrap();
+    let mut result = src.to_string();
+    result.replace_range(fix.start..fix.end, &fix.replacement);
+    assert_eq!(result, "local id = player.UserId");
+}
+
+#[test]
+fn test_fix_deprecated_userid_in_expression() {
+    let src = r#"store:SetAsync("key" .. Player.userId, data)"#;
+    let pos = src.find("userId").unwrap();
+    let fix = compute_fix("roblox::deprecated_userid", src, pos).unwrap();
+    let mut result = src.to_string();
+    result.replace_range(fix.start..fix.end, &fix.replacement);
+    assert_eq!(result, r#"store:SetAsync("key" .. Player.UserId, data)"#);
+}

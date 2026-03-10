@@ -61,6 +61,7 @@ pub fn compute_fix(rule_id: &str, source: &str, pos: usize) -> Option<Fix> {
         "style::pairs_discard_value" => fix_pairs_discard_value(source, pos),
         "roblox::deprecated_lowercase_method" => fix_deprecated_lowercase_method(source, pos),
         "style::next_comma_iteration" => fix_next_comma_iteration(source, pos),
+        "roblox::deprecated_userid" => fix_deprecated_userid(source, pos),
         _ => None,
     }
 }
@@ -1479,6 +1480,18 @@ fn fix_deprecated_lowercase_method(source: &str, pos: usize) -> Option<Fix> {
         }
     }
     None
+}
+
+fn fix_deprecated_userid(source: &str, pos: usize) -> Option<Fix> {
+    if source.get(pos..pos + 6) == Some("userId") {
+        Some(Fix {
+            start: pos,
+            end: pos + 6,
+            replacement: "UserId".into(),
+        })
+    } else {
+        None
+    }
 }
 
 #[cfg(test)]
