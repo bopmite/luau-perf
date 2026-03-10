@@ -736,6 +736,7 @@ pub fn is_fixable(id: &str) -> bool {
             | "instance::two_arg_instance_new"
             | "style::redundant_nil_check"
             | "math::floor_to_multiple"
+            | "style::redundant_bool_return"
     )
 }
 

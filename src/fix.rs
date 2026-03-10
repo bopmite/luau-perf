@@ -57,6 +57,7 @@ pub fn compute_fix(rule_id: &str, source: &str, pos: usize) -> Option<Fix> {
         "instance::two_arg_instance_new" => fix_two_arg_instance_new(source, pos),
         "style::redundant_nil_check" => fix_redundant_nil_check(source, pos),
         "math::floor_to_multiple" => fix_floor_to_multiple(source, pos),
+        "style::redundant_bool_return" => fix_redundant_bool_return(source, pos),
         _ => None,
     }
 }
@@ -1333,6 +1334,40 @@ fn fix_tostring_on_string(source: &str, pos: usize) -> Option<Fix> {
         start: pos,
         end,
         replacement: literal.to_string(),
+    })
+}
+
+fn fix_redundant_bool_return(source: &str, pos: usize) -> Option<Fix> {
+    let slice = source.get(pos..)?;
+    let lines: Vec<&str> = slice.lines().take(5).collect();
+    if lines.len() < 5 {
+        return None;
+    }
+    let if_line = lines[0].trim();
+    if !if_line.starts_with("if ") || !if_line.ends_with(" then") {
+        return None;
+    }
+    let condition = &if_line["if ".len()..if_line.len() - " then".len()];
+    let body1 = lines[1].trim();
+    let body2 = lines[3].trim();
+    let end_line = lines[4].trim();
+    if lines[2].trim() != "else" || end_line != "end" {
+        return None;
+    }
+    let indent = &lines[0][..lines[0].len() - lines[0].trim_start().len()];
+    let replacement = if body1 == "return true" && body2 == "return false" {
+        format!("{indent}return {condition}")
+    } else if body1 == "return false" && body2 == "return true" {
+        format!("{indent}return not {condition}")
+    } else {
+        return None;
+    };
+    let total_len: usize = lines[..5].iter().map(|l| l.len() + 1).sum();
+    let end = (pos + total_len).min(source.len());
+    Some(Fix {
+        start: pos,
+        end,
+        replacement,
     })
 }
 

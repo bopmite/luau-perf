@@ -762,6 +762,24 @@ fn test_fix_floor_to_multiple() {
 }
 
 #[test]
+fn test_fix_redundant_bool_return_true() {
+    let src = "if x > 0 then\n  return true\nelse\n  return false\nend";
+    let fix = compute_fix("style::redundant_bool_return", src, 0).unwrap();
+    let mut result = src.to_string();
+    result.replace_range(fix.start..fix.end, &fix.replacement);
+    assert_eq!(result, "return x > 0");
+}
+
+#[test]
+fn test_fix_redundant_bool_return_false() {
+    let src = "if x > 0 then\n  return false\nelse\n  return true\nend";
+    let fix = compute_fix("style::redundant_bool_return", src, 0).unwrap();
+    let mut result = src.to_string();
+    result.replace_range(fix.start..fix.end, &fix.replacement);
+    assert_eq!(result, "return not x > 0");
+}
+
+#[test]
 fn test_fix_floor_to_multiple_with_number() {
     let src = "math.floor(seconds / DAY) * DAY";
     let fix = compute_fix("math::floor_to_multiple", src, 0).unwrap();
