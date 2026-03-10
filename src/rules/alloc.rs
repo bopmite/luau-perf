@@ -553,6 +553,7 @@ impl Rule for UnpackInLoop {
                     || line.contains("[idx]")
                     || line.contains("shift(")
                     || line.contains("remove(")
+                    || visit::call_arg_count(call) >= 3
                 {
                     return;
                 }

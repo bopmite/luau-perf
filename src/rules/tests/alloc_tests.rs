@@ -111,6 +111,14 @@ fn table_unpack_in_loop_detected() {
 }
 
 #[test]
+fn unpack_with_range_in_loop_ok() {
+    let src = "for i = 1, n do\n  string.char(table.unpack(data, i, i + 4095))\nend";
+    let ast = parse(src);
+    let hits = UnpackInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
 fn string_interp_in_loop_detected() {
     let src = "for i = 1, 10 do\n  local s = `hello {name}`\nend";
     let ast = parse(src);
