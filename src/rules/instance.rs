@@ -139,6 +139,10 @@ impl Rule for PropertyChangeSignalWrong {
             {
                 continue;
             }
+            let value_access = format!("{last_word}.Value");
+            if after_connect.contains(&value_access) || context.contains(&value_access) {
+                continue;
+            }
             hits.push(Hit {
                 pos,
                 msg: ".Changed fires for ANY property - use GetPropertyChangedSignal(\"Prop\") for specific properties".into(),

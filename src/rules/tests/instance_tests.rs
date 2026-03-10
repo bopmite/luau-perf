@@ -247,3 +247,19 @@ fn one_arg_instance_new_ok() {
     assert_eq!(hits.len(), 0);
 }
 
+#[test]
+fn changed_value_base_dot_value_ok() {
+    let src = "FocusWindow.Changed:Connect(function()\n  local val = FocusWindow.Value\nend)";
+    let ast = parse(src);
+    let hits = PropertyChangeSignalWrong.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn changed_non_value_detected() {
+    let src = "part.Changed:Connect(function(prop)\n  print(prop)\nend)";
+    let ast = parse(src);
+    let hits = PropertyChangeSignalWrong.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
