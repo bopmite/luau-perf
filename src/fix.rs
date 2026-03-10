@@ -50,6 +50,7 @@ pub fn compute_fix(rule_id: &str, source: &str, pos: usize) -> Option<Fix> {
         "roblox::deprecated_version" => fix_deprecated_version(source, pos),
         "math::unnecessary_tonumber" => fix_unnecessary_tonumber(source, pos),
         "string::tostring_on_string" => fix_tostring_on_string(source, pos),
+        "math::pow_two" => fix_pow_two(source, pos),
         _ => None,
     }
 }
@@ -993,6 +994,33 @@ fn fix_ypcall(source: &str, pos: usize) -> Option<Fix> {
         start: pos,
         end: pos + 6,
         replacement: "pcall".into(),
+    })
+}
+
+fn fix_pow_two(source: &str, pos: usize) -> Option<Fix> {
+    let rest = source.get(pos..)?;
+    let after = rest.strip_prefix("math.pow(")?;
+    let close = after.find(')')?;
+    let args = &after[..close];
+    let parts: Vec<&str> = args.splitn(2, ',').collect();
+    if parts.len() != 2 || parts[1].trim() != "2" {
+        return None;
+    }
+    let base = parts[0].trim();
+    let needs_parens = base.contains(' ')
+        || base.contains('+')
+        || base.contains('-')
+        || base.contains('*')
+        || base.contains('/');
+    let replacement = if needs_parens {
+        format!("({base}) * ({base})")
+    } else {
+        format!("{base} * {base}")
+    };
+    Some(Fix {
+        start: pos,
+        end: pos + "math.pow(".len() + close + 1,
+        replacement,
     })
 }
 

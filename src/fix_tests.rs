@@ -571,3 +571,27 @@ fn test_fix_tostring_on_string_single_quote() {
     result.replace_range(fix.start..fix.end, &fix.replacement);
     assert_eq!(result, "local s = 'hello'");
 }
+
+#[test]
+fn test_fix_pow_two_simple() {
+    let src = "local y = math.pow(x, 2)";
+    let fix = compute_fix("math::pow_two", src, 10).unwrap();
+    let mut result = src.to_string();
+    result.replace_range(fix.start..fix.end, &fix.replacement);
+    assert_eq!(result, "local y = x * x");
+}
+
+#[test]
+fn test_fix_pow_two_expr() {
+    let src = "math.pow(a + b, 2)";
+    let fix = compute_fix("math::pow_two", src, 0).unwrap();
+    let mut result = src.to_string();
+    result.replace_range(fix.start..fix.end, &fix.replacement);
+    assert_eq!(result, "(a + b) * (a + b)");
+}
+
+#[test]
+fn test_fix_pow_three_returns_none() {
+    let src = "math.pow(x, 3)";
+    assert!(compute_fix("math::pow_two", src, 0).is_none());
+}

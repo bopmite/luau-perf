@@ -718,6 +718,7 @@ pub fn is_fixable(id: &str) -> bool {
             | "roblox::deprecated_version"
             | "math::unnecessary_tonumber"
             | "string::tostring_on_string"
+            | "math::pow_two"
     )
 }
 
