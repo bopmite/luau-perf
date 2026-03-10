@@ -56,6 +56,7 @@ pub fn compute_fix(rule_id: &str, source: &str, pos: usize) -> Option<Fix> {
         "instance::pairs_over_getchildren" => fix_pairs_over_getchildren(source, pos),
         "instance::two_arg_instance_new" => fix_two_arg_instance_new(source, pos),
         "style::redundant_nil_check" => fix_redundant_nil_check(source, pos),
+        "math::floor_to_multiple" => fix_floor_to_multiple(source, pos),
         _ => None,
     }
 }
@@ -1332,6 +1333,45 @@ fn fix_tostring_on_string(source: &str, pos: usize) -> Option<Fix> {
         start: pos,
         end,
         replacement: literal.to_string(),
+    })
+}
+
+fn fix_floor_to_multiple(source: &str, pos: usize) -> Option<Fix> {
+    let slice = source.get(pos..)?;
+    if !slice.starts_with("math.floor(") {
+        return None;
+    }
+    let inner_start = "math.floor(".len();
+    let inner = &slice[inner_start..];
+    let close = crate::visit::find_balanced_paren(inner)?;
+    let args = inner[..close].trim();
+    let slash = args.find('/')?;
+    let x = args[..slash].trim();
+    let step = args[slash + 1..].trim();
+    if x.is_empty() || step.is_empty() {
+        return None;
+    }
+    let after_floor = slice[inner_start + close + 1..].trim_start();
+    if !after_floor.starts_with('*') {
+        return None;
+    }
+    let mult_src = after_floor[1..].trim_start();
+    let mult_end = mult_src
+        .find(|c: char| !c.is_alphanumeric() && c != '_' && c != '.')
+        .unwrap_or(mult_src.len());
+    let multiplier = &mult_src[..mult_end];
+    if multiplier != step {
+        return None;
+    }
+    let total_len = inner_start + close + 1
+        + (slice[inner_start + close + 1..].len() - after_floor.len())
+        + 1
+        + (after_floor[1..].len() - mult_src.len())
+        + mult_end;
+    Some(Fix {
+        start: pos,
+        end: pos + total_len,
+        replacement: format!("{x} - {x} % {step}"),
     })
 }
 

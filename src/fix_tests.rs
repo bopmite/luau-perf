@@ -751,3 +751,21 @@ fn test_fix_two_arg_instance_new_complex_parent() {
     result.replace_range(fix.start..fix.end, &fix.replacement);
     assert_eq!(result, "Instance.new(\"Part\")");
 }
+
+#[test]
+fn test_fix_floor_to_multiple() {
+    let src = "local snapped = math.floor(x / step) * step";
+    let fix = compute_fix("math::floor_to_multiple", src, 16).unwrap();
+    let mut result = src.to_string();
+    result.replace_range(fix.start..fix.end, &fix.replacement);
+    assert_eq!(result, "local snapped = x - x % step");
+}
+
+#[test]
+fn test_fix_floor_to_multiple_with_number() {
+    let src = "math.floor(seconds / DAY) * DAY";
+    let fix = compute_fix("math::floor_to_multiple", src, 0).unwrap();
+    let mut result = src.to_string();
+    result.replace_range(fix.start..fix.end, &fix.replacement);
+    assert_eq!(result, "seconds - seconds % DAY");
+}
