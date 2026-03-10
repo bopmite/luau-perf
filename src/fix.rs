@@ -51,6 +51,7 @@ pub fn compute_fix(rule_id: &str, source: &str, pos: usize) -> Option<Fix> {
         "math::unnecessary_tonumber" => fix_unnecessary_tonumber(source, pos),
         "string::tostring_on_string" => fix_tostring_on_string(source, pos),
         "math::pow_two" => fix_pow_two(source, pos),
+        "table::pairs_over_generalized" => fix_pairs_over_generalized(source, pos),
         _ => None,
     }
 }
@@ -994,6 +995,40 @@ fn fix_ypcall(source: &str, pos: usize) -> Option<Fix> {
         start: pos,
         end: pos + 6,
         replacement: "pcall".into(),
+    })
+}
+
+fn fix_pairs_over_generalized(source: &str, pos: usize) -> Option<Fix> {
+    let rest = source.get(pos..)?;
+    let (prefix, inner_start) = if rest.starts_with("in pairs(") {
+        ("in pairs(", "in pairs(".len())
+    } else if rest.starts_with("in ipairs(") {
+        ("in ipairs(", "in ipairs(".len())
+    } else {
+        return None;
+    };
+    let after = &rest[inner_start..];
+    let mut depth = 1i32;
+    let mut close = None;
+    for (i, c) in after.char_indices() {
+        match c {
+            '(' => depth += 1,
+            ')' => {
+                depth -= 1;
+                if depth == 0 {
+                    close = Some(i);
+                    break;
+                }
+            }
+            _ => {}
+        }
+    }
+    let close = close?;
+    let inner = &after[..close];
+    Some(Fix {
+        start: pos,
+        end: pos + prefix.len() + close + 1,
+        replacement: format!("in {inner}"),
     })
 }
 

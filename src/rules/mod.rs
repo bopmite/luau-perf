@@ -719,6 +719,7 @@ pub fn is_fixable(id: &str) -> bool {
             | "math::unnecessary_tonumber"
             | "string::tostring_on_string"
             | "math::pow_two"
+            | "table::pairs_over_generalized"
     )
 }
 

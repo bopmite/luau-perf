@@ -595,3 +595,30 @@ fn test_fix_pow_three_returns_none() {
     let src = "math.pow(x, 3)";
     assert!(compute_fix("math::pow_two", src, 0).is_none());
 }
+
+#[test]
+fn test_fix_pairs_over_generalized() {
+    let src = "for k, v in pairs(myTable) do";
+    let fix = compute_fix("table::pairs_over_generalized", src, 9).unwrap();
+    let mut result = src.to_string();
+    result.replace_range(fix.start..fix.end, &fix.replacement);
+    assert_eq!(result, "for k, v in myTable do");
+}
+
+#[test]
+fn test_fix_ipairs_over_generalized() {
+    let src = "for i, v in ipairs(list) do";
+    let fix = compute_fix("table::pairs_over_generalized", src, 9).unwrap();
+    let mut result = src.to_string();
+    result.replace_range(fix.start..fix.end, &fix.replacement);
+    assert_eq!(result, "for i, v in list do");
+}
+
+#[test]
+fn test_fix_pairs_nested_call() {
+    let src = "for k, v in pairs(getTable()) do";
+    let fix = compute_fix("table::pairs_over_generalized", src, 9).unwrap();
+    let mut result = src.to_string();
+    result.replace_range(fix.start..fix.end, &fix.replacement);
+    assert_eq!(result, "for k, v in getTable() do");
+}
