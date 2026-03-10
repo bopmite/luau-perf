@@ -488,14 +488,7 @@ pub fn apply_fixes(fixes_by_file: HashMap<PathBuf, Vec<Fix>>) -> (usize, usize) 
         fixes.sort_by(|a, b| b.start.cmp(&a.start));
 
         merge_same_position(&mut fixes);
-
-        if has_overlaps(&fixes) {
-            eprintln!(
-                " \x1b[33mskipping\x1b[0m {} - overlapping fixes detected",
-                path.display()
-            );
-            continue;
-        }
+        remove_overlapping(&mut fixes);
 
         let source = match std::fs::read_to_string(&path) {
             Ok(s) => s,
@@ -555,16 +548,19 @@ fn merge_same_position(fixes: &mut Vec<Fix>) {
     }
 }
 
-/// Check for overlapping fixes (sorted descending by start).
-fn has_overlaps(fixes: &[Fix]) -> bool {
-    for i in 0..fixes.len().saturating_sub(1) {
+/// Remove overlapping fixes, keeping the first (highest start position) in each overlap group.
+/// Fixes are sorted descending by start position.
+fn remove_overlapping(fixes: &mut Vec<Fix>) {
+    let mut i = 0;
+    while i + 1 < fixes.len() {
         let later = &fixes[i]; // higher start
         let earlier = &fixes[i + 1]; // lower start
         if earlier.end > later.start {
-            return true;
+            fixes.remove(i + 1);
+        } else {
+            i += 1;
         }
     }
-    false
 }
 
 fn fix_color3_new_misuse(source: &str, pos: usize) -> Option<Fix> {
@@ -655,7 +651,22 @@ fn fix_deprecated_tick(source: &str, pos: usize) -> Option<Fix> {
 fn fix_random_deprecated(source: &str, pos: usize) -> Option<Fix> {
     let slice = &source[pos..];
     if let Some(after) = slice.strip_prefix("math.random(") {
-        let close = after.find(')')?;
+        let mut depth = 1i32;
+        let mut close = None;
+        for (i, c) in after.char_indices() {
+            match c {
+                '(' => depth += 1,
+                ')' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        close = Some(i);
+                        break;
+                    }
+                }
+                _ => {}
+            }
+        }
+        let close = close?;
         let args = &after[..close];
         if args.trim().is_empty() {
             return Some(Fix {
@@ -677,8 +688,25 @@ fn fix_random_deprecated(source: &str, pos: usize) -> Option<Fix> {
             replacement: format!("Random.new():NextInteger(1, {args})"),
         });
     }
-    if slice.starts_with("math.randomseed") {
-        let end = pos + slice.find(')')? + 1;
+    if slice.starts_with("math.randomseed(") {
+        let after = &slice["math.randomseed(".len()..];
+        let mut depth = 1i32;
+        let mut close = None;
+        for (i, c) in after.char_indices() {
+            match c {
+                '(' => depth += 1,
+                ')' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        close = Some(i);
+                        break;
+                    }
+                }
+                _ => {}
+            }
+        }
+        let close = close?;
+        let end = pos + "math.randomseed(".len() + close + 1;
         return Some(Fix {
             start: pos,
             end,
@@ -1184,7 +1212,22 @@ fn fix_pairs_over_generalized(source: &str, pos: usize) -> Option<Fix> {
 fn fix_pow_two(source: &str, pos: usize) -> Option<Fix> {
     let rest = source.get(pos..)?;
     let after = rest.strip_prefix("math.pow(")?;
-    let close = after.find(')')?;
+    let mut depth = 1i32;
+    let mut close = None;
+    for (i, c) in after.char_indices() {
+        match c {
+            '(' => depth += 1,
+            ')' => {
+                depth -= 1;
+                if depth == 0 {
+                    close = Some(i);
+                    break;
+                }
+            }
+            _ => {}
+        }
+    }
+    let close = close?;
     let args = &after[..close];
     let parts: Vec<&str> = args.splitn(2, ',').collect();
     if parts.len() != 2 || parts[1].trim() != "2" {

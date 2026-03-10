@@ -145,8 +145,8 @@ fn test_end_to_start_application() {
 }
 
 #[test]
-fn test_overlap_detection() {
-    let fixes = vec![
+fn test_remove_overlapping() {
+    let mut fixes = vec![
         Fix {
             start: 10,
             end: 20,
@@ -158,12 +158,14 @@ fn test_overlap_detection() {
             replacement: "y".into(),
         },
     ];
-    assert!(has_overlaps(&fixes));
+    remove_overlapping(&mut fixes);
+    assert_eq!(fixes.len(), 1);
+    assert_eq!(fixes[0].start, 10);
 }
 
 #[test]
-fn test_no_overlap() {
-    let fixes = vec![
+fn test_no_overlap_keeps_both() {
+    let mut fixes = vec![
         Fix {
             start: 10,
             end: 15,
@@ -175,7 +177,8 @@ fn test_no_overlap() {
             replacement: "y".into(),
         },
     ];
-    assert!(!has_overlaps(&fixes));
+    remove_overlapping(&mut fixes);
+    assert_eq!(fixes.len(), 2);
 }
 
 #[test]
@@ -675,6 +678,24 @@ fn test_fix_redundant_nil_eq() {
     let mut result = src.to_string();
     result.replace_range(fix.start..fix.end, &fix.replacement);
     assert_eq!(result, "if not parent:FindFirstChild(\"Name\") then end");
+}
+
+#[test]
+fn test_fix_randomseed_nested_parens() {
+    let src = "math.randomseed(os.time())";
+    let fix = compute_fix("math::random_deprecated", src, 0).unwrap();
+    let mut result = src.to_string();
+    result.replace_range(fix.start..fix.end, &fix.replacement);
+    assert_eq!(result, "");
+}
+
+#[test]
+fn test_fix_random_nested_call() {
+    let src = "math.random(math.floor(x))";
+    let fix = compute_fix("math::random_deprecated", src, 0).unwrap();
+    let mut result = src.to_string();
+    result.replace_range(fix.start..fix.end, &fix.replacement);
+    assert_eq!(result, "Random.new():NextInteger(1, math.floor(x))");
 }
 
 #[test]
