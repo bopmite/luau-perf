@@ -13,10 +13,15 @@ pub struct CollectionServiceInLoop;
 pub struct NameIndexingInLoop;
 pub struct DestroyInLoop;
 pub struct GetChildrenInLoop;
+pub struct ClassNameOverIsA;
 
 impl Rule for TwoArgInstanceNew {
-    fn id(&self) -> &'static str { "instance::two_arg_instance_new" }
-    fn severity(&self) -> Severity { Severity::Error }
+    fn id(&self) -> &'static str {
+        "instance::two_arg_instance_new"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Error
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -33,13 +38,25 @@ impl Rule for TwoArgInstanceNew {
 }
 
 impl Rule for PropertyChangeSignalWrong {
-    fn id(&self) -> &'static str { "instance::property_change_signal_wrong" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "instance::property_change_signal_wrong"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let value_base_types = [
-            "BoolValue", "IntValue", "StringValue", "ObjectValue", "NumberValue",
-            "Color3Value", "Vector3Value", "CFrameValue", "BrickColorValue", "RayValue",
+            "BoolValue",
+            "IntValue",
+            "StringValue",
+            "ObjectValue",
+            "NumberValue",
+            "Color3Value",
+            "Vector3Value",
+            "CFrameValue",
+            "BrickColorValue",
+            "RayValue",
         ];
         let mut hits = Vec::new();
         for pos in visit::find_pattern_positions(source, ".Changed:Connect") {
@@ -47,7 +64,10 @@ impl Rule for PropertyChangeSignalWrong {
             if before.ends_with("GetPropertyChangedSignal") || before.ends_with("Humanoid") {
                 continue;
             }
-            let word_start = before.rfind(|c: char| !c.is_alphanumeric() && c != '_' && c != '.').map(|i| i + 1).unwrap_or(0);
+            let word_start = before
+                .rfind(|c: char| !c.is_alphanumeric() && c != '_' && c != '.')
+                .map(|i| i + 1)
+                .unwrap_or(0);
             let accessor = &source[word_start..pos];
             if accessor == "self" || accessor.contains("self.") || accessor.contains("self._") {
                 continue;
@@ -57,8 +77,11 @@ impl Rule for PropertyChangeSignalWrong {
             }
             let last_word = accessor.rsplit('.').next().unwrap_or(accessor);
             let lw = last_word.to_lowercase();
-            if lw.ends_with("value") || lw.ends_with("action") || lw.ends_with("state")
-                || lw.ends_with("object") || lw.ends_with("signal")
+            if lw.ends_with("value")
+                || lw.ends_with("action")
+                || lw.ends_with("state")
+                || lw.ends_with("object")
+                || lw.ends_with("signal")
             {
                 continue;
             }
@@ -74,14 +97,38 @@ impl Rule for PropertyChangeSignalWrong {
             }
             if !accessor.contains('.') {
                 let first_char = accessor.chars().next().unwrap_or('A');
-                if first_char.is_ascii_lowercase() && !matches!(accessor, "part" | "gui" | "button" | "frame" | "label" | "instance" | "inst" | "obj" | "descendant" | "child" | "player" | "character" | "humanoid" | "camera" | "sound" | "model" | "tool" | "workspace") {
+                if first_char.is_ascii_lowercase()
+                    && !matches!(
+                        accessor,
+                        "part"
+                            | "gui"
+                            | "button"
+                            | "frame"
+                            | "label"
+                            | "instance"
+                            | "inst"
+                            | "obj"
+                            | "descendant"
+                            | "child"
+                            | "player"
+                            | "character"
+                            | "humanoid"
+                            | "camera"
+                            | "sound"
+                            | "model"
+                            | "tool"
+                            | "workspace"
+                    )
+                {
                     continue;
                 }
             }
             let after_end = visit::ceil_char(source, (pos + 500).min(source.len()));
             let after_connect = &source[pos..after_end];
-            if after_connect.contains("property ==") || after_connect.contains("property ==\"")
-                || after_connect.contains("prop ==") || after_connect.contains("if property")
+            if after_connect.contains("property ==")
+                || after_connect.contains("property ==\"")
+                || after_connect.contains("prop ==")
+                || after_connect.contains("if property")
                 || after_connect.contains("if prop ")
             {
                 continue;
@@ -96,8 +143,12 @@ impl Rule for PropertyChangeSignalWrong {
 }
 
 impl Rule for ClearAllChildrenLoop {
-    fn id(&self) -> &'static str { "instance::clear_all_children_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "instance::clear_all_children_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -105,7 +156,11 @@ impl Rule for ClearAllChildrenLoop {
         visit::each_call(ast, |call, ctx| {
             if ctx.in_hot_loop && visit::is_method_call(call, "Destroy") {
                 let src = format!("{call}");
-                if src.contains("child") || src.contains("obj") || src.contains("item") || src.contains("v:") {
+                if src.contains("child")
+                    || src.contains("obj")
+                    || src.contains("item")
+                    || src.contains("v:")
+                {
                     let pos = visit::call_pos(call);
                     let line_idx = source[..pos].matches('\n').count();
                     let start = line_idx.saturating_sub(5);
@@ -116,7 +171,8 @@ impl Rule for ClearAllChildrenLoop {
                     }
                     hits.push(Hit {
                         pos,
-                        msg: ":Destroy() in loop over children - use :ClearAllChildren() instead".into(),
+                        msg: ":Destroy() in loop over children - use :ClearAllChildren() instead"
+                            .into(),
                     });
                 }
             }
@@ -126,8 +182,12 @@ impl Rule for ClearAllChildrenLoop {
 }
 
 impl Rule for SetParentInLoop {
-    fn id(&self) -> &'static str { "instance::set_parent_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "instance::set_parent_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let parent_positions = visit::find_pattern_positions(source, ".Parent =");
@@ -150,9 +210,9 @@ impl Rule for SetParentInLoop {
                 if current.contains(").Parent") || current.contains("].Parent") {
                     return false;
                 }
-                let start = if line >= 5 { line - 5 } else { 0 };
-                for k in start..line {
-                    let prev = lines[k].trim();
+                let start = line.saturating_sub(5);
+                for prev_line in &lines[start..line] {
+                    let prev = prev_line.trim();
                     if prev.contains("Instance.new(") || prev.contains(":Clone()") {
                         return false;
                     }
@@ -168,8 +228,12 @@ impl Rule for SetParentInLoop {
 }
 
 impl Rule for PropertyBeforeParent {
-    fn id(&self) -> &'static str { "instance::property_before_parent" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "instance::property_before_parent"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let parent_positions = visit::find_pattern_positions(source, ".Parent =");
@@ -188,7 +252,9 @@ impl Rule for PropertyBeforeParent {
 
         let mut hits = Vec::new();
         for &parent_pos in &parent_positions {
-            let line = line_starts.partition_point(|&s| s <= parent_pos).saturating_sub(1);
+            let line = line_starts
+                .partition_point(|&s| s <= parent_pos)
+                .saturating_sub(1);
             if line < loop_depth.len() && loop_depth[line] > 0 {
                 continue;
             }
@@ -202,7 +268,9 @@ impl Rule for PropertyBeforeParent {
             let line_start = source[..parent_pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
             let parent_line = source[line_start..parent_pos].trim();
             let var_name = parent_line.strip_suffix(".Parent").unwrap_or(parent_line);
-            if var_name.is_empty() { continue; }
+            if var_name.is_empty() {
+                continue;
+            }
             let var_prefix = format!("{}.", var_name);
 
             let after_parent = parent_pos + ".Parent =".len();
@@ -215,11 +283,25 @@ impl Rule for PropertyBeforeParent {
                 if trimmed.is_empty() || trimmed.starts_with("--") {
                     continue;
                 }
-                if trimmed == "end" || trimmed.starts_with("end") || trimmed.starts_with("local ") || trimmed.starts_with("return") || trimmed.starts_with("elseif ") || trimmed == "else" || trimmed.contains("function(") || trimmed.contains("function (") {
+                if trimmed == "end"
+                    || trimmed.starts_with("end")
+                    || trimmed.starts_with("local ")
+                    || trimmed.starts_with("return")
+                    || trimmed.starts_with("elseif ")
+                    || trimmed == "else"
+                    || trimmed.contains("function(")
+                    || trimmed.contains("function (")
+                {
                     break;
                 }
-                if trimmed.starts_with(&var_prefix) && trimmed.contains(" = ") && !trimmed.contains(".Parent") {
-                    let dot_part = trimmed[var_prefix.len()..].split(|c: char| !c.is_alphanumeric()).next().unwrap_or("");
+                if trimmed.starts_with(&var_prefix)
+                    && trimmed.contains(" = ")
+                    && !trimmed.contains(".Parent")
+                {
+                    let dot_part = trimmed[var_prefix.len()..]
+                        .split(|c: char| !c.is_alphanumeric())
+                        .next()
+                        .unwrap_or("");
                     if dot_part.starts_with(|c: char| c.is_uppercase()) {
                         props_after += 1;
                     }
@@ -238,8 +320,12 @@ impl Rule for PropertyBeforeParent {
 }
 
 impl Rule for RepeatedFindFirstChild {
-    fn id(&self) -> &'static str { "instance::repeated_find_first_child" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "instance::repeated_find_first_child"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let positions = visit::find_pattern_positions(source, ":FindFirstChild(");
@@ -269,11 +355,19 @@ impl Rule for RepeatedFindFirstChild {
                     let between = &source[first_pos..*pos];
                     let has_scope_break = between.lines().any(|l| {
                         let t = l.trim();
-                        t == "return" || t.starts_with("return ") || t == "return;"
-                            || t == "else" || t.starts_with("elseif ")
-                            || t.starts_with("function ") || t.starts_with("local function ")
-                            || t.starts_with("for ") || t.starts_with("while ") || t == "repeat"
-                            || t == "end)" || t == "end))" || t == "end,"
+                        t == "return"
+                            || t.starts_with("return ")
+                            || t == "return;"
+                            || t == "else"
+                            || t.starts_with("elseif ")
+                            || t.starts_with("function ")
+                            || t.starts_with("local function ")
+                            || t.starts_with("for ")
+                            || t.starts_with("while ")
+                            || t == "repeat"
+                            || t == "end)"
+                            || t == "end))"
+                            || t == "end,"
                     });
                     if !has_scope_break {
                         hits.push(Hit {
@@ -291,20 +385,35 @@ impl Rule for RepeatedFindFirstChild {
 }
 
 impl Rule for ChangedOnMovingPart {
-    fn id(&self) -> &'static str { "instance::changed_on_moving_part" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "instance::changed_on_moving_part"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         for pos in visit::find_pattern_positions(source, ".Changed:Connect") {
             let before = &source[..pos];
-            let word_start = before.rfind(|c: char| !c.is_alphanumeric() && c != '_' && c != '.').map(|i| i + 1).unwrap_or(0);
+            let word_start = before
+                .rfind(|c: char| !c.is_alphanumeric() && c != '_' && c != '.')
+                .map(|i| i + 1)
+                .unwrap_or(0);
             let accessor = &source[word_start..pos];
-            if accessor == "self" || accessor.contains("self.") { continue; }
-            if word_start > 0 && source.as_bytes().get(word_start - 1) == Some(&b')') { continue; }
+            if accessor == "self" || accessor.contains("self.") {
+                continue;
+            }
+            if word_start > 0 && source.as_bytes().get(word_start - 1) == Some(&b')') {
+                continue;
+            }
             let al = accessor.to_lowercase();
-            let is_likely_part = al.contains("part") || al.contains("model") || al.contains("mesh")
-                || al.contains("union") || al == "workspace" || al.ends_with("cframe")
+            let is_likely_part = al.contains("part")
+                || al.contains("model")
+                || al.contains("mesh")
+                || al.contains("union")
+                || al == "workspace"
+                || al.ends_with("cframe")
                 || al.ends_with("position");
             if is_likely_part {
                 hits.push(Hit {
@@ -318,8 +427,12 @@ impl Rule for ChangedOnMovingPart {
 }
 
 impl Rule for BulkPropertySet {
-    fn id(&self) -> &'static str { "instance::bulk_property_set" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "instance::bulk_property_set"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -348,7 +461,10 @@ impl Rule for BulkPropertySet {
                     break;
                 }
                 if count >= 5 {
-                    let byte_pos = lines[..start_line].iter().map(|l| l.len() + 1).sum::<usize>();
+                    let byte_pos = lines[..start_line]
+                        .iter()
+                        .map(|l| l.len() + 1)
+                        .sum::<usize>();
                     hits.push(Hit {
                         pos: byte_pos,
                         msg: format!("{count} consecutive property sets on '{var}' - if parented, each triggers replication; consider BulkMoveTo or batching"),
@@ -364,8 +480,12 @@ impl Rule for BulkPropertySet {
 }
 
 impl Rule for CollectionServiceInLoop {
-    fn id(&self) -> &'static str { "instance::collection_service_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "instance::collection_service_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -391,8 +511,12 @@ impl Rule for CollectionServiceInLoop {
 }
 
 impl Rule for NameIndexingInLoop {
-    fn id(&self) -> &'static str { "instance::name_indexing_in_loop" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "instance::name_indexing_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let loop_depth = build_hot_loop_depth_map(source);
@@ -401,7 +525,9 @@ impl Rule for NameIndexingInLoop {
 
         for pos in visit::find_pattern_positions(source, "workspace.") {
             let after = &source[pos + "workspace.".len()..];
-            let name_end = after.find(|c: char| !c.is_alphanumeric() && c != '_').unwrap_or(after.len());
+            let name_end = after
+                .find(|c: char| !c.is_alphanumeric() && c != '_')
+                .unwrap_or(after.len());
             let name = &after[..name_end];
             if name.is_empty() || !name.starts_with(|c: char| c.is_uppercase()) {
                 continue;
@@ -438,7 +564,8 @@ fn parse_property_assignment(line: &str) -> Option<(&str, &str)> {
 
 fn extract_call_object(before: &str) -> String {
     let trimmed = before.trim_end();
-    let start = trimmed.rfind(|c: char| !c.is_alphanumeric() && c != '_' && c != '.' && c != ':')
+    let start = trimmed
+        .rfind(|c: char| !c.is_alphanumeric() && c != '_' && c != '.' && c != ':')
         .map(|i| i + 1)
         .unwrap_or(0);
     trimmed[start..].to_string()
@@ -478,13 +605,18 @@ fn build_hot_loop_depth_map(source: &str) -> Vec<u32> {
             depths.push(depth);
             continue;
         }
-        if trimmed.starts_with("while ") || trimmed.starts_with("repeat") {
-            depth += 1;
-        } else if trimmed.starts_with("for ") && !trimmed.contains(" in ") {
+        if trimmed.starts_with("while ")
+            || trimmed.starts_with("repeat")
+            || (trimmed.starts_with("for ") && !trimmed.contains(" in "))
+        {
             depth += 1;
         }
         depths.push(depth);
-        if trimmed == "end" || trimmed.starts_with("end ") || trimmed.starts_with("until ") || trimmed == "until" {
+        if trimmed == "end"
+            || trimmed.starts_with("end ")
+            || trimmed.starts_with("until ")
+            || trimmed == "until"
+        {
             depth = depth.saturating_sub(1);
         }
     }
@@ -492,8 +624,12 @@ fn build_hot_loop_depth_map(source: &str) -> Vec<u32> {
 }
 
 impl Rule for DestroyInLoop {
-    fn id(&self) -> &'static str { "instance::destroy_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "instance::destroy_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -510,19 +646,49 @@ impl Rule for DestroyInLoop {
 }
 
 impl Rule for GetChildrenInLoop {
-    fn id(&self) -> &'static str { "instance::get_children_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "instance::get_children_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_hot_loop && (visit::is_method_call(call, "GetChildren") || visit::is_method_call(call, "GetDescendants")) {
+            if ctx.in_hot_loop
+                && (visit::is_method_call(call, "GetChildren")
+                    || visit::is_method_call(call, "GetDescendants"))
+            {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
                     msg: ":GetChildren/:GetDescendants in loop allocates a new table each call - cache outside the loop".into(),
                 });
             }
         });
+        hits
+    }
+}
+
+impl Rule for ClassNameOverIsA {
+    fn id(&self) -> &'static str {
+        "instance::classname_over_isa"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        let patterns = [".ClassName == ", ".ClassName ~= "];
+        for pat in &patterns {
+            for pos in visit::find_pattern_positions(source, pat) {
+                hits.push(Hit {
+                    pos,
+                    msg: ".ClassName comparison doesn't account for class inheritance - use :IsA() instead which handles subclasses (e.g. MeshPart, WedgePart are also BaseParts)".into(),
+                });
+            }
+        }
         hits
     }
 }

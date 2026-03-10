@@ -158,3 +158,27 @@ fn changed_skip_property_filter() {
     let hits = PropertyChangeSignalWrong.check(src, &ast);
     assert_eq!(hits.len(), 0);
 }
+
+#[test]
+fn classname_eq_detected() {
+    let src = "if obj.ClassName == \"Part\" then end";
+    let ast = parse(src);
+    let hits = ClassNameOverIsA.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn classname_neq_detected() {
+    let src = "if obj.ClassName ~= \"Model\" then end";
+    let ast = parse(src);
+    let hits = ClassNameOverIsA.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn isa_ok() {
+    let src = "if obj:IsA(\"Part\") then end";
+    let ast = parse(src);
+    let hits = ClassNameOverIsA.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}

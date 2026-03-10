@@ -352,3 +352,35 @@ fn if_return_true_no_else_ok() {
     let hits = RedundantBoolReturn.check(src, &ast);
     assert_eq!(hits.len(), 0);
 }
+
+#[test]
+fn redundant_nil_check_neq_detected() {
+    let src = "if parent:FindFirstChild(\"Name\") ~= nil then end";
+    let ast = parse(src);
+    let hits = RedundantNilCheck.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn redundant_nil_check_eq_detected() {
+    let src = "if parent:FindFirstChild(\"Name\") == nil then end";
+    let ast = parse(src);
+    let hits = RedundantNilCheck.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn find_first_child_no_nil_check_ok() {
+    let src = "if parent:FindFirstChild(\"Name\") then end";
+    let ast = parse(src);
+    let hits = RedundantNilCheck.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn find_first_child_of_class_nil_check_detected() {
+    let src = "if workspace:FindFirstChildOfClass(\"Part\") ~= nil then end";
+    let ast = parse(src);
+    let hits = RedundantNilCheck.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}

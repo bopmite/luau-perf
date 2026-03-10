@@ -615,6 +615,24 @@ fn test_fix_ipairs_over_generalized() {
 }
 
 #[test]
+fn test_fix_classname_eq() {
+    let src = "if obj.ClassName == \"Part\" then end";
+    let fix = compute_fix("instance::classname_over_isa", src, 6).unwrap();
+    let mut result = src.to_string();
+    result.replace_range(fix.start..fix.end, &fix.replacement);
+    assert_eq!(result, "if obj:IsA(\"Part\") then end");
+}
+
+#[test]
+fn test_fix_classname_neq() {
+    let src = "if obj.ClassName ~= \"Model\" then end";
+    let fix = compute_fix("instance::classname_over_isa", src, 6).unwrap();
+    let mut result = src.to_string();
+    result.replace_range(fix.start..fix.end, &fix.replacement);
+    assert_eq!(result, "if not obj:IsA(\"Model\") then end");
+}
+
+#[test]
 fn test_fix_pairs_nested_call() {
     let src = "for k, v in pairs(getTable()) do";
     let fix = compute_fix("table::pairs_over_generalized", src, 9).unwrap();

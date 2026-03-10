@@ -31,6 +31,7 @@ pub struct MatchForExistence;
 pub struct NestedStringFormat;
 pub struct CoroutineCreateOverTaskSpawn;
 pub struct RedundantBoolReturn;
+pub struct RedundantNilCheck;
 
 impl Rule for ServiceLocatorAntiPattern {
     fn id(&self) -> &'static str {
@@ -1088,7 +1089,7 @@ impl Rule for RedundantBoolReturn {
         "style::redundant_bool_return"
     }
     fn severity(&self) -> Severity {
-        Severity::Allow
+        Severity::Warn
     }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
@@ -1114,6 +1115,41 @@ impl Rule for RedundantBoolReturn {
                     pos: byte_pos,
                     msg: "if/else returning true/false - simplify to return <condition>".into(),
                 });
+            }
+        }
+        hits
+    }
+}
+
+impl Rule for RedundantNilCheck {
+    fn id(&self) -> &'static str {
+        "style::redundant_nil_check"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
+
+    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let mut hits = Vec::new();
+        let truthy_patterns = [
+            ":FindFirstChild(",
+            ":FindFirstChildOfClass(",
+            ":FindFirstChildWhichIsA(",
+            ":FindFirstAncestor(",
+            ":FindFirstAncestorOfClass(",
+            ":FindFirstAncestorWhichIsA(",
+        ];
+        for pat in &truthy_patterns {
+            for pos in visit::find_pattern_positions(source, pat) {
+                let line_start = source[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
+                let line_end = source[pos..].find('\n').map(|i| pos + i).unwrap_or(source.len());
+                let line = &source[line_start..line_end];
+                if line.contains("~= nil") || line.contains("== nil") {
+                    hits.push(Hit {
+                        pos,
+                        msg: "FindFirstChild result already returns nil on failure - the ~= nil / == nil comparison is redundant".into(),
+                    });
+                }
             }
         }
         hits

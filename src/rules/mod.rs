@@ -312,6 +312,7 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(instance::NameIndexingInLoop),
         Box::new(instance::DestroyInLoop),
         Box::new(instance::GetChildrenInLoop),
+        Box::new(instance::ClassNameOverIsA),
         // style
         Box::new(style::ServiceLocatorAntiPattern),
         Box::new(style::EmptyFunctionBody),
@@ -341,6 +342,7 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(style::NestedStringFormat),
         Box::new(style::CoroutineCreateOverTaskSpawn),
         Box::new(style::RedundantBoolReturn),
+        Box::new(style::RedundantNilCheck),
     ]
 }
 
@@ -582,6 +584,7 @@ pub fn rule_level(id: &str) -> crate::lint::Level {
         | "instance::collection_service_in_loop"
         | "instance::destroy_in_loop"
         | "instance::get_children_in_loop"
+        | "instance::classname_over_isa"
 
         // physics
         | "physics::spatial_query_in_loop"
@@ -721,6 +724,7 @@ pub fn is_fixable(id: &str) -> bool {
             | "string::tostring_on_string"
             | "math::pow_two"
             | "table::pairs_over_generalized"
+            | "instance::classname_over_isa"
     )
 }
 
@@ -1072,6 +1076,8 @@ fn explain_text(id: &str) -> &'static str {
         "roblox::get_descendants_in_heartbeat" => ":GetDescendants()/:GetChildren() in a RunService per-frame callback (Heartbeat, RenderStepped, Stepped) allocates a new table of all children/descendants every frame at 60Hz. Cache the list outside the callback and update it via ChildAdded/ChildRemoved events.",
         "table::table_insert_front_in_loop" => "table.insert(t, 1, value) in a loop shifts all existing elements right on each call - O(n) per insertion. Over m iterations, total cost is O(n*m). Append to the end with table.insert(t, v) and reverse after the loop, or use a different data structure.",
         "style::redundant_bool_return" => "if condition then return true else return false end is equivalent to return condition. The simplified form is clearer and avoids unnecessary branching.",
+        "instance::classname_over_isa" => ".ClassName == \"Part\" only matches the exact class, not subclasses. :IsA(\"Part\") correctly handles inheritance - MeshPart, WedgePart, etc. are all BaseParts. :IsA() is also a native C++ method that avoids Lua string comparison.",
+        "style::redundant_nil_check" => "FindFirstChild() and similar methods return nil when no match is found. Comparing the result to nil (~= nil or == nil) is redundant since nil is already falsy in Luau. Just use if obj:FindFirstChild(\"X\") then directly.",
 
         _ => "No detailed explanation available for this rule. Run --list-rules to see all rules.",
     }

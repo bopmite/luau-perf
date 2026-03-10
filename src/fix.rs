@@ -52,6 +52,7 @@ pub fn compute_fix(rule_id: &str, source: &str, pos: usize) -> Option<Fix> {
         "string::tostring_on_string" => fix_tostring_on_string(source, pos),
         "math::pow_two" => fix_pow_two(source, pos),
         "table::pairs_over_generalized" => fix_pairs_over_generalized(source, pos),
+        "instance::classname_over_isa" => fix_classname_over_isa(source, pos),
         _ => None,
     }
 }
@@ -995,6 +996,41 @@ fn fix_ypcall(source: &str, pos: usize) -> Option<Fix> {
         start: pos,
         end: pos + 6,
         replacement: "pcall".into(),
+    })
+}
+
+fn fix_classname_over_isa(source: &str, pos: usize) -> Option<Fix> {
+    let rest = source.get(pos..)?;
+    let (pat, op) = if rest.starts_with(".ClassName == ") {
+        (".ClassName == ", "==")
+    } else if rest.starts_with(".ClassName ~= ") {
+        (".ClassName ~= ", "~=")
+    } else {
+        return None;
+    };
+    let after = &rest[pat.len()..];
+    let quote = after.chars().next()?;
+    if quote != '"' && quote != '\'' {
+        return None;
+    }
+    let close_quote = after[1..].find(quote)?;
+    let class_name = &after[1..close_quote + 1];
+    let end = pos + pat.len() + close_quote + 2;
+    let before = &source[..pos];
+    let var_end = before.len();
+    let var_start = before[..var_end]
+        .rfind(|c: char| !c.is_alphanumeric() && c != '_' && c != '.' && c != ':' && c != '[' && c != ']')
+        .map(|i| i + 1)
+        .unwrap_or(0);
+    let var = &before[var_start..var_end];
+    if var.is_empty() {
+        return None;
+    }
+    let prefix = if op == "~=" { "not " } else { "" };
+    Some(Fix {
+        start: var_start,
+        end,
+        replacement: format!("{prefix}{var}:IsA({quote}{class_name}{quote})"),
     })
 }
 
