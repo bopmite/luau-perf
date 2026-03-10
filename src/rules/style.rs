@@ -1144,12 +1144,21 @@ impl Rule for RedundantNilCheck {
                 let line_start = source[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
                 let line_end = source[pos..].find('\n').map(|i| pos + i).unwrap_or(source.len());
                 let line = &source[line_start..line_end];
-                if line.contains("~= nil") || line.contains("== nil") {
-                    hits.push(Hit {
-                        pos,
-                        msg: "FindFirstChild result already returns nil on failure - the ~= nil / == nil comparison is redundant".into(),
-                    });
+                if !line.contains("~= nil") && !line.contains("== nil") {
+                    continue;
                 }
+                let trimmed = line.trim();
+                let in_condition = trimmed.starts_with("if ")
+                    || trimmed.starts_with("elseif ")
+                    || trimmed.starts_with("while ")
+                    || trimmed.starts_with("until ");
+                if !in_condition {
+                    continue;
+                }
+                hits.push(Hit {
+                    pos,
+                    msg: "FindFirstChild result already returns nil on failure - the ~= nil / == nil comparison is redundant".into(),
+                });
             }
         }
         hits

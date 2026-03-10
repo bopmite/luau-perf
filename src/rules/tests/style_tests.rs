@@ -384,3 +384,19 @@ fn find_first_child_of_class_nil_check_detected() {
     let hits = RedundantNilCheck.check(src, &ast);
     assert_eq!(hits.len(), 1);
 }
+
+#[test]
+fn nil_check_in_assignment_not_flagged() {
+    let src = "local hasChild = parent:FindFirstChild(\"X\") ~= nil";
+    let ast = parse(src);
+    let hits = RedundantNilCheck.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn nil_check_in_return_not_flagged() {
+    let src = "return parent:FindFirstChild(\"X\") ~= nil";
+    let ast = parse(src);
+    let hits = RedundantNilCheck.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
