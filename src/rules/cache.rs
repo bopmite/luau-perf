@@ -4,21 +4,25 @@ use crate::visit;
 fn is_in_factory_function(source: &str, pos: usize, type_name: &str) -> bool {
     let window_end = (pos + 500).min(source.len());
     let after = &source[pos..window_end];
-    let check_end = after.find("\nfunction ").or_else(|| after.find("\nlocal function ")).unwrap_or(after.len());
+    let check_end = after
+        .find("\nfunction ")
+        .or_else(|| after.find("\nlocal function "))
+        .unwrap_or(after.len());
     let body = &after[..check_end];
-    body.contains("return params") || body.contains("return result")
+    body.contains("return params")
+        || body.contains("return result")
         || body.contains(&format!("return {}", type_name.to_lowercase()))
         || body.contains(&format!("return {type_name}"))
 }
 
 fn has_dynamic_args(call: &full_moon::ast::FunctionCall) -> bool {
-    if let Some(args) = visit::call_args(call) {
-        if let full_moon::ast::FunctionArgs::Parentheses { arguments, .. } = args {
-            for arg in arguments.iter() {
-                let s = format!("{arg}").trim().to_string();
-                if s.contains(|c: char| c.is_ascii_lowercase()) && !s.starts_with("Enum.") {
-                    return true;
-                }
+    if let Some(full_moon::ast::FunctionArgs::Parentheses { arguments, .. }) =
+        visit::call_args(call)
+    {
+        for arg in arguments.iter() {
+            let s = format!("{arg}").trim().to_string();
+            if s.contains(|c: char| c.is_ascii_lowercase()) && !s.starts_with("Enum.") {
+                return true;
             }
         }
     }
@@ -53,8 +57,12 @@ pub struct RepeatedPropertyChain;
 pub struct LoadAnimationInLoop;
 
 impl Rule for MagnitudeOverSquared {
-    fn id(&self) -> &'static str { "cache::magnitude_over_squared" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "cache::magnitude_over_squared"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         visit::find_pattern_positions(source, ".Magnitude")
@@ -74,7 +82,7 @@ impl Rule for MagnitudeOverSquared {
                 if line.contains(".Unit") {
                     return false;
                 }
-                let cmp_val = after.trim_start_matches(|c: char| c == '<' || c == '>' || c == '=' || c == '~')
+                let cmp_val = after.trim_start_matches(['<', '>', '=', '~'])
                     .trim_start();
                 if cmp_val.starts_with('0') && !cmp_val[1..].starts_with(|c: char| c.is_ascii_digit() || c == '.') {
                     return false;
@@ -90,8 +98,12 @@ impl Rule for MagnitudeOverSquared {
 }
 
 impl Rule for UncachedGetService {
-    fn id(&self) -> &'static str { "cache::uncached_get_service" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "cache::uncached_get_service"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -115,7 +127,8 @@ impl Rule for UncachedGetService {
                         }
                         hits.push(Hit {
                             pos,
-                            msg: "game:GetService() inside function body - cache at module level".into(),
+                            msg: "game:GetService() inside function body - cache at module level"
+                                .into(),
                         });
                     }
                 }
@@ -126,8 +139,12 @@ impl Rule for UncachedGetService {
 }
 
 impl Rule for TweenInfoInFunction {
-    fn id(&self) -> &'static str { "cache::tween_info_in_function" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "cache::tween_info_in_function"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -135,18 +152,33 @@ impl Rule for TweenInfoInFunction {
             if ctx.in_func && visit::is_dot_call(call, "TweenInfo", "new") {
                 let pos = visit::call_pos(call);
                 let call_start = pos + "TweenInfo.new(".len();
-                let call_end = source[call_start..].find(')').map(|i| call_start + i).unwrap_or(call_start);
+                let call_end = source[call_start..]
+                    .find(')')
+                    .map(|i| call_start + i)
+                    .unwrap_or(call_start);
                 let args = &source[call_start..call_end];
-                let has_variable = args.split(',').next().map(|first| {
-                    let first = first.trim();
-                    !first.is_empty() && first.chars().next().map(|c| c.is_ascii_lowercase()).unwrap_or(false)
-                }).unwrap_or(false);
+                let has_variable = args
+                    .split(',')
+                    .next()
+                    .map(|first| {
+                        let first = first.trim();
+                        !first.is_empty()
+                            && first
+                                .chars()
+                                .next()
+                                .map(|c| c.is_ascii_lowercase())
+                                .unwrap_or(false)
+                    })
+                    .unwrap_or(false);
                 let msg = if has_variable {
                     "TweenInfo.new() with dynamic duration in function - allocates each call, consider caching if inputs are stable"
                 } else {
                     "TweenInfo.new() in function - cache as module-level constant if arguments are fixed"
                 };
-                hits.push(Hit { pos, msg: msg.into() });
+                hits.push(Hit {
+                    pos,
+                    msg: msg.into(),
+                });
             }
         });
         hits
@@ -154,15 +186,21 @@ impl Rule for TweenInfoInFunction {
 }
 
 impl Rule for RaycastParamsInFunction {
-    fn id(&self) -> &'static str { "cache::raycast_params_in_function" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "cache::raycast_params_in_function"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
             if ctx.in_func && visit::is_dot_call(call, "RaycastParams", "new") {
                 let pos = visit::call_pos(call);
-                if is_in_factory_function(source, pos, "RaycastParams") { return; }
+                if is_in_factory_function(source, pos, "RaycastParams") {
+                    return;
+                }
                 hits.push(Hit {
                     pos,
                     msg: "RaycastParams.new() in function - cache and reuse".into(),
@@ -174,8 +212,12 @@ impl Rule for RaycastParamsInFunction {
 }
 
 impl Rule for InstanceNewInLoop {
-    fn id(&self) -> &'static str { "cache::instance_new_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "cache::instance_new_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -192,8 +234,12 @@ impl Rule for InstanceNewInLoop {
 }
 
 impl Rule for CFrameNewInLoop {
-    fn id(&self) -> &'static str { "cache::cframe_new_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "cache::cframe_new_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -209,7 +255,8 @@ impl Rule for CFrameNewInLoop {
             if is_cframe {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
-                    msg: "CFrame constructor in loop - cache if arguments are loop-invariant".into(),
+                    msg: "CFrame constructor in loop - cache if arguments are loop-invariant"
+                        .into(),
                 });
             }
         });
@@ -218,8 +265,12 @@ impl Rule for CFrameNewInLoop {
 }
 
 impl Rule for Vector3NewInLoop {
-    fn id(&self) -> &'static str { "cache::vector3_new_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "cache::vector3_new_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -236,8 +287,12 @@ impl Rule for Vector3NewInLoop {
 }
 
 impl Rule for Vector2NewInLoop {
-    fn id(&self) -> &'static str { "cache::vector2_new_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "cache::vector2_new_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -254,15 +309,21 @@ impl Rule for Vector2NewInLoop {
 }
 
 impl Rule for OverlapParamsInFunction {
-    fn id(&self) -> &'static str { "cache::overlap_params_in_function" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "cache::overlap_params_in_function"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
             if ctx.in_func && visit::is_dot_call(call, "OverlapParams", "new") {
                 let pos = visit::call_pos(call);
-                if is_in_factory_function(source, pos, "OverlapParams") { return; }
+                if is_in_factory_function(source, pos, "OverlapParams") {
+                    return;
+                }
                 hits.push(Hit {
                     pos,
                     msg: "OverlapParams.new() in function - cache at module level and reuse".into(),
@@ -274,13 +335,20 @@ impl Rule for OverlapParamsInFunction {
 }
 
 impl Rule for NumberRangeInFunction {
-    fn id(&self) -> &'static str { "cache::number_range_in_function" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "cache::number_range_in_function"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_func && visit::is_dot_call(call, "NumberRange", "new") && !has_dynamic_args(call) {
+            if ctx.in_func
+                && visit::is_dot_call(call, "NumberRange", "new")
+                && !has_dynamic_args(call)
+            {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
                     msg: "NumberRange.new() in function - cache as module-level constant if arguments are fixed".into(),
@@ -292,13 +360,20 @@ impl Rule for NumberRangeInFunction {
 }
 
 impl Rule for NumberSequenceInFunction {
-    fn id(&self) -> &'static str { "cache::number_sequence_in_function" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "cache::number_sequence_in_function"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_func && visit::is_dot_call(call, "NumberSequence", "new") && !has_dynamic_args(call) {
+            if ctx.in_func
+                && visit::is_dot_call(call, "NumberSequence", "new")
+                && !has_dynamic_args(call)
+            {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
                     msg: "NumberSequence.new() in function - cache as module-level constant if arguments are fixed".into(),
@@ -310,24 +385,40 @@ impl Rule for NumberSequenceInFunction {
 }
 
 impl Rule for ColorSequenceInFunction {
-    fn id(&self) -> &'static str { "cache::color_sequence_in_function" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "cache::color_sequence_in_function"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_func && visit::is_dot_call(call, "ColorSequence", "new") && !has_dynamic_args(call) {
+            if ctx.in_func
+                && visit::is_dot_call(call, "ColorSequence", "new")
+                && !has_dynamic_args(call)
+            {
                 let pos = visit::call_pos(call);
                 let line_start = source[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
-                let line = &source[line_start..source[pos..].find('\n').map(|i| pos + i).unwrap_or(source.len())];
-                let has_variable_arg = line.contains("keypoints") || line.contains("colors")
-                    || line.contains("Keypoint") || line.contains("table");
+                let line = &source[line_start
+                    ..source[pos..]
+                        .find('\n')
+                        .map(|i| pos + i)
+                        .unwrap_or(source.len())];
+                let has_variable_arg = line.contains("keypoints")
+                    || line.contains("colors")
+                    || line.contains("Keypoint")
+                    || line.contains("table");
                 let msg = if has_variable_arg {
                     "ColorSequence.new() with dynamic keypoints in function - allocates each call, consider caching if inputs are stable"
                 } else {
                     "ColorSequence.new() in function - cache as module-level constant if arguments are fixed"
                 };
-                hits.push(Hit { pos, msg: msg.into() });
+                hits.push(Hit {
+                    pos,
+                    msg: msg.into(),
+                });
             }
         });
         hits
@@ -335,18 +426,27 @@ impl Rule for ColorSequenceInFunction {
 }
 
 impl Rule for TweenCreateInLoop {
-    fn id(&self) -> &'static str { "cache::tween_create_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "cache::tween_create_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
             if ctx.in_hot_loop && visit::is_method_call(call, "Create") {
                 let src = format!("{call}");
-                if src.contains("TweenService") || src.contains("tweenService") || src.contains("Tween") {
+                if src.contains("TweenService")
+                    || src.contains("tweenService")
+                    || src.contains("Tween")
+                {
                     hits.push(Hit {
                         pos: visit::call_pos(call),
-                        msg: "TweenService:Create() in loop - creates new tween object per iteration".into(),
+                        msg:
+                            "TweenService:Create() in loop - creates new tween object per iteration"
+                                .into(),
                     });
                 }
             }
@@ -356,8 +456,12 @@ impl Rule for TweenCreateInLoop {
 }
 
 impl Rule for GetAttributeInLoop {
-    fn id(&self) -> &'static str { "cache::get_attribute_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "cache::get_attribute_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -377,7 +481,9 @@ impl Rule for GetAttributeInLoop {
                 }
                 hits.push(Hit {
                     pos,
-                    msg: ":GetAttribute() in loop - ~247ns bridge cost per call, cache outside loop".into(),
+                    msg:
+                        ":GetAttribute() in loop - ~247ns bridge cost per call, cache outside loop"
+                            .into(),
                 });
             }
         });
@@ -386,8 +492,12 @@ impl Rule for GetAttributeInLoop {
 }
 
 impl Rule for Color3NewInLoop {
-    fn id(&self) -> &'static str { "cache::color3_new_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "cache::color3_new_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -402,7 +512,8 @@ impl Rule for Color3NewInLoop {
             if is_color3 {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
-                    msg: "Color3 constructor in loop - cache if arguments are loop-invariant".into(),
+                    msg: "Color3 constructor in loop - cache if arguments are loop-invariant"
+                        .into(),
                 });
             }
         });
@@ -411,8 +522,12 @@ impl Rule for Color3NewInLoop {
 }
 
 impl Rule for UDim2NewInLoop {
-    fn id(&self) -> &'static str { "cache::udim2_new_in_loop" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "cache::udim2_new_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -435,13 +550,21 @@ impl Rule for UDim2NewInLoop {
 }
 
 impl Rule for RepeatedMethodCall {
-    fn id(&self) -> &'static str { "cache::repeated_method_call" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "cache::repeated_method_call"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let expensive_methods = [
-            ":GetChildren()", ":GetDescendants()", ":GetAttributes()",
-            ":GetTags()", ":GetBoundingBox()", ":GetPivot()",
+            ":GetChildren()",
+            ":GetDescendants()",
+            ":GetAttributes()",
+            ":GetTags()",
+            ":GetBoundingBox()",
+            ":GetPivot()",
         ];
         let mut hits = Vec::new();
         for method in &expensive_methods {
@@ -453,11 +576,18 @@ impl Rule for RepeatedMethodCall {
             for &pos in &positions {
                 let before = &source[..pos];
                 let obj_end = before.len();
-                let obj_start = before.rfind(|c: char| !c.is_alphanumeric() && c != '_' && c != '.')
+                let obj_start = before
+                    .rfind(|c: char| !c.is_alphanumeric() && c != '_' && c != '.')
                     .map(|i| i + 1)
                     .unwrap_or(0);
                 let obj = &source[obj_start..obj_end];
-                if !obj.is_empty() && obj.chars().next().map(|c| c.is_alphabetic()).unwrap_or(false) {
+                if !obj.is_empty()
+                    && obj
+                        .chars()
+                        .next()
+                        .map(|c| c.is_alphabetic())
+                        .unwrap_or(false)
+                {
                     calls.push((pos, obj.to_string()));
                 }
             }
@@ -482,8 +612,12 @@ impl Rule for RepeatedMethodCall {
 }
 
 impl Rule for CurrentCameraUncached {
-    fn id(&self) -> &'static str { "cache::current_camera_uncached" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "cache::current_camera_uncached"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let positions = visit::find_pattern_positions(source, "workspace.CurrentCamera");
@@ -501,30 +635,40 @@ impl Rule for CurrentCameraUncached {
 }
 
 impl Rule for LocalPlayerUncached {
-    fn id(&self) -> &'static str { "cache::local_player_uncached" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "cache::local_player_uncached"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let positions = visit::find_pattern_positions(source, ".LocalPlayer");
-        let positions: Vec<_> = positions.into_iter().filter(|&p| {
-            let after = &source[p + ".LocalPlayer".len()..];
-            if after.starts_with("Uncached") || after.starts_with("_") {
-                return false;
-            }
-            let line_start = source[..p].rfind('\n').map(|i| i + 1).unwrap_or(0);
-            let line_end = source[p..].find('\n').map(|i| p + i).unwrap_or(source.len());
-            let line = &source[line_start..line_end];
-            if line.contains("~= nil") || line.contains("== nil") {
-                return false;
-            }
-            if line.contains("LocalPlayer =") && line.contains(".LocalPlayer") {
-                let lhs = line.split('=').next().unwrap_or("").trim();
-                if lhs.ends_with("LocalPlayer") {
+        let positions: Vec<_> = positions
+            .into_iter()
+            .filter(|&p| {
+                let after = &source[p + ".LocalPlayer".len()..];
+                if after.starts_with("Uncached") || after.starts_with("_") {
                     return false;
                 }
-            }
-            true
-        }).collect();
+                let line_start = source[..p].rfind('\n').map(|i| i + 1).unwrap_or(0);
+                let line_end = source[p..]
+                    .find('\n')
+                    .map(|i| p + i)
+                    .unwrap_or(source.len());
+                let line = &source[line_start..line_end];
+                if line.contains("~= nil") || line.contains("== nil") {
+                    return false;
+                }
+                if line.contains("LocalPlayer =") && line.contains(".LocalPlayer") {
+                    let lhs = line.split('=').next().unwrap_or("").trim();
+                    if lhs.ends_with("LocalPlayer") {
+                        return false;
+                    }
+                }
+                true
+            })
+            .collect();
         if positions.len() < 2 {
             return vec![];
         }
@@ -532,15 +676,20 @@ impl Rule for LocalPlayerUncached {
             .iter()
             .map(|&pos| Hit {
                 pos,
-                msg: "Players.LocalPlayer accessed multiple times - cache in a module-level local".into(),
+                msg: "Players.LocalPlayer accessed multiple times - cache in a module-level local"
+                    .into(),
             })
             .collect()
     }
 }
 
 impl Rule for WorkspaceLookupInLoop {
-    fn id(&self) -> &'static str { "cache::workspace_lookup_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "cache::workspace_lookup_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -552,17 +701,16 @@ impl Rule for WorkspaceLookupInLoop {
                 Some(t) => t,
                 None => return,
             };
-            if visit::tok_text(tok) == "workspace" {
-                if visit::is_method_call(call, "FindFirstChild")
+            if visit::tok_text(tok) == "workspace"
+                && (visit::is_method_call(call, "FindFirstChild")
                     || visit::is_method_call(call, "WaitForChild")
                     || visit::is_method_call(call, "FindFirstChildOfClass")
-                    || visit::is_method_call(call, "FindFirstChildWhichIsA")
-                {
-                    hits.push(Hit {
-                        pos: visit::call_pos(call),
-                        msg: "workspace lookup in loop - cache the result outside the loop".into(),
-                    });
-                }
+                    || visit::is_method_call(call, "FindFirstChildWhichIsA"))
+            {
+                hits.push(Hit {
+                    pos: visit::call_pos(call),
+                    msg: "workspace lookup in loop - cache the result outside the loop".into(),
+                });
             }
         });
         hits
@@ -570,19 +718,26 @@ impl Rule for WorkspaceLookupInLoop {
 }
 
 impl Rule for RepeatedColor3 {
-    fn id(&self) -> &'static str { "cache::repeated_color3" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "cache::repeated_color3"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
-        let mut counts: std::collections::HashMap<String, (usize, usize)> = std::collections::HashMap::new();
+        let mut counts: std::collections::HashMap<String, (usize, usize)> =
+            std::collections::HashMap::new();
         let mut start = 0;
         while let Some(idx) = source[start..].find("Color3.fromRGB(") {
             let abs = start + idx;
             let after = &source[abs + "Color3.fromRGB(".len()..];
             if let Some(close) = after.find(')') {
                 let args = after[..close].to_string();
-                let entry = counts.entry(format!("Color3.fromRGB({})", args)).or_insert((0, abs));
+                let entry = counts
+                    .entry(format!("Color3.fromRGB({})", args))
+                    .or_insert((0, abs));
                 entry.0 += 1;
             }
             start = abs + 1;
@@ -593,7 +748,9 @@ impl Rule for RepeatedColor3 {
             let after = &source[abs + "Color3.new(".len()..];
             if let Some(close) = after.find(')') {
                 let args = after[..close].to_string();
-                let entry = counts.entry(format!("Color3.new({})", args)).or_insert((0, abs));
+                let entry = counts
+                    .entry(format!("Color3.new({})", args))
+                    .or_insert((0, abs));
                 entry.0 += 1;
             }
             start = abs + 1;
@@ -602,7 +759,10 @@ impl Rule for RepeatedColor3 {
             if *count >= 4 {
                 hits.push(Hit {
                     pos: *pos,
-                    msg: format!("{} repeated {} times - extract to a module-level constant", call, count),
+                    msg: format!(
+                        "{} repeated {} times - extract to a module-level constant",
+                        call, count
+                    ),
                 });
             }
         }
@@ -611,8 +771,12 @@ impl Rule for RepeatedColor3 {
 }
 
 impl Rule for EnumLookupInLoop {
-    fn id(&self) -> &'static str { "cache::enum_lookup_in_loop" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "cache::enum_lookup_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -628,11 +792,20 @@ impl Rule for EnumLookupInLoop {
                     if after_dot2.starts_with(|c: char| c.is_ascii_uppercase()) {
                         let line = line_starts.partition_point(|&s| s <= abs).saturating_sub(1);
                         if line < loop_depth.len() && loop_depth[line] > 0 {
-                            let end = abs + 5 + dot2 + 1 + after_dot2.find(|c: char| !c.is_alphanumeric() && c != '_').unwrap_or(after_dot2.len());
+                            let end = abs
+                                + 5
+                                + dot2
+                                + 1
+                                + after_dot2
+                                    .find(|c: char| !c.is_alphanumeric() && c != '_')
+                                    .unwrap_or(after_dot2.len());
                             let enum_val = &source[abs..end];
                             hits.push(Hit {
                                 pos: abs,
-                                msg: format!("{} in loop - cache enum value outside the loop", enum_val),
+                                msg: format!(
+                                    "{} in loop - cache enum value outside the loop",
+                                    enum_val
+                                ),
                             });
                         }
                     }
@@ -645,8 +818,12 @@ impl Rule for EnumLookupInLoop {
 }
 
 impl Rule for RepeatedPropertyChain {
-    fn id(&self) -> &'static str { "cache::repeated_property_chain" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "cache::repeated_property_chain"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let chains = [
@@ -676,7 +853,10 @@ impl Rule for RepeatedPropertyChain {
             if positions.len() >= 3 {
                 hits.push(Hit {
                     pos: positions[2],
-                    msg: format!("{chain} accessed {} times - cache in a local", positions.len()),
+                    msg: format!(
+                        "{chain} accessed {} times - cache in a local",
+                        positions.len()
+                    ),
                 });
             }
         }
@@ -685,8 +865,12 @@ impl Rule for RepeatedPropertyChain {
 }
 
 impl Rule for LoadAnimationInLoop {
-    fn id(&self) -> &'static str { "cache::load_animation_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "cache::load_animation_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -705,7 +889,9 @@ impl Rule for LoadAnimationInLoop {
 fn line_start_offsets(source: &str) -> Vec<usize> {
     let mut starts = vec![0];
     for (i, b) in source.bytes().enumerate() {
-        if b == b'\n' { starts.push(i + 1); }
+        if b == b'\n' {
+            starts.push(i + 1);
+        }
     }
     starts
 }
@@ -734,13 +920,18 @@ fn build_hot_loop_depth_map(source: &str) -> Vec<u32> {
             depths.push(depth);
             continue;
         }
-        if trimmed.starts_with("while ") || trimmed.starts_with("repeat") {
-            depth += 1;
-        } else if trimmed.starts_with("for ") && !trimmed.contains(" in ") {
+        if trimmed.starts_with("while ")
+            || trimmed.starts_with("repeat")
+            || (trimmed.starts_with("for ") && !trimmed.contains(" in "))
+        {
             depth += 1;
         }
         depths.push(depth);
-        if trimmed == "end" || trimmed.starts_with("end ") || trimmed.starts_with("until ") || trimmed == "until" {
+        if trimmed == "end"
+            || trimmed.starts_with("end ")
+            || trimmed.starts_with("until ")
+            || trimmed == "until"
+        {
             depth = depth.saturating_sub(1);
         }
     }
@@ -748,8 +939,12 @@ fn build_hot_loop_depth_map(source: &str) -> Vec<u32> {
 }
 
 impl Rule for BrickColorNewInLoop {
-    fn id(&self) -> &'static str { "cache::brick_color_new_in_loop" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "cache::brick_color_new_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -766,8 +961,12 @@ impl Rule for BrickColorNewInLoop {
 }
 
 impl Rule for RegionNewInLoop {
-    fn id(&self) -> &'static str { "cache::region_new_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "cache::region_new_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();

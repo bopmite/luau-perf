@@ -5,23 +5,36 @@ fn is_structured_traversal(source: &str, pos: usize) -> bool {
     let before = &source[..pos];
     let inner_line_start = before.rfind('\n').map(|i| i + 1).unwrap_or(0);
     let inner_line = &source[inner_line_start..pos + 50.min(source.len() - pos)];
-    let inner_arg = if let Some(start) = inner_line.rfind("pairs(").or_else(|| inner_line.rfind("ipairs(")) {
-        let arg_start = inner_line[start..].find('(').map(|i| start + i + 1).unwrap_or(0);
-        let arg_end = inner_line[arg_start..].find(')').map(|i| arg_start + i).unwrap_or(inner_line.len());
+    let inner_arg = if let Some(start) = inner_line
+        .rfind("pairs(")
+        .or_else(|| inner_line.rfind("ipairs("))
+    {
+        let arg_start = inner_line[start..]
+            .find('(')
+            .map(|i| start + i + 1)
+            .unwrap_or(0);
+        let arg_end = inner_line[arg_start..]
+            .find(')')
+            .map(|i| arg_start + i)
+            .unwrap_or(inner_line.len());
         inner_line[arg_start..arg_end].trim()
     } else {
         return false;
     };
-    if inner_arg.is_empty() { return false; }
+    if inner_arg.is_empty() {
+        return false;
+    }
     for line in before.lines().rev().skip(1).take(20) {
         let t = line.trim();
-        if (t.starts_with("for ") && t.contains(" in ")) || (t.starts_with("for ") && t.contains(" do")) {
+        if (t.starts_with("for ") && t.contains(" in "))
+            || (t.starts_with("for ") && t.contains(" do"))
+        {
             if let Some(binding_end) = t.find(" in ") {
                 let binding = &t[4..binding_end];
                 let vars: Vec<&str> = binding.split(',').map(|v| v.trim()).collect();
                 let root = inner_arg.split('.').next().unwrap_or(inner_arg);
                 let root = root.split('[').next().unwrap_or(root);
-                if vars.iter().any(|v| *v == root) {
+                if vars.contains(&root) {
                     return true;
                 }
             }
@@ -56,8 +69,12 @@ pub struct RepeatedTypeof;
 pub struct QuadraticStringBuild;
 
 impl Rule for TableFindInLoop {
-    fn id(&self) -> &'static str { "complexity::table_find_in_loop" }
-    fn severity(&self) -> Severity { Severity::Error }
+    fn id(&self) -> &'static str {
+        "complexity::table_find_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Error
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -74,8 +91,12 @@ impl Rule for TableFindInLoop {
 }
 
 impl Rule for GetDescendantsInLoop {
-    fn id(&self) -> &'static str { "complexity::get_descendants_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "complexity::get_descendants_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -84,13 +105,14 @@ impl Rule for GetDescendantsInLoop {
                 return;
             }
             let pos = visit::call_pos(call);
-            if visit::is_method_call(call, "GetDescendants") || visit::is_method_call(call, "GetChildren") {
-                if !visit::is_likely_for_iterator(source, pos) {
-                    hits.push(Hit {
-                        pos,
-                        msg: "GetDescendants/GetChildren in loop - allocates new table each call, cache outside".into(),
-                    });
-                }
+            if (visit::is_method_call(call, "GetDescendants")
+                || visit::is_method_call(call, "GetChildren"))
+                && !visit::is_likely_for_iterator(source, pos)
+            {
+                hits.push(Hit {
+                    pos,
+                    msg: "GetDescendants/GetChildren in loop - allocates new table each call, cache outside".into(),
+                });
             }
         });
         hits
@@ -98,8 +120,12 @@ impl Rule for GetDescendantsInLoop {
 }
 
 impl Rule for TableRemoveShift {
-    fn id(&self) -> &'static str { "complexity::table_remove_shift" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "complexity::table_remove_shift"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -121,8 +147,12 @@ impl Rule for TableRemoveShift {
 }
 
 impl Rule for TableSortInLoop {
-    fn id(&self) -> &'static str { "complexity::table_sort_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "complexity::table_sort_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -130,7 +160,8 @@ impl Rule for TableSortInLoop {
             if ctx.in_hot_loop && visit::is_dot_call(call, "table", "sort") {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
-                    msg: "table.sort() in loop - O(n log n) per iteration, sort once outside".into(),
+                    msg: "table.sort() in loop - O(n log n) per iteration, sort once outside"
+                        .into(),
                 });
             }
         });
@@ -139,8 +170,12 @@ impl Rule for TableSortInLoop {
 }
 
 impl Rule for GetTaggedInLoop {
-    fn id(&self) -> &'static str { "complexity::get_tagged_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "complexity::get_tagged_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -149,7 +184,9 @@ impl Rule for GetTaggedInLoop {
                 return;
             }
             let pos = visit::call_pos(call);
-            if visit::is_method_call(call, "GetTagged") && !visit::is_likely_for_iterator(source, pos) {
+            if visit::is_method_call(call, "GetTagged")
+                && !visit::is_likely_for_iterator(source, pos)
+            {
                 hits.push(Hit {
                     pos,
                     msg: "CollectionService:GetTagged() in loop - allocates new table, cache outside loop".into(),
@@ -161,8 +198,12 @@ impl Rule for GetTaggedInLoop {
 }
 
 impl Rule for GetPlayersInLoop {
-    fn id(&self) -> &'static str { "complexity::get_players_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "complexity::get_players_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -171,7 +212,9 @@ impl Rule for GetPlayersInLoop {
                 return;
             }
             let pos = visit::call_pos(call);
-            if visit::is_method_call(call, "GetPlayers") && !visit::is_likely_for_iterator(source, pos) {
+            if visit::is_method_call(call, "GetPlayers")
+                && !visit::is_likely_for_iterator(source, pos)
+            {
                 hits.push(Hit {
                     pos,
                     msg: ":GetPlayers() in loop - allocates a new table each call, cache outside loop".into(),
@@ -183,8 +226,12 @@ impl Rule for GetPlayersInLoop {
 }
 
 impl Rule for CloneInLoop {
-    fn id(&self) -> &'static str { "complexity::clone_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "complexity::clone_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -201,8 +248,12 @@ impl Rule for CloneInLoop {
 }
 
 impl Rule for WaitForChildInLoop {
-    fn id(&self) -> &'static str { "complexity::wait_for_child_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "complexity::wait_for_child_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -210,7 +261,9 @@ impl Rule for WaitForChildInLoop {
             if ctx.in_hot_loop && visit::is_method_call(call, "WaitForChild") {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
-                    msg: ":WaitForChild() in loop - yields per iteration, cache result outside loop".into(),
+                    msg:
+                        ":WaitForChild() in loop - yields per iteration, cache result outside loop"
+                            .into(),
                 });
             }
         });
@@ -219,8 +272,12 @@ impl Rule for WaitForChildInLoop {
 }
 
 impl Rule for FindFirstChildRecursive {
-    fn id(&self) -> &'static str { "complexity::find_first_child_recursive" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "complexity::find_first_child_recursive"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -237,8 +294,12 @@ impl Rule for FindFirstChildRecursive {
 }
 
 impl Rule for RequireInFunction {
-    fn id(&self) -> &'static str { "complexity::require_in_function" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "complexity::require_in_function"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -255,8 +316,12 @@ impl Rule for RequireInFunction {
 }
 
 impl Rule for DeepMetatableChain {
-    fn id(&self) -> &'static str { "complexity::deep_metatable_chain" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "complexity::deep_metatable_chain"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let positions = visit::find_pattern_positions(source, "setmetatable(");
@@ -284,18 +349,24 @@ impl Rule for DeepMetatableChain {
 }
 
 impl Rule for PairsInPairs {
-    fn id(&self) -> &'static str { "complexity::pairs_in_pairs" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "complexity::pairs_in_pairs"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
             if ctx.for_in_depth >= 2 && ctx.in_loop_direct {
-                let is_iter = visit::is_bare_call(call, "pairs")
-                    || visit::is_bare_call(call, "ipairs");
+                let is_iter =
+                    visit::is_bare_call(call, "pairs") || visit::is_bare_call(call, "ipairs");
                 if is_iter {
                     let pos = visit::call_pos(call);
-                    if is_structured_traversal(source, pos) { return; }
+                    if is_structured_traversal(source, pos) {
+                        return;
+                    }
                     hits.push(Hit {
                         pos,
                         msg: "nested pairs/ipairs loop - O(n*m) complexity, consider a lookup table for the inner loop".into(),
@@ -308,13 +379,20 @@ impl Rule for PairsInPairs {
 }
 
 impl Rule for GmatchInLoop {
-    fn id(&self) -> &'static str { "complexity::gmatch_in_loop" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "complexity::gmatch_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.loop_depth >= 2 && (visit::is_dot_call(call, "string", "gmatch") || visit::is_method_call(call, "gmatch")) {
+            if ctx.loop_depth >= 2
+                && (visit::is_dot_call(call, "string", "gmatch")
+                    || visit::is_method_call(call, "gmatch"))
+            {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
                     msg: "string.gmatch() in loop - creates iterator + compiles pattern each iteration, move outside if pattern is constant".into(),
@@ -326,8 +404,12 @@ impl Rule for GmatchInLoop {
 }
 
 impl Rule for DataStoreNoPcall {
-    fn id(&self) -> &'static str { "complexity::datastore_no_pcall" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "complexity::datastore_no_pcall"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn skip_path(&self, path: &std::path::Path) -> bool {
         path.file_name()
@@ -341,12 +423,22 @@ impl Rule for DataStoreNoPcall {
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
-        let ds_methods = [":GetAsync(", ":SetAsync(", ":UpdateAsync(", ":RemoveAsync(", ":IncrementAsync("];
+        let ds_methods = [
+            ":GetAsync(",
+            ":SetAsync(",
+            ":UpdateAsync(",
+            ":RemoveAsync(",
+            ":IncrementAsync(",
+        ];
         for method in &ds_methods {
             for pos in visit::find_pattern_positions(source, method) {
                 let before_start = pos.saturating_sub(200);
                 let before = &source[before_start..pos];
-                if !before.contains("DataStore") && !before.contains("dataStore") && !before.contains("data_store") && !before.contains("store") {
+                if !before.contains("DataStore")
+                    && !before.contains("dataStore")
+                    && !before.contains("data_store")
+                    && !before.contains("store")
+                {
                     continue;
                 }
                 let line_start = source[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
@@ -355,8 +447,13 @@ impl Rule for DataStoreNoPcall {
                     continue;
                 }
                 let prev_line_start = if line_start > 1 {
-                    source[..line_start - 1].rfind('\n').map(|i| i + 1).unwrap_or(0)
-                } else { 0 };
+                    source[..line_start - 1]
+                        .rfind('\n')
+                        .map(|i| i + 1)
+                        .unwrap_or(0)
+                } else {
+                    0
+                };
                 let prev_line = &source[prev_line_start..line_start];
                 if prev_line.contains("pcall(") || prev_line.contains("xpcall(") {
                     continue;
@@ -405,14 +502,16 @@ impl DataStoreNoPcall {
 }
 
 impl Rule for AccumulatingRebuild {
-    fn id(&self) -> &'static str { "complexity::accumulating_rebuild" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "complexity::accumulating_rebuild"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
-        let patterns = [
-            "{unpack(", "{table.unpack(",
-        ];
+        let patterns = ["{unpack(", "{table.unpack("];
         for pat in &patterns {
             for pos in visit::find_pattern_positions(source, pat) {
                 let loop_depth = build_hot_loop_depth_map(source);
@@ -431,8 +530,12 @@ impl Rule for AccumulatingRebuild {
 }
 
 impl Rule for OneIterationLoop {
-    fn id(&self) -> &'static str { "complexity::one_iteration_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "complexity::one_iteration_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -442,10 +545,16 @@ impl Rule for OneIterationLoop {
             if !(trimmed.starts_with("for ") || trimmed.starts_with("while ")) {
                 continue;
             }
-            if trimmed.ends_with(" end") || trimmed.ends_with("\tend") || trimmed.contains(" end)") || trimmed.contains(" end ") {
+            if trimmed.ends_with(" end")
+                || trimmed.ends_with("\tend")
+                || trimmed.contains(" end)")
+                || trimmed.contains(" end ")
+            {
                 continue;
             }
-            if i + 1 >= lines.len() { continue; }
+            if i + 1 >= lines.len() {
+                continue;
+            }
             let body = lines[i + 1].trim();
             if body.starts_with("return ") || body == "return" || body == "break" {
                 let pos = source.lines().take(i).map(|l| l.len() + 1).sum::<usize>();
@@ -460,8 +569,12 @@ impl Rule for OneIterationLoop {
 }
 
 impl Rule for ElseifChainOverTable {
-    fn id(&self) -> &'static str { "complexity::elseif_chain_over_table" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "complexity::elseif_chain_over_table"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -477,10 +590,16 @@ impl Rule for ElseifChainOverTable {
                     in_chain = true;
                 }
                 chain_len += 1;
-            } else if trimmed == "end" || (trimmed.starts_with("else") && !trimmed.starts_with("elseif")) {
+            } else if trimmed == "end"
+                || (trimmed.starts_with("else") && !trimmed.starts_with("elseif"))
+            {
                 if chain_len >= 6 {
                     if let Some(start) = chain_start {
-                        let pos = source.lines().take(start).map(|l| l.len() + 1).sum::<usize>();
+                        let pos = source
+                            .lines()
+                            .take(start)
+                            .map(|l| l.len() + 1)
+                            .sum::<usize>();
                         hits.push(Hit {
                             pos,
                             msg: format!("long elseif chain ({} branches) comparing same value - use a lookup table for O(1) dispatch", chain_len + 1),
@@ -494,7 +613,11 @@ impl Rule for ElseifChainOverTable {
         }
         if chain_len >= 6 {
             if let Some(start) = chain_start {
-                let pos = source.lines().take(start).map(|l| l.len() + 1).sum::<usize>();
+                let pos = source
+                    .lines()
+                    .take(start)
+                    .map(|l| l.len() + 1)
+                    .sum::<usize>();
                 hits.push(Hit {
                     pos,
                     msg: format!("long elseif chain ({} branches) comparing same value - use a lookup table for O(1) dispatch", chain_len + 1),
@@ -508,7 +631,9 @@ impl Rule for ElseifChainOverTable {
 fn line_start_offsets(source: &str) -> Vec<usize> {
     let mut starts = vec![0];
     for (i, b) in source.bytes().enumerate() {
-        if b == b'\n' { starts.push(i + 1); }
+        if b == b'\n' {
+            starts.push(i + 1);
+        }
     }
     starts
 }
@@ -537,13 +662,18 @@ fn build_hot_loop_depth_map(source: &str) -> Vec<u32> {
             depths.push(depth);
             continue;
         }
-        if trimmed.starts_with("while ") || trimmed.starts_with("repeat") {
-            depth += 1;
-        } else if trimmed.starts_with("for ") && !trimmed.contains(" in ") {
+        if trimmed.starts_with("while ")
+            || trimmed.starts_with("repeat")
+            || (trimmed.starts_with("for ") && !trimmed.contains(" in "))
+        {
             depth += 1;
         }
         depths.push(depth);
-        if trimmed == "end" || trimmed.starts_with("end ") || trimmed.starts_with("until ") || trimmed == "until" {
+        if trimmed == "end"
+            || trimmed.starts_with("end ")
+            || trimmed.starts_with("until ")
+            || trimmed == "until"
+        {
             depth = depth.saturating_sub(1);
         }
     }
@@ -551,22 +681,37 @@ fn build_hot_loop_depth_map(source: &str) -> Vec<u32> {
 }
 
 impl Rule for FilterThenFirst {
-    fn id(&self) -> &'static str { "complexity::filter_then_first" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "complexity::filter_then_first"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         let lines: Vec<&str> = source.lines().collect();
         for (i, line) in lines.iter().enumerate() {
             let trimmed = line.trim();
-            if !trimmed.starts_with("for ") { continue; }
-            if !trimmed.contains("GetDescendants") && !trimmed.contains("GetChildren") && !trimmed.contains("GetTagged") {
+            if !trimmed.starts_with("for ") {
+                continue;
+            }
+            if !trimmed.contains("GetDescendants")
+                && !trimmed.contains("GetChildren")
+                && !trimmed.contains("GetTagged")
+            {
                 continue;
             }
             for j in (i + 1)..lines.len().min(i + 15) {
                 let inner = lines[j].trim();
-                if inner == "end" { break; }
-                if inner.starts_with("if ") && (inner.contains(":IsA(") || inner.contains(".Name ==") || inner.contains(".ClassName ==")) {
+                if inner == "end" {
+                    break;
+                }
+                if inner.starts_with("if ")
+                    && (inner.contains(":IsA(")
+                        || inner.contains(".Name ==")
+                        || inner.contains(".ClassName =="))
+                {
                     if inner.contains(" and ") || inner.contains(" ~= ") || inner.contains(" or ") {
                         break;
                     }
@@ -576,7 +721,9 @@ impl Rule for FilterThenFirst {
                         if deeper.starts_with("table.insert") || deeper.contains("[#") {
                             found_collect = true;
                         }
-                        if (deeper.starts_with("return ") || deeper.starts_with("break")) && !found_collect {
+                        if (deeper.starts_with("return ") || deeper.starts_with("break"))
+                            && !found_collect
+                        {
                             let byte_pos: usize = lines[..i].iter().map(|l| l.len() + 1).sum();
                             hits.push(Hit {
                                 pos: byte_pos,
@@ -594,8 +741,12 @@ impl Rule for FilterThenFirst {
 }
 
 impl Rule for NestedTableFind {
-    fn id(&self) -> &'static str { "complexity::nested_table_find" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "complexity::nested_table_find"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -615,8 +766,12 @@ impl Rule for NestedTableFind {
 }
 
 impl Rule for StringMatchInLoop {
-    fn id(&self) -> &'static str { "complexity::string_match_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "complexity::string_match_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -645,8 +800,12 @@ impl Rule for StringMatchInLoop {
 }
 
 impl Rule for PromiseChainInLoop {
-    fn id(&self) -> &'static str { "complexity::promise_chain_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "complexity::promise_chain_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -666,15 +825,21 @@ impl Rule for PromiseChainInLoop {
 }
 
 impl Rule for RepeatedTypeof {
-    fn id(&self) -> &'static str { "complexity::repeated_typeof" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "complexity::repeated_typeof"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         let patterns = ["typeof(", "type("];
         for pat in &patterns {
             let positions = visit::find_pattern_positions(source, pat);
-            if positions.len() < 3 { continue; }
+            if positions.len() < 3 {
+                continue;
+            }
             let mut calls: Vec<(usize, String)> = Vec::new();
             for &pos in &positions {
                 let after = &source[pos + pat.len()..];
@@ -685,7 +850,8 @@ impl Rule for RepeatedTypeof {
                     }
                 }
             }
-            let mut counts: std::collections::HashMap<&str, Vec<usize>> = std::collections::HashMap::new();
+            let mut counts: std::collections::HashMap<&str, Vec<usize>> =
+                std::collections::HashMap::new();
             for (pos, arg) in &calls {
                 counts.entry(arg.as_str()).or_default().push(*pos);
             }
@@ -695,7 +861,10 @@ impl Rule for RepeatedTypeof {
                     if let Some(&pos) = positions.get(2) {
                         hits.push(Hit {
                             pos,
-                            msg: format!("{func}({arg}) called {} times - cache in a local variable", positions.len()),
+                            msg: format!(
+                                "{func}({arg}) called {} times - cache in a local variable",
+                                positions.len()
+                            ),
                         });
                     }
                 }
@@ -706,8 +875,12 @@ impl Rule for RepeatedTypeof {
 }
 
 impl Rule for QuadraticStringBuild {
-    fn id(&self) -> &'static str { "complexity::quadratic_string_build" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "complexity::quadratic_string_build"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let loop_depth = build_hot_loop_depth_map(source);
@@ -715,12 +888,21 @@ impl Rule for QuadraticStringBuild {
         let mut hits = Vec::new();
         let mut seen_lines = std::collections::HashSet::new();
         for pos in visit::find_pattern_positions(source, "..") {
-            if pos + 2 < source.len() && source.as_bytes()[pos + 2] == b'.' { continue; }
-            if pos > 0 && source.as_bytes()[pos - 1] == b'.' { continue; }
+            if pos + 2 < source.len() && source.as_bytes()[pos + 2] == b'.' {
+                continue;
+            }
+            if pos > 0 && source.as_bytes()[pos - 1] == b'.' {
+                continue;
+            }
             let line = line_starts.partition_point(|&s| s <= pos).saturating_sub(1);
-            if line >= loop_depth.len() || loop_depth[line] == 0 { continue; }
+            if line >= loop_depth.len() || loop_depth[line] == 0 {
+                continue;
+            }
             let line_start = line_starts[line];
-            let line_end = source[line_start..].find('\n').map(|i| line_start + i).unwrap_or(source.len());
+            let line_end = source[line_start..]
+                .find('\n')
+                .map(|i| line_start + i)
+                .unwrap_or(source.len());
             let line_text = &source[line_start..line_end];
             let trimmed = line_text.trim();
             let is_accumulate = trimmed.contains(" = ") && {

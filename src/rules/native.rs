@@ -25,8 +25,12 @@ pub struct DynamicTableKeyInNative;
 pub struct NonFastcallInHotLoop;
 
 impl Rule for GetfenvSetfenv {
-    fn id(&self) -> &'static str { "native::getfenv_setfenv" }
-    fn severity(&self) -> Severity { Severity::Error }
+    fn id(&self) -> &'static str {
+        "native::getfenv_setfenv"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Error
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -43,8 +47,12 @@ impl Rule for GetfenvSetfenv {
 }
 
 impl Rule for DynamicRequire {
-    fn id(&self) -> &'static str { "native::dynamic_require" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "native::dynamic_require"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -71,8 +79,12 @@ impl Rule for DynamicRequire {
 }
 
 impl Rule for CoroutineInNative {
-    fn id(&self) -> &'static str { "native::coroutine_in_native" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "native::coroutine_in_native"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         if !source.contains("--!native") {
@@ -97,15 +109,21 @@ impl Rule for CoroutineInNative {
 }
 
 impl Rule for MathHugeComparison {
-    fn id(&self) -> &'static str { "native::math_huge_comparison" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "native::math_huge_comparison"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         for pos in visit::find_pattern_positions(source, "== math.huge") {
             hits.push(Hit {
                 pos,
-                msg: "comparing to math.huge - use x ~= x to check for NaN, or x == 1/0 for infinity".into(),
+                msg:
+                    "comparing to math.huge - use x ~= x to check for NaN, or x == 1/0 for infinity"
+                        .into(),
             });
         }
         for pos in visit::find_pattern_positions(source, "~= math.huge") {
@@ -119,8 +137,12 @@ impl Rule for MathHugeComparison {
 }
 
 impl Rule for VarargInNative {
-    fn id(&self) -> &'static str { "native::vararg_in_native" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "native::vararg_in_native"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         if !source.contains("--!native") {
@@ -141,8 +163,12 @@ impl Rule for VarargInNative {
 }
 
 impl Rule for StringPatternInNative {
-    fn id(&self) -> &'static str { "native::string_pattern_in_native" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "native::string_pattern_in_native"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         if !source.contains("--!native") {
@@ -173,8 +199,12 @@ impl Rule for StringPatternInNative {
 }
 
 impl Rule for LoadstringDeopt {
-    fn id(&self) -> &'static str { "native::loadstring_deopt" }
-    fn severity(&self) -> Severity { Severity::Error }
+    fn id(&self) -> &'static str {
+        "native::loadstring_deopt"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Error
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -191,15 +221,21 @@ impl Rule for LoadstringDeopt {
 }
 
 impl Rule for UntypedParams {
-    fn id(&self) -> &'static str { "native::untyped_params" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "native::untyped_params"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         if !source.contains("--!native") {
             return vec![];
         }
 
-        struct ParamWalker { hits: Vec<Hit> }
+        struct ParamWalker {
+            hits: Vec<Hit>,
+        }
         impl Visitor for ParamWalker {
             fn visit_function_body(&mut self, node: &full_moon::ast::FunctionBody) {
                 let param_count = node.parameters().iter().count();
@@ -225,8 +261,12 @@ impl Rule for UntypedParams {
 }
 
 impl Rule for HeavyApiScript {
-    fn id(&self) -> &'static str { "native::heavy_api_script" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "native::heavy_api_script"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         if !source.contains("--!native") {
@@ -268,15 +308,21 @@ impl Rule for HeavyApiScript {
 }
 
 impl Rule for LargeTableLiteral {
-    fn id(&self) -> &'static str { "native::large_table_literal" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "native::large_table_literal"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         if !source.contains("--!native") {
             return vec![];
         }
 
-        struct TableWalker { hits: Vec<Hit> }
+        struct TableWalker {
+            hits: Vec<Hit>,
+        }
         impl Visitor for TableWalker {
             fn visit_table_constructor(&mut self, node: &full_moon::ast::TableConstructor) {
                 let count = node.fields().into_iter().count();
@@ -298,8 +344,12 @@ impl Rule for LargeTableLiteral {
 }
 
 impl Rule for MixedComputationApi {
-    fn id(&self) -> &'static str { "native::mixed_computation_api" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "native::mixed_computation_api"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         if !source.contains("--!native") {
@@ -317,9 +367,20 @@ impl Rule for MixedComputationApi {
                 let mut api_ops = 0u32;
 
                 let math_patterns = ["math.", "Vector3", "CFrame", "* ", "+ ", "- ", "/ "];
-                let api_patterns = [":GetService(", ":FindFirstChild(", ":WaitForChild(",
-                    ":Clone(", ":Destroy(", ":Connect(", ":Fire(", "Instance.new(",
-                    ":SetAttribute(", ":GetAttribute(", ":GetChildren(", ":GetDescendants("];
+                let api_patterns = [
+                    ":GetService(",
+                    ":FindFirstChild(",
+                    ":WaitForChild(",
+                    ":Clone(",
+                    ":Destroy(",
+                    ":Connect(",
+                    ":Fire(",
+                    "Instance.new(",
+                    ":SetAttribute(",
+                    ":GetAttribute(",
+                    ":GetChildren(",
+                    ":GetDescendants(",
+                ];
 
                 for p in &math_patterns {
                     math_ops += body.matches(p).count() as u32;
@@ -347,8 +408,12 @@ impl Rule for MixedComputationApi {
 }
 
 impl Rule for GlobalWrite {
-    fn id(&self) -> &'static str { "native::global_write" }
-    fn severity(&self) -> Severity { Severity::Error }
+    fn id(&self) -> &'static str {
+        "native::global_write"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Error
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -376,17 +441,46 @@ impl Rule for GlobalWrite {
 }
 
 impl Rule for ShadowedBuiltin {
-    fn id(&self) -> &'static str { "native::shadowed_builtin" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "native::shadowed_builtin"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let builtins = [
-            "math", "string", "table", "bit32", "coroutine", "debug",
-            "os", "utf8", "vector", "task",
-            "pairs", "ipairs", "next", "select", "type", "typeof",
-            "tonumber", "tostring", "error", "assert", "pcall", "xpcall",
-            "print", "warn", "setmetatable", "getmetatable",
-            "rawget", "rawset", "rawequal", "rawlen", "unpack",
+            "math",
+            "string",
+            "table",
+            "bit32",
+            "coroutine",
+            "debug",
+            "os",
+            "utf8",
+            "vector",
+            "task",
+            "pairs",
+            "ipairs",
+            "next",
+            "select",
+            "type",
+            "typeof",
+            "tonumber",
+            "tostring",
+            "error",
+            "assert",
+            "pcall",
+            "xpcall",
+            "print",
+            "warn",
+            "setmetatable",
+            "getmetatable",
+            "rawget",
+            "rawset",
+            "rawequal",
+            "rawlen",
+            "unpack",
         ];
         let mut hits = Vec::new();
         for builtin in &builtins {
@@ -403,14 +497,18 @@ impl Rule for ShadowedBuiltin {
                     continue;
                 }
                 if value.starts_with(&format!("game and {builtin}"))
-                    || value.starts_with(builtin) && value.contains(" or ") {
+                    || value.starts_with(builtin) && value.contains(" or ")
+                {
                     continue;
                 }
                 if value == "(" {
                     continue;
                 }
                 let stripped = value.trim_start_matches('(');
-                if stripped.starts_with(builtin) && !stripped[builtin.len()..].starts_with(|c: char| c.is_alphanumeric() || c == '_') {
+                if stripped.starts_with(builtin)
+                    && !stripped[builtin.len()..]
+                        .starts_with(|c: char| c.is_alphanumeric() || c == '_')
+                {
                     continue;
                 }
                 hits.push(Hit {
@@ -424,8 +522,12 @@ impl Rule for ShadowedBuiltin {
 }
 
 impl Rule for TableZeroIndex {
-    fn id(&self) -> &'static str { "native::table_zero_index" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "native::table_zero_index"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         if source.contains("[-") {
@@ -435,7 +537,11 @@ impl Rule for TableZeroIndex {
         for pos in visit::find_pattern_positions(source, "[0]") {
             let before = &source[..pos];
             let before_char = before.trim_end().chars().last().unwrap_or(' ');
-            if before_char.is_alphanumeric() || before_char == '_' || before_char == ')' || before_char == ']' {
+            if before_char.is_alphanumeric()
+                || before_char == '_'
+                || before_char == ')'
+                || before_char == ']'
+            {
                 if before_char == ']' {
                     return vec![];
                 }
@@ -450,14 +556,20 @@ impl Rule for TableZeroIndex {
 }
 
 impl Rule for MethodCallDefeatsFastcall {
-    fn id(&self) -> &'static str { "native::method_call_defeats_fastcall" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "native::method_call_defeats_fastcall"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let fastcall_methods = ["byte", "char", "sub", "len"];
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if !ctx.in_hot_loop { return; }
+            if !ctx.in_hot_loop {
+                return;
+            }
             for method in &fastcall_methods {
                 if visit::is_method_call(call, method) {
                     let pos = visit::call_pos(call);
@@ -473,8 +585,12 @@ impl Rule for MethodCallDefeatsFastcall {
 }
 
 impl Rule for SharedGlobalMutation {
-    fn id(&self) -> &'static str { "native::shared_global_mutation" }
-    fn severity(&self) -> Severity { Severity::Error }
+    fn id(&self) -> &'static str {
+        "native::shared_global_mutation"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Error
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let has_local_shared = source.lines().any(|l| {
@@ -484,7 +600,11 @@ impl Rule for SharedGlobalMutation {
             }
             let after_local = &t[6..];
             if after_local.starts_with("shared =") || after_local.starts_with("shared=") {
-                let rhs = after_local.splitn(2, '=').nth(1).unwrap_or("").trim();
+                let rhs = after_local
+                    .split_once('=')
+                    .map(|x| x.1)
+                    .unwrap_or("")
+                    .trim();
                 return rhs != "shared" && !rhs.starts_with("shared.");
             }
             after_local.contains("shared") && after_local.contains(',')
@@ -504,7 +624,9 @@ impl Rule for SharedGlobalMutation {
             if after.contains('=') {
                 let line_end = after.find('\n').unwrap_or(after.len());
                 let line = &after[..line_end];
-                if line.contains(" = ") || line.starts_with(|c: char| c.is_alphanumeric() || c == '_') {
+                if line.contains(" = ")
+                    || line.starts_with(|c: char| c.is_alphanumeric() || c == '_')
+                {
                     let before_eq = line.find(" = ");
                     let before_eq2 = line.find("=");
                     let eq_pos = before_eq.or(before_eq2);
@@ -541,8 +663,12 @@ impl Rule for SharedGlobalMutation {
 }
 
 impl Rule for ImportChainTooDeep {
-    fn id(&self) -> &'static str { "native::import_chain_too_deep" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "native::import_chain_too_deep"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -554,7 +680,11 @@ impl Rule for ImportChainTooDeep {
             if i < loop_depth.len() && loop_depth[i] > 0 {
                 let dot_count = trimmed.matches('.').count();
                 if dot_count >= 4 {
-                    let pos = if i < line_starts.len() { line_starts[i] } else { 0 };
+                    let pos = if i < line_starts.len() {
+                        line_starts[i]
+                    } else {
+                        0
+                    };
                     hits.push(Hit {
                         pos,
                         msg: "deep property chain (4+ dots) in loop - GETIMPORT only caches 3 levels, cache intermediate results in locals".into(),
@@ -569,7 +699,9 @@ impl Rule for ImportChainTooDeep {
 fn line_start_offsets(source: &str) -> Vec<usize> {
     let mut starts = vec![0];
     for (i, b) in source.bytes().enumerate() {
-        if b == b'\n' { starts.push(i + 1); }
+        if b == b'\n' {
+            starts.push(i + 1);
+        }
     }
     starts
 }
@@ -599,13 +731,18 @@ fn build_hot_loop_depth_map(source: &str) -> Vec<i32> {
             depth[i] = current;
             continue;
         }
-        if t.starts_with("while ") || t == "while" || t.starts_with("repeat") || t == "repeat" {
-            current += 1;
-        } else if t.starts_with("for ") && !t.contains(" in ") {
+        if t.starts_with("while ")
+            || t == "while"
+            || t.starts_with("repeat")
+            || t == "repeat"
+            || (t.starts_with("for ") && !t.contains(" in "))
+        {
             current += 1;
         }
         depth[i] = current;
-        if (t == "end" || t.starts_with("end ") || t.starts_with("end)") || t.starts_with("end,")) && current > 0 {
+        if (t == "end" || t.starts_with("end ") || t.starts_with("end)") || t.starts_with("end,"))
+            && current > 0
+        {
             current -= 1;
         }
         if t.starts_with("until ") && current > 0 {
@@ -616,8 +753,12 @@ fn build_hot_loop_depth_map(source: &str) -> Vec<i32> {
 }
 
 impl Rule for PcallInNative {
-    fn id(&self) -> &'static str { "native::pcall_in_native" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "native::pcall_in_native"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         if !source.starts_with("--!native") {
@@ -625,7 +766,9 @@ impl Rule for PcallInNative {
         }
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_hot_loop && (visit::is_bare_call(call, "pcall") || visit::is_bare_call(call, "xpcall")) {
+            if ctx.in_hot_loop
+                && (visit::is_bare_call(call, "pcall") || visit::is_bare_call(call, "xpcall"))
+            {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
                     msg: "pcall/xpcall in loop in --!native script forces interpreter fallback for the protected call - move error handling outside the loop".into(),
@@ -637,8 +780,12 @@ impl Rule for PcallInNative {
 }
 
 impl Rule for DynamicTableKeyInNative {
-    fn id(&self) -> &'static str { "native::dynamic_table_key_in_native" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "native::dynamic_table_key_in_native"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         if !source.starts_with("--!native") {
@@ -648,8 +795,10 @@ impl Rule for DynamicTableKeyInNative {
         let loop_depth = build_hot_loop_depth_map(source);
         let line_starts = line_start_offsets(source);
         for pos in visit::find_pattern_positions(source, "[") {
-            if pos == 0 { continue; }
-            let before = source[..pos].as_bytes();
+            if pos == 0 {
+                continue;
+            }
+            let before = &source.as_bytes()[..pos];
             let prev = before[before.len() - 1];
             if prev == b'=' || prev == b',' || prev == b'{' || prev == b'(' {
                 continue;
@@ -663,7 +812,11 @@ impl Rule for DynamicTableKeyInNative {
                 let key = after[..close].trim();
                 if !key.starts_with('"') && !key.starts_with('\'') && key.parse::<f64>().is_err() {
                     let line_start = line_starts[line];
-                    let line_text = &source[line_start..source[line_start..].find('\n').map(|p| line_start + p).unwrap_or(source.len())];
+                    let line_text = &source[line_start
+                        ..source[line_start..]
+                            .find('\n')
+                            .map(|p| line_start + p)
+                            .unwrap_or(source.len())];
                     if line_text.contains("t[") || line_text.contains("][") {
                         hits.push(Hit {
                             pos,
@@ -678,20 +831,38 @@ impl Rule for DynamicTableKeyInNative {
 }
 
 impl Rule for NonFastcallInHotLoop {
-    fn id(&self) -> &'static str { "native::non_fastcall_in_hot_loop" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "native::non_fastcall_in_hot_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         if !source.contains("--!native") {
             return vec![];
         }
         let slow_funcs = [
-            "string.find(", "string.format(", "string.gsub(", "string.gmatch(",
-            "string.match(", "string.rep(", "string.reverse(", "string.lower(",
-            "string.upper(", "string.split(",
-            "table.find(", "table.sort(", "table.concat(", "table.remove(",
-            "table.move(", "table.clear(", "table.clone(", "table.freeze(",
-            "math.noise(", "math.random(",
+            "string.find(",
+            "string.format(",
+            "string.gsub(",
+            "string.gmatch(",
+            "string.match(",
+            "string.rep(",
+            "string.reverse(",
+            "string.lower(",
+            "string.upper(",
+            "string.split(",
+            "table.find(",
+            "table.sort(",
+            "table.concat(",
+            "table.remove(",
+            "table.move(",
+            "table.clear(",
+            "table.clone(",
+            "table.freeze(",
+            "math.noise(",
+            "math.random(",
         ];
         let loop_depth = build_hot_loop_depth_map(source);
         let line_starts = line_start_offsets(source);

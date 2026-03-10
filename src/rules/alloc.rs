@@ -8,16 +8,23 @@ fn is_in_error_or_debug_path(source: &str, pos: usize) -> bool {
     let line = &source[line_start..end];
     let line_end = line.find('\n').map(|i| &line[..i]).unwrap_or(line);
     let t = line_end.trim();
-    if t.starts_with("error(") || t.starts_with("error (") || t.contains("error(Error")
-        || t.starts_with("warn(") || t.starts_with("warn (") {
+    if t.starts_with("error(")
+        || t.starts_with("error (")
+        || t.contains("error(Error")
+        || t.starts_with("warn(")
+        || t.starts_with("warn (")
+    {
         return true;
     }
     let before_start = visit::floor_char_boundary(source, pos.saturating_sub(300));
     let before = &source[before_start..pos];
     for bl in before.lines().rev().take(10) {
         let bt = bl.trim();
-        if bt.starts_with("if __DEBUG__") || bt.starts_with("if __DEV__")
-            || bt.starts_with("elseif __DEBUG__") || bt.starts_with("elseif __DEV__") {
+        if bt.starts_with("if __DEBUG__")
+            || bt.starts_with("if __DEV__")
+            || bt.starts_with("elseif __DEBUG__")
+            || bt.starts_with("elseif __DEV__")
+        {
             return true;
         }
         if bt.starts_with("for ") || bt.starts_with("while ") || bt.starts_with("repeat") {
@@ -51,8 +58,12 @@ pub struct TableCloneInLoop;
 pub struct UnnecessaryClosure;
 
 impl Rule for ClosureInLoop {
-    fn id(&self) -> &'static str { "alloc::closure_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "alloc::closure_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let func_positions = visit::find_pattern_positions(source, "function(");
@@ -83,15 +94,20 @@ impl Rule for ClosureInLoop {
             })
             .map(|pos| Hit {
                 pos,
-                msg: "closure created in loop - allocates each iteration, extract outside loop".into(),
+                msg: "closure created in loop - allocates each iteration, extract outside loop"
+                    .into(),
             })
             .collect()
     }
 }
 
 impl Rule for StringConcatInLoop {
-    fn id(&self) -> &'static str { "alloc::string_concat_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "alloc::string_concat_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let concat_positions = visit::find_pattern_positions(source, "..");
@@ -119,7 +135,9 @@ impl Rule for StringConcatInLoop {
             if is_in_error_or_debug_path(source, pos) {
                 continue;
             }
-            if line == last_hit_line { continue; }
+            if line == last_hit_line {
+                continue;
+            }
             last_hit_line = line;
             hits.push(Hit {
                 pos,
@@ -164,13 +182,18 @@ fn build_hot_loop_depth_map(source: &str) -> Vec<u32> {
             depths.push(depth);
             continue;
         }
-        if trimmed.starts_with("while ") || trimmed.starts_with("repeat") {
-            depth += 1;
-        } else if trimmed.starts_with("for ") && !trimmed.contains(" in ") {
+        if trimmed.starts_with("while ")
+            || trimmed.starts_with("repeat")
+            || (trimmed.starts_with("for ") && !trimmed.contains(" in "))
+        {
             depth += 1;
         }
         depths.push(depth);
-        if trimmed == "end" || trimmed.starts_with("end ") || trimmed.starts_with("until ") || trimmed == "until" {
+        if trimmed == "end"
+            || trimmed.starts_with("end ")
+            || trimmed.starts_with("until ")
+            || trimmed == "until"
+        {
             depth = depth.saturating_sub(1);
         }
     }
@@ -178,15 +201,24 @@ fn build_hot_loop_depth_map(source: &str) -> Vec<u32> {
 }
 
 impl Rule for StringFormatInLoop {
-    fn id(&self) -> &'static str { "alloc::string_format_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "alloc::string_format_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_hot_loop && (visit::is_dot_call(call, "string", "format") || visit::is_method_call(call, "format")) {
+            if ctx.in_hot_loop
+                && (visit::is_dot_call(call, "string", "format")
+                    || visit::is_method_call(call, "format"))
+            {
                 let pos = visit::call_pos(call);
-                if is_in_error_or_debug_path(source, pos) { return; }
+                if is_in_error_or_debug_path(source, pos) {
+                    return;
+                }
                 hits.push(Hit {
                     pos,
                     msg: "string.format() in loop - allocates a new string each iteration".into(),
@@ -198,8 +230,12 @@ impl Rule for StringFormatInLoop {
 }
 
 impl Rule for RepeatedGsub {
-    fn id(&self) -> &'static str { "alloc::repeated_gsub" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "alloc::repeated_gsub"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let gsub_positions = visit::find_pattern_positions(source, ":gsub(");
@@ -216,7 +252,9 @@ impl Rule for RepeatedGsub {
         for &pos in &gsub_positions {
             let line = line_starts.partition_point(|&s| s <= pos).saturating_sub(1);
             if prev_line != usize::MAX && (line == prev_line || line == prev_line + 1) {
-                if chain_start.is_none() { chain_start = Some(pos); }
+                if chain_start.is_none() {
+                    chain_start = Some(pos);
+                }
                 chain_count += 1;
             } else {
                 if chain_count >= 2 {
@@ -245,15 +283,21 @@ impl Rule for RepeatedGsub {
 }
 
 impl Rule for TostringInLoop {
-    fn id(&self) -> &'static str { "alloc::tostring_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "alloc::tostring_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
             if ctx.in_hot_loop && visit::is_bare_call(call, "tostring") {
                 let pos = visit::call_pos(call);
-                if is_in_error_or_debug_path(source, pos) { return; }
+                if is_in_error_or_debug_path(source, pos) {
+                    return;
+                }
                 hits.push(Hit {
                     pos,
                     msg: "tostring() in loop - allocates a new string each call".into(),
@@ -265,8 +309,12 @@ impl Rule for TostringInLoop {
 }
 
 impl Rule for TableCreatePreferred {
-    fn id(&self) -> &'static str { "alloc::table_create_preferred" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "alloc::table_create_preferred"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let loop_depth = build_hot_loop_depth_map(source);
@@ -287,13 +335,20 @@ impl Rule for TableCreatePreferred {
 }
 
 impl Rule for ExcessiveStringSplit {
-    fn id(&self) -> &'static str { "alloc::excessive_string_split" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "alloc::excessive_string_split"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_hot_loop && (visit::is_dot_call(call, "string", "split") || visit::is_method_call(call, "split")) {
+            if ctx.in_hot_loop
+                && (visit::is_dot_call(call, "string", "split")
+                    || visit::is_method_call(call, "split"))
+            {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
                     msg: "string.split() in loop - allocates new table per call, split once outside loop".into(),
@@ -305,8 +360,12 @@ impl Rule for ExcessiveStringSplit {
 }
 
 impl Rule for CoroutineWrapInLoop {
-    fn id(&self) -> &'static str { "alloc::coroutine_wrap_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "alloc::coroutine_wrap_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -329,8 +388,12 @@ impl Rule for CoroutineWrapInLoop {
 }
 
 impl Rule for TableCreateForDict {
-    fn id(&self) -> &'static str { "alloc::table_create_for_dict" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "alloc::table_create_for_dict"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let create_positions = visit::find_pattern_positions(source, "table.create(");
@@ -350,10 +413,18 @@ impl Rule for TableCreateForDict {
             if !has_assignment {
                 continue;
             }
-            let line_start = before.rfind('\n').map(|i| before_start + i + 1 - before_start.min(before_start)).unwrap_or(before_start);
+            let line_start = before
+                .rfind('\n')
+                .map(|i| before_start + i + 1 - before_start.min(before_start))
+                .unwrap_or(before_start);
             let assign_line = source[line_start..pos].trim();
-            let var_name = assign_line.split('=').next().unwrap_or("").trim()
-                .strip_prefix("local ").unwrap_or(assign_line.split('=').next().unwrap_or("").trim())
+            let var_name = assign_line
+                .split('=')
+                .next()
+                .unwrap_or("")
+                .trim()
+                .strip_prefix("local ")
+                .unwrap_or(assign_line.split('=').next().unwrap_or("").trim())
                 .trim();
             let mut string_key_count = 0;
             for line in after.lines().skip(1).take(10) {
@@ -391,8 +462,12 @@ impl Rule for TableCreateForDict {
 }
 
 impl Rule for MutableUpvalueClosure {
-    fn id(&self) -> &'static str { "alloc::mutable_upvalue_closure" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "alloc::mutable_upvalue_closure"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         // Simplified heuristic: detect a local variable that is both:
@@ -409,7 +484,8 @@ impl Rule for MutableUpvalueClosure {
             let mut reassigned_locals: Vec<&str> = Vec::new();
             for line in before.lines() {
                 let trimmed = line.trim();
-                if trimmed.starts_with("local ") || trimmed.starts_with("--") || trimmed.is_empty() {
+                if trimmed.starts_with("local ") || trimmed.starts_with("--") || trimmed.is_empty()
+                {
                     continue;
                 }
                 if let Some(eq_pos) = trimmed.find(" = ") {
@@ -449,8 +525,12 @@ impl Rule for MutableUpvalueClosure {
 }
 
 impl Rule for UnpackInLoop {
-    fn id(&self) -> &'static str { "alloc::unpack_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "alloc::unpack_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -461,11 +541,19 @@ impl Rule for UnpackInLoop {
             if visit::is_bare_call(call, "unpack") || visit::is_dot_call(call, "table", "unpack") {
                 let pos = visit::call_pos(call);
                 let line_start = source[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
-                let line_end = source[pos..].find('\n').map(|i| pos + i).unwrap_or(source.len());
+                let line_end = source[pos..]
+                    .find('\n')
+                    .map(|i| pos + i)
+                    .unwrap_or(source.len());
                 let line = &source[line_start..line_end];
-                if line.contains("[i]") || line.contains("[j]") || line.contains("[k]")
-                    || line.contains("[index]") || line.contains("[idx]")
-                    || line.contains("shift(") || line.contains("remove(") {
+                if line.contains("[i]")
+                    || line.contains("[j]")
+                    || line.contains("[k]")
+                    || line.contains("[index]")
+                    || line.contains("[idx]")
+                    || line.contains("shift(")
+                    || line.contains("remove(")
+                {
                     return;
                 }
                 hits.push(Hit {
@@ -479,8 +567,12 @@ impl Rule for UnpackInLoop {
 }
 
 impl Rule for RepeatedStringByte {
-    fn id(&self) -> &'static str { "alloc::repeated_string_byte" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "alloc::repeated_string_byte"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         // Detect multiple string.byte(s, i) calls on same variable in a loop
@@ -500,14 +592,15 @@ impl Rule for RepeatedStringByte {
                 continue;
             }
             let after = &source[pos + "string.byte(".len()..];
-            if let Some(comma_or_close) = after.find(|c: char| c == ',' || c == ')') {
+            if let Some(comma_or_close) = after.find([',', ')']) {
                 let first_arg = after[..comma_or_close].trim().to_string();
                 if !first_arg.is_empty() {
                     loop_calls.push((pos, first_arg));
                 }
             }
         }
-        let mut counts: std::collections::HashMap<&str, (usize, usize)> = std::collections::HashMap::new();
+        let mut counts: std::collections::HashMap<&str, (usize, usize)> =
+            std::collections::HashMap::new();
         for (pos, arg) in &loop_calls {
             let entry = counts.entry(arg.as_str()).or_insert((0, *pos));
             entry.0 += 1;
@@ -525,8 +618,12 @@ impl Rule for RepeatedStringByte {
 }
 
 impl Rule for StringInterpInLoop {
-    fn id(&self) -> &'static str { "alloc::string_interp_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "alloc::string_interp_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         // Detect backtick string interpolation (`...{expr}...`) inside loops
@@ -567,8 +664,12 @@ impl Rule for StringInterpInLoop {
 }
 
 impl Rule for SelectInLoop {
-    fn id(&self) -> &'static str { "alloc::select_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "alloc::select_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -592,7 +693,8 @@ impl Rule for SelectInLoop {
                 }
                 hits.push(Hit {
                     pos,
-                    msg: "select() in loop - O(n) per call on varargs, cache results outside loop".into(),
+                    msg: "select() in loop - O(n) per call on varargs, cache results outside loop"
+                        .into(),
                 });
             }
         });
@@ -601,8 +703,12 @@ impl Rule for SelectInLoop {
 }
 
 impl Rule for TableInsertKnownSize {
-    fn id(&self) -> &'static str { "alloc::table_insert_known_size" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "alloc::table_insert_known_size"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -641,13 +747,20 @@ impl Rule for TableInsertKnownSize {
 }
 
 impl Rule for BufferOverStringPack {
-    fn id(&self) -> &'static str { "alloc::buffer_over_string_pack" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "alloc::buffer_over_string_pack"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_hot_loop && (visit::is_dot_call(call, "string", "pack") || visit::is_dot_call(call, "string", "unpack")) {
+            if ctx.in_hot_loop
+                && (visit::is_dot_call(call, "string", "pack")
+                    || visit::is_dot_call(call, "string", "unpack"))
+            {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
                     msg: "string.pack/unpack in loop allocates a string per call - use buffer library (buffer.writeu32/readu32) for zero-allocation binary I/O".into(),
@@ -659,24 +772,38 @@ impl Rule for BufferOverStringPack {
 }
 
 impl Rule for TaskSpawnInLoop {
-    fn id(&self) -> &'static str { "alloc::task_spawn_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "alloc::task_spawn_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if !ctx.in_hot_loop { return; }
-            if visit::is_dot_call(call, "task", "spawn") || visit::is_dot_call(call, "task", "defer") {
+            if !ctx.in_hot_loop {
+                return;
+            }
+            if visit::is_dot_call(call, "task", "spawn")
+                || visit::is_dot_call(call, "task", "defer")
+            {
                 if let Some(arg) = visit::nth_arg(call, 0) {
                     let arg_str = format!("{arg}").trim().to_string();
                     if !arg_str.starts_with("function") {
                         let pos = visit::call_pos(call);
                         let line_start = source[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
-                        let line_end = source[pos..].find('\n').map(|i| pos + i).unwrap_or(source.len());
+                        let line_end = source[pos..]
+                            .find('\n')
+                            .map(|i| pos + i)
+                            .unwrap_or(source.len());
                         let line = &source[line_start..line_end];
-                        if line.contains("thread") || line.contains("Thread")
-                            || line.contains("runner") || line.contains("Runner")
-                            || line.contains("coroutine") {
+                        if line.contains("thread")
+                            || line.contains("Thread")
+                            || line.contains("runner")
+                            || line.contains("Runner")
+                            || line.contains("coroutine")
+                        {
                             return;
                         }
                     }
@@ -692,8 +819,12 @@ impl Rule for TaskSpawnInLoop {
 }
 
 impl Rule for GsubFunctionInLoop {
-    fn id(&self) -> &'static str { "alloc::gsub_function_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "alloc::gsub_function_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -722,8 +853,12 @@ impl Rule for GsubFunctionInLoop {
 }
 
 impl Rule for TypeofInLoop {
-    fn id(&self) -> &'static str { "alloc::typeof_in_loop" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "alloc::typeof_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -740,8 +875,12 @@ impl Rule for TypeofInLoop {
 }
 
 impl Rule for SetmetatableInLoop {
-    fn id(&self) -> &'static str { "alloc::setmetatable_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "alloc::setmetatable_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -758,8 +897,12 @@ impl Rule for SetmetatableInLoop {
 }
 
 impl Rule for TableCloneInLoop {
-    fn id(&self) -> &'static str { "alloc::table_clone_in_loop" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "alloc::table_clone_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -767,7 +910,8 @@ impl Rule for TableCloneInLoop {
             if ctx.in_hot_loop && visit::is_dot_call(call, "table", "clone") {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
-                    msg: "table.clone() in loop - shallow-copies the entire table each iteration".into(),
+                    msg: "table.clone() in loop - shallow-copies the entire table each iteration"
+                        .into(),
                 });
             }
         });
@@ -776,17 +920,27 @@ impl Rule for TableCloneInLoop {
 }
 
 impl Rule for UnnecessaryClosure {
-    fn id(&self) -> &'static str { "alloc::unnecessary_closure" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "alloc::unnecessary_closure"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         let lines: Vec<&str> = source.lines().collect();
-        let wrappers = ["pcall(function()", "xpcall(function()", "task.spawn(function()"];
+        let wrappers = [
+            "pcall(function()",
+            "xpcall(function()",
+            "task.spawn(function()",
+        ];
 
         for (i, line) in lines.iter().enumerate() {
             let trimmed = line.trim();
-            if trimmed.starts_with("--") { continue; }
+            if trimmed.starts_with("--") {
+                continue;
+            }
 
             let mut matched_wrapper = None;
             for w in &wrappers {
@@ -811,15 +965,15 @@ impl Rule for UnnecessaryClosure {
                 None => continue,
             };
             let closer = lines[k].trim();
-            if !closer.starts_with("end)") { continue; }
+            if !closer.starts_with("end)") {
+                continue;
+            }
 
-            let call_str = if body.starts_with("return ") {
-                &body[7..]
-            } else {
-                body
-            };
+            let call_str = body.strip_prefix("return ").unwrap_or(body);
 
-            if !Self::is_single_bare_call(call_str) { continue; }
+            if !Self::is_single_bare_call(call_str) {
+                continue;
+            }
 
             let pos = source.lines().take(i).map(|l| l.len() + 1).sum::<usize>();
             hits.push(Hit {
@@ -833,9 +987,11 @@ impl Rule for UnnecessaryClosure {
 
 impl UnnecessaryClosure {
     fn next_code_line(lines: &[&str], start: usize) -> Option<usize> {
-        for j in start..lines.len() {
-            let t = lines[j].trim();
-            if t.is_empty() || t.starts_with("--") { continue; }
+        for (j, line) in lines.iter().enumerate().skip(start) {
+            let t = line.trim();
+            if t.is_empty() || t.starts_with("--") {
+                continue;
+            }
             return Some(j);
         }
         None
@@ -843,19 +999,29 @@ impl UnnecessaryClosure {
 
     fn is_single_bare_call(s: &str) -> bool {
         let s = s.trim();
-        if s.is_empty() { return false; }
+        if s.is_empty() {
+            return false;
+        }
 
         let paren = match s.find('(') {
             Some(p) => p,
             None => return false,
         };
         let fn_part = &s[..paren];
-        if fn_part.is_empty() { return false; }
-        if fn_part.contains(':') { return false; }
-        if fn_part.contains('{') || fn_part.contains('[') { return false; }
+        if fn_part.is_empty() {
+            return false;
+        }
+        if fn_part.contains(':') {
+            return false;
+        }
+        if fn_part.contains('{') || fn_part.contains('[') {
+            return false;
+        }
 
         for ch in fn_part.chars() {
-            if !ch.is_alphanumeric() && ch != '_' && ch != '.' { return false; }
+            if !ch.is_alphanumeric() && ch != '_' && ch != '.' {
+                return false;
+            }
         }
 
         let mut depth = 0i32;

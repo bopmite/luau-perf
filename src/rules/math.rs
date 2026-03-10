@@ -22,13 +22,19 @@ pub struct MaxMinSingleArg;
 pub struct PowSlowExponent;
 
 impl Rule for RandomDeprecated {
-    fn id(&self) -> &'static str { "math::random_deprecated" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "math::random_deprecated"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, _ctx| {
-            if visit::is_dot_call(call, "math", "random") || visit::is_dot_call(call, "math", "randomseed") {
+            if visit::is_dot_call(call, "math", "random")
+                || visit::is_dot_call(call, "math", "randomseed")
+            {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
                     msg: "math.random() is deprecated - use Random.new():NextNumber()".into(),
@@ -40,8 +46,12 @@ impl Rule for RandomDeprecated {
 }
 
 impl Rule for RandomNewInLoop {
-    fn id(&self) -> &'static str { "math::random_new_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "math::random_new_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -58,8 +68,12 @@ impl Rule for RandomNewInLoop {
 }
 
 impl Rule for ClampManual {
-    fn id(&self) -> &'static str { "math::clamp_manual" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "math::clamp_manual"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -76,7 +90,9 @@ impl Rule for ClampManual {
                         b')' => depth -= 1,
                         _ => {}
                     }
-                    if depth > 0 { j += 1; }
+                    if depth > 0 {
+                        j += 1;
+                    }
                 }
                 if j < bytes.len() {
                     let after_inner = &source[j + 1..];
@@ -84,7 +100,10 @@ impl Rule for ClampManual {
                     if next_ch == ',' || next_ch == ')' {
                         hits.push(Hit {
                             pos,
-                            msg: format!("{} - use math.clamp(x, min, max) instead", &pat[..pat.len() - 1]),
+                            msg: format!(
+                                "{} - use math.clamp(x, min, max) instead",
+                                &pat[..pat.len() - 1]
+                            ),
                         });
                     }
                 }
@@ -95,8 +114,12 @@ impl Rule for ClampManual {
 }
 
 impl Rule for SqrtOverSquared {
-    fn id(&self) -> &'static str { "math::sqrt_over_squared" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "math::sqrt_over_squared"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -104,11 +127,17 @@ impl Rule for SqrtOverSquared {
             if visit::is_dot_call(call, "math", "sqrt") {
                 let pos = visit::call_pos(call);
                 let line_start = source[..pos].rfind('\n').map(|p| p + 1).unwrap_or(0);
-                let line_end = source[pos..].find('\n').map(|p| pos + p).unwrap_or(source.len());
+                let line_end = source[pos..]
+                    .find('\n')
+                    .map(|p| pos + p)
+                    .unwrap_or(source.len());
                 let line = &source[line_start..line_end];
-                if line.contains(" < ") || line.contains(" > ")
-                    || line.contains(" <= ") || line.contains(" >= ")
-                    || line.contains(" == ") || line.contains(" ~= ")
+                if line.contains(" < ")
+                    || line.contains(" > ")
+                    || line.contains(" <= ")
+                    || line.contains(" >= ")
+                    || line.contains(" == ")
+                    || line.contains(" ~= ")
                     || line.contains(" then")
                 {
                     hits.push(Hit {
@@ -123,8 +152,12 @@ impl Rule for SqrtOverSquared {
 }
 
 impl Rule for FloorDivision {
-    fn id(&self) -> &'static str { "math::floor_division" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "math::floor_division"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -133,10 +166,11 @@ impl Rule for FloorDivision {
             if after.contains('/') {
                 let paren_end = after.find(')').unwrap_or(0);
                 let inside = &after[..paren_end];
-                if inside.contains('/') && !inside.contains("//")  {
+                if inside.contains('/') && !inside.contains("//") {
                     hits.push(Hit {
                         pos,
-                        msg: "math.floor(a/b) - use a // b (integer division, single FASTCALL)".into(),
+                        msg: "math.floor(a/b) - use a // b (integer division, single FASTCALL)"
+                            .into(),
                     });
                 }
             }
@@ -146,8 +180,12 @@ impl Rule for FloorDivision {
 }
 
 impl Rule for FmodOverModulo {
-    fn id(&self) -> &'static str { "math::fmod_over_modulo" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "math::fmod_over_modulo"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -164,8 +202,12 @@ impl Rule for FmodOverModulo {
 }
 
 impl Rule for PowTwo {
-    fn id(&self) -> &'static str { "math::pow_two" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "math::pow_two"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -176,7 +218,9 @@ impl Rule for PowTwo {
                     if txt == "2" {
                         hits.push(Hit {
                             pos: visit::call_pos(call),
-                            msg: "math.pow(x, 2) - use x * x instead (avoids function call overhead)".into(),
+                            msg:
+                                "math.pow(x, 2) - use x * x instead (avoids function call overhead)"
+                                    .into(),
                         });
                     }
                 }
@@ -187,14 +231,21 @@ impl Rule for PowTwo {
 }
 
 impl Rule for VectorNormalizeManual {
-    fn id(&self) -> &'static str { "math::vector_normalize_manual" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "math::vector_normalize_manual"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         for pos in visit::find_pattern_positions(source, "/ ") {
             let after_start = pos + 2;
-            let line_end = source[after_start..].find('\n').map(|i| after_start + i).unwrap_or(source.len());
+            let line_end = source[after_start..]
+                .find('\n')
+                .map(|i| after_start + i)
+                .unwrap_or(source.len());
             let after = &source[after_start..line_end];
             if after.contains(".Magnitude") {
                 let line_start = source[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
@@ -212,8 +263,12 @@ impl Rule for VectorNormalizeManual {
 }
 
 impl Rule for UnnecessaryTonumber {
-    fn id(&self) -> &'static str { "math::unnecessary_tonumber" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "math::unnecessary_tonumber"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -236,8 +291,12 @@ impl Rule for UnnecessaryTonumber {
 }
 
 impl Rule for LerpManual {
-    fn id(&self) -> &'static str { "math::lerp_manual" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "math::lerp_manual"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -246,7 +305,10 @@ impl Rule for LerpManual {
             let before = &source[before_start..pos];
             if before.contains(" - ") && before.contains("(") {
                 let line_start = source[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
-                let line_end = source[pos..].find('\n').map(|p| pos + p).unwrap_or(source.len());
+                let line_end = source[pos..]
+                    .find('\n')
+                    .map(|p| pos + p)
+                    .unwrap_or(source.len());
                 let line = &source[line_start..line_end];
                 if line.contains(" + ") && line.contains(" - ") && line.contains(" * ") {
                     hits.push(Hit {
@@ -261,8 +323,12 @@ impl Rule for LerpManual {
 }
 
 impl Rule for AbsForSignCheck {
-    fn id(&self) -> &'static str { "math::abs_for_sign_check" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "math::abs_for_sign_check"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -272,12 +338,20 @@ impl Rule for AbsForSignCheck {
             }
             let pos = visit::call_pos(call);
             let line_start = source[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
-            let line_end = source[pos..].find('\n').map(|p| pos + p).unwrap_or(source.len());
+            let line_end = source[pos..]
+                .find('\n')
+                .map(|p| pos + p)
+                .unwrap_or(source.len());
             let line = &source[line_start..line_end];
-            if line.contains("> 0") || line.contains(">0") || line.contains("== 0") || line.contains("~= 0") {
+            if line.contains("> 0")
+                || line.contains(">0")
+                || line.contains("== 0")
+                || line.contains("~= 0")
+            {
                 hits.push(Hit {
                     pos,
-                    msg: "math.abs(x) compared to 0 - compare x directly (x ~= 0, x > 0, x < 0)".into(),
+                    msg: "math.abs(x) compared to 0 - compare x directly (x ~= 0, x > 0, x < 0)"
+                        .into(),
                 });
             }
         });
@@ -286,8 +360,12 @@ impl Rule for AbsForSignCheck {
 }
 
 impl Rule for Vector3ZeroConstant {
-    fn id(&self) -> &'static str { "math::vector3_zero_constant" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "math::vector3_zero_constant"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -299,9 +377,17 @@ impl Rule for Vector3ZeroConstant {
             };
             let args = after[..close].replace(' ', "");
             if args == "0,0,0" {
-                hits.push(Hit { pos, msg: "Vector3.new(0, 0, 0) - use Vector3.zero (pre-allocated, no allocation)".into() });
+                hits.push(Hit {
+                    pos,
+                    msg: "Vector3.new(0, 0, 0) - use Vector3.zero (pre-allocated, no allocation)"
+                        .into(),
+                });
             } else if args == "1,1,1" {
-                hits.push(Hit { pos, msg: "Vector3.new(1, 1, 1) - use Vector3.one (pre-allocated, no allocation)".into() });
+                hits.push(Hit {
+                    pos,
+                    msg: "Vector3.new(1, 1, 1) - use Vector3.one (pre-allocated, no allocation)"
+                        .into(),
+                });
             }
         }
         hits
@@ -309,8 +395,12 @@ impl Rule for Vector3ZeroConstant {
 }
 
 impl Rule for Vector2ZeroConstant {
-    fn id(&self) -> &'static str { "math::vector2_zero_constant" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "math::vector2_zero_constant"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -322,9 +412,17 @@ impl Rule for Vector2ZeroConstant {
             };
             let args = after[..close].replace(' ', "");
             if args == "0,0" {
-                hits.push(Hit { pos, msg: "Vector2.new(0, 0) - use Vector2.zero (pre-allocated, no allocation)".into() });
+                hits.push(Hit {
+                    pos,
+                    msg: "Vector2.new(0, 0) - use Vector2.zero (pre-allocated, no allocation)"
+                        .into(),
+                });
             } else if args == "1,1" {
-                hits.push(Hit { pos, msg: "Vector2.new(1, 1) - use Vector2.one (pre-allocated, no allocation)".into() });
+                hits.push(Hit {
+                    pos,
+                    msg: "Vector2.new(1, 1) - use Vector2.one (pre-allocated, no allocation)"
+                        .into(),
+                });
             }
         }
         hits
@@ -332,15 +430,20 @@ impl Rule for Vector2ZeroConstant {
 }
 
 impl Rule for CFrameIdentityConstant {
-    fn id(&self) -> &'static str { "math::cframe_identity_constant" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "math::cframe_identity_constant"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         for pos in visit::find_pattern_positions(source, "CFrame.new()") {
             hits.push(Hit {
                 pos,
-                msg: "CFrame.new() - use CFrame.identity (pre-allocated constant, no allocation)".into(),
+                msg: "CFrame.new() - use CFrame.identity (pre-allocated constant, no allocation)"
+                    .into(),
             });
         }
         hits
@@ -348,8 +451,12 @@ impl Rule for CFrameIdentityConstant {
 }
 
 impl Rule for HugeComparison {
-    fn id(&self) -> &'static str { "math::huge_comparison" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "math::huge_comparison"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -369,8 +476,12 @@ impl Rule for HugeComparison {
 }
 
 impl Rule for ExpOverPow {
-    fn id(&self) -> &'static str { "math::exp_over_pow" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "math::exp_over_pow"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -387,41 +498,73 @@ impl Rule for ExpOverPow {
 }
 
 impl Rule for PowSlowExponent {
-    fn id(&self) -> &'static str { "math::pow_slow_exponent" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "math::pow_slow_exponent"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         let comment_ranges = visit::build_comment_ranges(source);
         let bytes = source.as_bytes();
         for (i, &b) in bytes.iter().enumerate() {
-            if b != b'^' { continue; }
-            if visit::in_comment_range(&comment_ranges, i) || visit::in_line_comment_or_string(source, i) {
+            if b != b'^' {
+                continue;
+            }
+            if visit::in_comment_range(&comment_ranges, i)
+                || visit::in_line_comment_or_string(source, i)
+            {
                 continue;
             }
             let mut j = i + 1;
-            while j < bytes.len() && bytes[j] == b' ' { j += 1; }
-            if j >= bytes.len() { continue; }
+            while j < bytes.len() && bytes[j] == b' ' {
+                j += 1;
+            }
+            if j >= bytes.len() {
+                continue;
+            }
             let neg = bytes[j] == b'-';
-            if neg { j += 1; }
-            if j >= bytes.len() || (!bytes[j].is_ascii_digit() && bytes[j] != b'(') { continue; }
+            if neg {
+                j += 1;
+            }
+            if j >= bytes.len() || (!bytes[j].is_ascii_digit() && bytes[j] != b'(') {
+                continue;
+            }
             if bytes[j] == b'(' {
                 let mut k = j + 1;
-                while k < bytes.len() && bytes[k] == b' ' { k += 1; }
+                while k < bytes.len() && bytes[k] == b' ' {
+                    k += 1;
+                }
                 let inner_neg = k < bytes.len() && bytes[k] == b'-';
-                if inner_neg { k += 1; }
-                if k >= bytes.len() || !bytes[k].is_ascii_digit() { continue; }
+                if inner_neg {
+                    k += 1;
+                }
+                if k >= bytes.len() || !bytes[k].is_ascii_digit() {
+                    continue;
+                }
                 let num_start = k;
-                while k < bytes.len() && (bytes[k].is_ascii_digit() || bytes[k] == b'.') { k += 1; }
-                while k < bytes.len() && bytes[k] == b' ' { k += 1; }
+                while k < bytes.len() && (bytes[k].is_ascii_digit() || bytes[k] == b'.') {
+                    k += 1;
+                }
+                while k < bytes.len() && bytes[k] == b' ' {
+                    k += 1;
+                }
                 if k < bytes.len() && bytes[k] == b'/' {
                     continue;
                 }
-                if k >= bytes.len() || bytes[k] != b')' { continue; }
-                let num_str = std::str::from_utf8(&bytes[num_start..k]).unwrap_or("").trim();
+                if k >= bytes.len() || bytes[k] != b')' {
+                    continue;
+                }
+                let num_str = std::str::from_utf8(&bytes[num_start..k])
+                    .unwrap_or("")
+                    .trim();
                 if let Ok(val) = num_str.parse::<f64>() {
                     let val = if inner_neg { -val } else { val };
-                    if val == 2.0 || val == 0.5 || val == 3.0 { continue; }
+                    if val == 2.0 || val == 0.5 || val == 3.0 {
+                        continue;
+                    }
                     let suggestion = suggest_pow_replacement(val);
                     hits.push(Hit {
                         pos: i,
@@ -431,15 +574,23 @@ impl Rule for PowSlowExponent {
                 continue;
             }
             let num_start = j;
-            while j < bytes.len() && (bytes[j].is_ascii_digit() || bytes[j] == b'.') { j += 1; }
-            let num_str = std::str::from_utf8(&bytes[num_start..j]).unwrap_or("").trim();
+            while j < bytes.len() && (bytes[j].is_ascii_digit() || bytes[j] == b'.') {
+                j += 1;
+            }
+            let num_str = std::str::from_utf8(&bytes[num_start..j])
+                .unwrap_or("")
+                .trim();
             if let Ok(val) = num_str.parse::<f64>() {
                 let val = if neg { -val } else { val };
-                if val == 2.0 || val == 0.5 || val == 3.0 { continue; }
+                if val == 2.0 || val == 0.5 || val == 3.0 {
+                    continue;
+                }
                 let suggestion = suggest_pow_replacement(val);
                 hits.push(Hit {
                     pos: i,
-                    msg: format!("^{val} uses slow libc pow() - VM only fast-paths ^2, ^0.5, ^3{suggestion}"),
+                    msg: format!(
+                        "^{val} uses slow libc pow() - VM only fast-paths ^2, ^0.5, ^3{suggestion}"
+                    ),
                 });
             }
         }
@@ -463,7 +614,9 @@ fn suggest_pow_replacement(exp: f64) -> String {
 fn line_start_offsets(source: &str) -> Vec<usize> {
     let mut starts = vec![0];
     for (i, b) in source.bytes().enumerate() {
-        if b == b'\n' { starts.push(i + 1); }
+        if b == b'\n' {
+            starts.push(i + 1);
+        }
     }
     starts
 }
@@ -492,13 +645,18 @@ fn build_hot_loop_depth_map(source: &str) -> Vec<u32> {
             depths.push(depth);
             continue;
         }
-        if trimmed.starts_with("while ") || trimmed.starts_with("repeat") {
-            depth += 1;
-        } else if trimmed.starts_with("for ") && !trimmed.contains(" in ") {
+        if trimmed.starts_with("while ")
+            || trimmed.starts_with("repeat")
+            || (trimmed.starts_with("for ") && !trimmed.contains(" in "))
+        {
             depth += 1;
         }
         depths.push(depth);
-        if trimmed == "end" || trimmed.starts_with("end ") || trimmed.starts_with("until ") || trimmed == "until" {
+        if trimmed == "end"
+            || trimmed.starts_with("end ")
+            || trimmed.starts_with("until ")
+            || trimmed == "until"
+        {
             depth = depth.saturating_sub(1);
         }
     }
@@ -506,8 +664,12 @@ fn build_hot_loop_depth_map(source: &str) -> Vec<u32> {
 }
 
 impl Rule for FloorRoundManual {
-    fn id(&self) -> &'static str { "math::floor_round_manual" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "math::floor_round_manual"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -528,15 +690,21 @@ impl Rule for FloorRoundManual {
 }
 
 impl Rule for MaxMinSingleArg {
-    fn id(&self) -> &'static str { "math::max_min_single_arg" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "math::max_min_single_arg"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, _ctx| {
             let is_max = visit::is_dot_call(call, "math", "max");
             let is_min = visit::is_dot_call(call, "math", "min");
-            if !is_max && !is_min { return; }
+            if !is_max && !is_min {
+                return;
+            }
             if visit::call_arg_count(call) == 1 {
                 let name = if is_max { "math.max" } else { "math.min" };
                 hits.push(Hit {

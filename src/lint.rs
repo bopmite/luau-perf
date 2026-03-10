@@ -27,7 +27,13 @@ pub struct Diagnostic {
     pub fix: Option<crate::fix::Fix>,
 }
 
-pub fn print_report(diagnostics: &[Diagnostic], base: &Path, n_files: usize, elapsed: Duration, parse_errors: usize) {
+pub fn print_report(
+    diagnostics: &[Diagnostic],
+    base: &Path,
+    n_files: usize,
+    elapsed: Duration,
+    parse_errors: usize,
+) {
     if diagnostics.is_empty() {
         let extra = if parse_errors > 0 {
             format!(" · \x1b[33m{parse_errors} skipped (parse errors)\x1b[0m")
@@ -70,8 +76,16 @@ pub fn print_report(diagnostics: &[Diagnostic], base: &Path, n_files: usize, ela
         let short = file.strip_prefix(base_dir).unwrap_or(file);
         println!(" \x1b[1;4m{}\x1b[0m", short.display());
 
-        let max_line = diags.iter().map(|d| d.line.to_string().len()).max().unwrap_or(0);
-        let max_col = diags.iter().map(|d| d.col.to_string().len()).max().unwrap_or(0);
+        let max_line = diags
+            .iter()
+            .map(|d| d.line.to_string().len())
+            .max()
+            .unwrap_or(0);
+        let max_col = diags
+            .iter()
+            .map(|d| d.col.to_string().len())
+            .max()
+            .unwrap_or(0);
 
         for d in diags {
             let line_s = format!("{:>w$}", d.line, w = max_line);
@@ -116,7 +130,11 @@ pub fn print_report(diagnostics: &[Diagnostic], base: &Path, n_files: usize, ela
         "0 warnings".to_string()
     };
 
-    let summary_color = if errors > 0 { "\x1b[1;31m" } else { "\x1b[1;33m" };
+    let summary_color = if errors > 0 {
+        "\x1b[1;31m"
+    } else {
+        "\x1b[1;33m"
+    };
 
     let skip_part = if parse_errors > 0 {
         format!(" · \x1b[33m{parse_errors} skipped\x1b[0m")
@@ -142,8 +160,16 @@ pub fn print_report(diagnostics: &[Diagnostic], base: &Path, n_files: usize, ela
     );
 }
 
-pub fn print_summary(diagnostics: &[Diagnostic], n_files: usize, elapsed: Duration, parse_errors: usize) {
-    let errors = diagnostics.iter().filter(|d| d.severity == Severity::Error).count();
+pub fn print_summary(
+    diagnostics: &[Diagnostic],
+    n_files: usize,
+    elapsed: Duration,
+    parse_errors: usize,
+) {
+    let errors = diagnostics
+        .iter()
+        .filter(|d| d.severity == Severity::Error)
+        .count();
     let warns = diagnostics.len() - errors;
 
     let skip_part = if parse_errors > 0 {
@@ -155,12 +181,18 @@ pub fn print_summary(diagnostics: &[Diagnostic], n_files: usize, elapsed: Durati
     if diagnostics.is_empty() {
         eprintln!(
             " {} files · no issues{} · {:.2}s",
-            n_files, skip_part, elapsed.as_secs_f64()
+            n_files,
+            skip_part,
+            elapsed.as_secs_f64()
         );
     } else {
         eprintln!(
             " {} files · {} errors · {} warnings{} · {:.2}s",
-            n_files, errors, warns, skip_part, elapsed.as_secs_f64()
+            n_files,
+            errors,
+            warns,
+            skip_part,
+            elapsed.as_secs_f64()
         );
     }
 }
@@ -178,7 +210,11 @@ pub fn print_json(diagnostics: &[Diagnostic]) {
         };
         let file = d.file.display().to_string().replace('\\', "/");
         let msg = d.message.replace('\\', "\\\\").replace('"', "\\\"");
-        let fixable = if crate::rules::is_fixable(d.rule) { "true" } else { "false" };
+        let fixable = if crate::rules::is_fixable(d.rule) {
+            "true"
+        } else {
+            "false"
+        };
         print!(
             r#"{{"file":"{}","line":{},"col":{},"severity":"{}","rule":"{}","message":"{}","fixable":{}}}"#,
             file, d.line, d.col, sev, d.rule, msg, fixable,
@@ -218,6 +254,7 @@ pub trait Rule: Send + Sync {
     fn id(&self) -> &'static str;
     fn severity(&self) -> Severity;
     fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit>;
-    fn skip_path(&self, _path: &std::path::Path) -> bool { false }
+    fn skip_path(&self, _path: &std::path::Path) -> bool {
+        false
+    }
 }
-

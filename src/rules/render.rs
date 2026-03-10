@@ -14,8 +14,12 @@ pub struct ScrollingFrameInLoop;
 pub struct GuiPropertyInHeartbeat;
 
 impl Rule for GuiCreationInLoop {
-    fn id(&self) -> &'static str { "render::gui_creation_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "render::gui_creation_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -25,16 +29,30 @@ impl Rule for GuiCreationInLoop {
             }
             let src = format!("{call}");
             let gui_classes = [
-                "ScreenGui", "Frame", "TextLabel", "TextButton", "TextBox",
-                "ImageLabel", "ImageButton", "ScrollingFrame", "ViewportFrame",
-                "SurfaceGui", "CanvasGroup", "UIListLayout", "UIGridLayout",
-                "UIPadding", "UICorner", "UIStroke",
+                "ScreenGui",
+                "Frame",
+                "TextLabel",
+                "TextButton",
+                "TextBox",
+                "ImageLabel",
+                "ImageButton",
+                "ScrollingFrame",
+                "ViewportFrame",
+                "SurfaceGui",
+                "CanvasGroup",
+                "UIListLayout",
+                "UIGridLayout",
+                "UIPadding",
+                "UICorner",
+                "UIStroke",
             ];
             for class in &gui_classes {
                 if src.contains(class) {
                     hits.push(Hit {
                         pos: visit::call_pos(call),
-                        msg: format!("GUI instance ({class}) created in loop - pre-create or use Clone()"),
+                        msg: format!(
+                            "GUI instance ({class}) created in loop - pre-create or use Clone()"
+                        ),
                     });
                     return;
                 }
@@ -45,8 +63,12 @@ impl Rule for GuiCreationInLoop {
 }
 
 impl Rule for BeamTrailInLoop {
-    fn id(&self) -> &'static str { "render::beam_trail_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "render::beam_trail_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -67,8 +89,12 @@ impl Rule for BeamTrailInLoop {
 }
 
 impl Rule for ParticleEmitterInLoop {
-    fn id(&self) -> &'static str { "render::particle_emitter_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "render::particle_emitter_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -80,7 +106,8 @@ impl Rule for ParticleEmitterInLoop {
             if src.contains("ParticleEmitter") {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
-                    msg: "ParticleEmitter created in loop - pre-create and reuse via :Emit()".into(),
+                    msg: "ParticleEmitter created in loop - pre-create and reuse via :Emit()"
+                        .into(),
                 });
             }
         });
@@ -89,8 +116,12 @@ impl Rule for ParticleEmitterInLoop {
 }
 
 impl Rule for BillboardGuiInLoop {
-    fn id(&self) -> &'static str { "render::billboard_gui_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "render::billboard_gui_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -111,8 +142,12 @@ impl Rule for BillboardGuiInLoop {
 }
 
 impl Rule for TransparencyChangeInLoop {
-    fn id(&self) -> &'static str { "render::transparency_change_in_loop" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "render::transparency_change_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let patterns = [
@@ -142,13 +177,19 @@ impl Rule for TransparencyChangeInLoop {
 }
 
 impl Rule for RichTextInLoop {
-    fn id(&self) -> &'static str { "render::rich_text_in_loop" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "render::rich_text_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let loop_depth = build_hot_loop_depth_map(source);
         let line_starts = line_start_offsets(source);
-        let rich_patterns = ["<font", "<b>", "<i>", "<u>", "<stroke", "<sc>", "</font>", "</b>"];
+        let rich_patterns = [
+            "<font", "<b>", "<i>", "<u>", "<stroke", "<sc>", "</font>", "</b>",
+        ];
         for pattern in &rich_patterns {
             let mut start = 0;
             while let Some(idx) = source[start..].find(pattern) {
@@ -168,8 +209,12 @@ impl Rule for RichTextInLoop {
 }
 
 impl Rule for NeonGlassMaterialInLoop {
-    fn id(&self) -> &'static str { "render::neon_glass_material_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "render::neon_glass_material_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -192,8 +237,12 @@ impl Rule for NeonGlassMaterialInLoop {
 }
 
 impl Rule for SurfaceGuiInLoop {
-    fn id(&self) -> &'static str { "render::surface_gui_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "render::surface_gui_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -213,8 +262,12 @@ impl Rule for SurfaceGuiInLoop {
 }
 
 impl Rule for ImageLabelInLoop {
-    fn id(&self) -> &'static str { "render::image_label_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "render::image_label_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -225,7 +278,11 @@ impl Rule for ImageLabelInLoop {
                 let line = line_starts.partition_point(|&s| s <= pos).saturating_sub(1);
                 if line < loop_depth.len() && loop_depth[line] > 0 {
                     let line_start = line_starts[line];
-                    let line_text = &source[line_start..source[line_start..].find('\n').map(|p| line_start + p).unwrap_or(source.len())];
+                    let line_text = &source[line_start
+                        ..source[line_start..]
+                            .find('\n')
+                            .map(|p| line_start + p)
+                            .unwrap_or(source.len())];
                     if line_text.contains("Instance.new") {
                         hits.push(Hit {
                             pos,
@@ -240,8 +297,12 @@ impl Rule for ImageLabelInLoop {
 }
 
 impl Rule for ScrollingFrameInLoop {
-    fn id(&self) -> &'static str { "render::scrolling_frame_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "render::scrolling_frame_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -261,22 +322,41 @@ impl Rule for ScrollingFrameInLoop {
 }
 
 impl Rule for GuiPropertyInHeartbeat {
-    fn id(&self) -> &'static str { "render::gui_property_in_heartbeat" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "render::gui_property_in_heartbeat"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
-        let signals = ["Heartbeat:Connect(", "RenderStepped:Connect(", "Stepped:Connect("];
+        let signals = [
+            "Heartbeat:Connect(",
+            "RenderStepped:Connect(",
+            "Stepped:Connect(",
+        ];
         let mut connect_positions: Vec<usize> = Vec::new();
         for sig in &signals {
             for pos in visit::find_pattern_positions(source, sig) {
                 connect_positions.push(pos);
             }
         }
-        if connect_positions.is_empty() { return vec![]; }
+        if connect_positions.is_empty() {
+            return vec![];
+        }
 
-        let gui_props = [".Text ", ".Text=", ".TextColor3 ", ".TextColor3=",
-                         ".Visible ", ".Visible=", ".ImageColor3 ", ".ImageColor3=",
-                         ".BackgroundColor3 ", ".BackgroundColor3="];
+        let gui_props = [
+            ".Text ",
+            ".Text=",
+            ".TextColor3 ",
+            ".TextColor3=",
+            ".Visible ",
+            ".Visible=",
+            ".ImageColor3 ",
+            ".ImageColor3=",
+            ".BackgroundColor3 ",
+            ".BackgroundColor3=",
+        ];
         let mut hits = Vec::new();
         for &pos in &connect_positions {
             let end = visit::ceil_char(source, (pos + 1000).min(source.len()));
@@ -285,11 +365,17 @@ impl Rule for GuiPropertyInHeartbeat {
             let mut body_end = callback.len();
             for (i, line) in callback.lines().enumerate() {
                 let t = line.trim();
-                if t.contains("function") { depth += 1; }
+                if t.contains("function") {
+                    depth += 1;
+                }
                 if t == "end" || t == "end)" || t.starts_with("end)") {
                     depth -= 1;
                     if depth <= 0 {
-                        body_end = callback.lines().take(i + 1).map(|l| l.len() + 1).sum::<usize>();
+                        body_end = callback
+                            .lines()
+                            .take(i + 1)
+                            .map(|l| l.len() + 1)
+                            .sum::<usize>();
                         break;
                     }
                 }
@@ -347,13 +433,18 @@ fn build_hot_loop_depth_map(source: &str) -> Vec<u32> {
             depths.push(depth);
             continue;
         }
-        if trimmed.starts_with("while ") || trimmed.starts_with("repeat") {
-            depth += 1;
-        } else if trimmed.starts_with("for ") && !trimmed.contains(" in ") {
+        if trimmed.starts_with("while ")
+            || trimmed.starts_with("repeat")
+            || (trimmed.starts_with("for ") && !trimmed.contains(" in "))
+        {
             depth += 1;
         }
         depths.push(depth);
-        if trimmed == "end" || trimmed.starts_with("end ") || trimmed.starts_with("until ") || trimmed == "until" {
+        if trimmed == "end"
+            || trimmed.starts_with("end ")
+            || trimmed.starts_with("until ")
+            || trimmed == "until"
+        {
             depth = depth.saturating_sub(1);
         }
     }

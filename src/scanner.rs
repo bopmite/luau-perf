@@ -73,7 +73,14 @@ pub fn run(path: &Path, config: &Config, fix_mode: bool, dry_run: bool, level: L
     }
 }
 
-fn lint_file(path: &Path, rules: &[Box<dyn Rule>], config: &Config, fix_mode: bool, parse_errors: &std::sync::atomic::AtomicUsize, level: Level) -> Vec<Diagnostic> {
+fn lint_file(
+    path: &Path,
+    rules: &[Box<dyn Rule>],
+    config: &Config,
+    fix_mode: bool,
+    parse_errors: &std::sync::atomic::AtomicUsize,
+    level: Level,
+) -> Vec<Diagnostic> {
     let source = match std::fs::read_to_string(path) {
         Ok(s) => s,
         Err(_) => return vec![],

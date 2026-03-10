@@ -18,8 +18,12 @@ pub struct SpatialQueryPerFrame;
 pub struct TerrainWriteInLoop;
 
 impl Rule for SpatialQueryInLoop {
-    fn id(&self) -> &'static str { "physics::spatial_query_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "physics::spatial_query_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -46,8 +50,12 @@ impl Rule for SpatialQueryInLoop {
 }
 
 impl Rule for MoveToInLoop {
-    fn id(&self) -> &'static str { "physics::move_to_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "physics::move_to_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -64,8 +72,12 @@ impl Rule for MoveToInLoop {
 }
 
 impl Rule for TouchedWithoutDebounce {
-    fn id(&self) -> &'static str { "physics::touched_without_debounce" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "physics::touched_without_debounce"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -85,7 +97,9 @@ impl Rule for TouchedWithoutDebounce {
             if !has_debounce {
                 hits.push(Hit {
                     pos,
-                    msg: ".Touched fires at ~240Hz per contact pair - add a debounce/cooldown check".into(),
+                    msg:
+                        ".Touched fires at ~240Hz per contact pair - add a debounce/cooldown check"
+                            .into(),
                 });
             }
         }
@@ -94,8 +108,12 @@ impl Rule for TouchedWithoutDebounce {
 }
 
 impl Rule for SetNetworkOwnerInLoop {
-    fn id(&self) -> &'static str { "physics::set_network_owner_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "physics::set_network_owner_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -112,8 +130,12 @@ impl Rule for SetNetworkOwnerInLoop {
 }
 
 impl Rule for PreciseCollisionFidelity {
-    fn id(&self) -> &'static str { "physics::precise_collision_fidelity" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "physics::precise_collision_fidelity"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -128,8 +150,12 @@ impl Rule for PreciseCollisionFidelity {
 }
 
 impl Rule for CollisionGroupStringInLoop {
-    fn id(&self) -> &'static str { "physics::collision_group_string_in_loop" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "physics::collision_group_string_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -140,7 +166,9 @@ impl Rule for CollisionGroupStringInLoop {
             if line < loop_depth.len() && loop_depth[line] > 0 {
                 hits.push(Hit {
                     pos,
-                    msg: ".CollisionGroup string assignment in loop - cache the string value outside".into(),
+                    msg:
+                        ".CollisionGroup string assignment in loop - cache the string value outside"
+                            .into(),
                 });
             }
         }
@@ -149,8 +177,12 @@ impl Rule for CollisionGroupStringInLoop {
 }
 
 impl Rule for AnchoredWithVelocity {
-    fn id(&self) -> &'static str { "physics::anchored_with_velocity" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "physics::anchored_with_velocity"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -158,7 +190,8 @@ impl Rule for AnchoredWithVelocity {
             let context_start = visit::floor_char(source, pos.saturating_sub(200));
             let context_end = visit::ceil_char(source, (pos + 200).min(source.len()));
             let context = &source[context_start..context_end];
-            if context.contains("Velocity") || context.contains("AssemblyLinearVelocity")
+            if context.contains("Velocity")
+                || context.contains("AssemblyLinearVelocity")
                 || context.contains("AssemblyAngularVelocity")
             {
                 hits.push(Hit {
@@ -172,8 +205,12 @@ impl Rule for AnchoredWithVelocity {
 }
 
 impl Rule for RaycastParamsInLoop {
-    fn id(&self) -> &'static str { "physics::raycast_params_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "physics::raycast_params_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -190,8 +227,12 @@ impl Rule for RaycastParamsInLoop {
 }
 
 impl Rule for CFrameAssignInLoop {
-    fn id(&self) -> &'static str { "physics::cframe_assign_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "physics::cframe_assign_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let positions = visit::find_pattern_positions(source, ".CFrame =");
@@ -215,8 +256,12 @@ impl Rule for CFrameAssignInLoop {
 }
 
 impl Rule for CanTouchQueryNotDisabled {
-    fn id(&self) -> &'static str { "physics::can_touch_query_not_disabled" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "physics::can_touch_query_not_disabled"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -237,8 +282,12 @@ impl Rule for CanTouchQueryNotDisabled {
 }
 
 impl Rule for WeldConstraintInLoop {
-    fn id(&self) -> &'static str { "physics::weld_constraint_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "physics::weld_constraint_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -260,7 +309,9 @@ impl Rule for WeldConstraintInLoop {
 fn line_start_offsets(source: &str) -> Vec<usize> {
     let mut starts = vec![0];
     for (i, b) in source.bytes().enumerate() {
-        if b == b'\n' { starts.push(i + 1); }
+        if b == b'\n' {
+            starts.push(i + 1);
+        }
     }
     starts
 }
@@ -289,13 +340,18 @@ fn build_hot_loop_depth_map(source: &str) -> Vec<u32> {
             depths.push(depth);
             continue;
         }
-        if trimmed.starts_with("while ") || trimmed.starts_with("repeat") {
-            depth += 1;
-        } else if trimmed.starts_with("for ") && !trimmed.contains(" in ") {
+        if trimmed.starts_with("while ")
+            || trimmed.starts_with("repeat")
+            || (trimmed.starts_with("for ") && !trimmed.contains(" in "))
+        {
             depth += 1;
         }
         depths.push(depth);
-        if trimmed == "end" || trimmed.starts_with("end ") || trimmed.starts_with("until ") || trimmed == "until" {
+        if trimmed == "end"
+            || trimmed.starts_with("end ")
+            || trimmed.starts_with("until ")
+            || trimmed == "until"
+        {
             depth = depth.saturating_sub(1);
         }
     }
@@ -303,17 +359,26 @@ fn build_hot_loop_depth_map(source: &str) -> Vec<u32> {
 }
 
 impl Rule for MasslessNotSet {
-    fn id(&self) -> &'static str { "physics::massless_not_set" }
-    fn severity(&self) -> Severity { Severity::Allow }
+    fn id(&self) -> &'static str {
+        "physics::massless_not_set"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Allow
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         for pos in visit::find_pattern_positions(source, ".Massless = true") {
             let line_start = source[..pos].rfind('\n').map(|p| p + 1).unwrap_or(0);
-            let line = &source[line_start..source[pos..].find('\n').map(|p| pos + p).unwrap_or(source.len())];
+            let line = &source[line_start
+                ..source[pos..]
+                    .find('\n')
+                    .map(|p| pos + p)
+                    .unwrap_or(source.len())];
             let trimmed = line.trim();
             if trimmed.contains(".Massless = true") {
-                let around = &source[visit::floor_char_boundary(source, pos.saturating_sub(200))..visit::ceil_char_boundary(source, pos + 200)];
+                let around = &source[visit::floor_char_boundary(source, pos.saturating_sub(200))
+                    ..visit::ceil_char_boundary(source, pos + 200)];
                 if !around.contains("Anchored") && around.contains("Weld") {
                     hits.push(Hit {
                         pos,
@@ -327,8 +392,12 @@ impl Rule for MasslessNotSet {
 }
 
 impl Rule for AssemblyVelocityInLoop {
-    fn id(&self) -> &'static str { "physics::assembly_velocity_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "physics::assembly_velocity_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
@@ -351,13 +420,28 @@ impl Rule for AssemblyVelocityInLoop {
 }
 
 impl Rule for SpatialQueryPerFrame {
-    fn id(&self) -> &'static str { "physics::spatial_query_per_frame" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "physics::spatial_query_per_frame"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
-        let connect_patterns = ["Heartbeat:Connect(", "RenderStepped:Connect(", ".Stepped:Connect("];
-        let spatial_methods = [":Raycast(", ":GetPartBoundsInBox(", ":GetPartBoundsInRadius(",
-            ":GetPartsInPart(", ":Blockcast(", ":Spherecast(", ":Shapecast("];
+        let connect_patterns = [
+            "Heartbeat:Connect(",
+            "RenderStepped:Connect(",
+            ".Stepped:Connect(",
+        ];
+        let spatial_methods = [
+            ":Raycast(",
+            ":GetPartBoundsInBox(",
+            ":GetPartBoundsInRadius(",
+            ":GetPartsInPart(",
+            ":Blockcast(",
+            ":Spherecast(",
+            ":Shapecast(",
+        ];
 
         let mut connect_positions: Vec<usize> = Vec::new();
         for pattern in &connect_patterns {
@@ -378,11 +462,17 @@ impl Rule for SpatialQueryPerFrame {
             let mut body_end = callback.len();
             for (i, line) in callback.lines().enumerate() {
                 let t = line.trim();
-                if t.contains("function") { depth += 1; }
+                if t.contains("function") {
+                    depth += 1;
+                }
                 if t == "end" || t == "end)" || t.starts_with("end)") || t.starts_with("end,") {
                     depth -= 1;
                     if depth <= 0 {
-                        body_end = callback.lines().take(i + 1).map(|l| l.len() + 1).sum::<usize>();
+                        body_end = callback
+                            .lines()
+                            .take(i + 1)
+                            .map(|l| l.len() + 1)
+                            .sum::<usize>();
                         break;
                     }
                 }
@@ -404,17 +494,28 @@ impl Rule for SpatialQueryPerFrame {
 }
 
 impl Rule for TerrainWriteInLoop {
-    fn id(&self) -> &'static str { "physics::terrain_write_in_loop" }
-    fn severity(&self) -> Severity { Severity::Warn }
+    fn id(&self) -> &'static str {
+        "physics::terrain_write_in_loop"
+    }
+    fn severity(&self) -> Severity {
+        Severity::Warn
+    }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let terrain_methods = [
-            "FillBlock", "FillRegion", "FillBall", "FillCylinder", "FillWedge",
-            "WriteVoxels", "ReplaceMaterial",
+            "FillBlock",
+            "FillRegion",
+            "FillBall",
+            "FillCylinder",
+            "FillWedge",
+            "WriteVoxels",
+            "ReplaceMaterial",
         ];
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if !ctx.in_hot_loop { return; }
+            if !ctx.in_hot_loop {
+                return;
+            }
             for method in &terrain_methods {
                 if visit::is_method_call(call, method) {
                     hits.push(Hit {

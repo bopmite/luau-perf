@@ -3,14 +3,22 @@ use full_moon::tokenizer;
 use full_moon::visitors::Visitor;
 
 pub fn floor_char_boundary(s: &str, mut i: usize) -> usize {
-    if i >= s.len() { return s.len(); }
-    while i > 0 && !s.is_char_boundary(i) { i -= 1; }
+    if i >= s.len() {
+        return s.len();
+    }
+    while i > 0 && !s.is_char_boundary(i) {
+        i -= 1;
+    }
     i
 }
 
 pub fn ceil_char_boundary(s: &str, mut i: usize) -> usize {
-    if i >= s.len() { return s.len(); }
-    while i < s.len() && !s.is_char_boundary(i) { i += 1; }
+    if i >= s.len() {
+        return s.len();
+    }
+    while i < s.len() && !s.is_char_boundary(i) {
+        i += 1;
+    }
     i
 }
 
@@ -35,26 +43,61 @@ struct Walker<F> {
 }
 
 pub fn each_call(ast: &Ast, f: impl FnMut(&FunctionCall, &CallCtx)) {
-    let mut w = Walker { loop_depth: 0, hot_loop_depth: 0, for_in_depth: 0, func_depth: 0, func_in_loop_depth: 0, cb: f };
+    let mut w = Walker {
+        loop_depth: 0,
+        hot_loop_depth: 0,
+        for_in_depth: 0,
+        func_depth: 0,
+        func_in_loop_depth: 0,
+        cb: f,
+    };
     w.visit_ast(ast);
 }
 
 impl<F: FnMut(&FunctionCall, &CallCtx)> Visitor for Walker<F> {
-    fn visit_while(&mut self, _: &While) { self.loop_depth += 1; self.hot_loop_depth += 1; }
-    fn visit_while_end(&mut self, _: &While) { self.loop_depth -= 1; self.hot_loop_depth -= 1; }
-    fn visit_numeric_for(&mut self, _: &NumericFor) { self.loop_depth += 1; self.hot_loop_depth += 1; }
-    fn visit_numeric_for_end(&mut self, _: &NumericFor) { self.loop_depth -= 1; self.hot_loop_depth -= 1; }
-    fn visit_generic_for(&mut self, _: &GenericFor) { self.loop_depth += 1; self.for_in_depth += 1; }
-    fn visit_generic_for_end(&mut self, _: &GenericFor) { self.loop_depth -= 1; self.for_in_depth -= 1; }
-    fn visit_repeat(&mut self, _: &Repeat) { self.loop_depth += 1; self.hot_loop_depth += 1; }
-    fn visit_repeat_end(&mut self, _: &Repeat) { self.loop_depth -= 1; self.hot_loop_depth -= 1; }
+    fn visit_while(&mut self, _: &While) {
+        self.loop_depth += 1;
+        self.hot_loop_depth += 1;
+    }
+    fn visit_while_end(&mut self, _: &While) {
+        self.loop_depth -= 1;
+        self.hot_loop_depth -= 1;
+    }
+    fn visit_numeric_for(&mut self, _: &NumericFor) {
+        self.loop_depth += 1;
+        self.hot_loop_depth += 1;
+    }
+    fn visit_numeric_for_end(&mut self, _: &NumericFor) {
+        self.loop_depth -= 1;
+        self.hot_loop_depth -= 1;
+    }
+    fn visit_generic_for(&mut self, _: &GenericFor) {
+        self.loop_depth += 1;
+        self.for_in_depth += 1;
+    }
+    fn visit_generic_for_end(&mut self, _: &GenericFor) {
+        self.loop_depth -= 1;
+        self.for_in_depth -= 1;
+    }
+    fn visit_repeat(&mut self, _: &Repeat) {
+        self.loop_depth += 1;
+        self.hot_loop_depth += 1;
+    }
+    fn visit_repeat_end(&mut self, _: &Repeat) {
+        self.loop_depth -= 1;
+        self.hot_loop_depth -= 1;
+    }
     fn visit_function_body(&mut self, _: &FunctionBody) {
         self.func_depth += 1;
-        if self.loop_depth > 0 { self.func_in_loop_depth += 1; }
+        if self.loop_depth > 0 {
+            self.func_in_loop_depth += 1;
+        }
     }
     fn visit_function_body_end(&mut self, _: &FunctionBody) {
         self.func_depth -= 1;
-        if self.func_in_loop_depth > 0 { self.func_in_loop_depth -= 1; }
+        if self.func_in_loop_depth > 0 {
+            self.func_in_loop_depth -= 1;
+        }
     }
     fn visit_function_call(&mut self, node: &FunctionCall) {
         let ctx = CallCtx {
@@ -100,10 +143,10 @@ pub fn call_pos(call: &FunctionCall) -> usize {
             Suffix::Index(Index::Dot { name, .. }) => {
                 return name.start_position().bytes();
             }
-            Suffix::Call(Call::AnonymousCall(args)) => {
-                if let FunctionArgs::Parentheses { parentheses, .. } = args {
-                    return parentheses.tokens().0.start_position().bytes();
-                }
+            Suffix::Call(Call::AnonymousCall(FunctionArgs::Parentheses {
+                parentheses, ..
+            })) => {
+                return parentheses.tokens().0.start_position().bytes();
             }
             _ => {}
         }
@@ -191,7 +234,7 @@ pub fn call_arg_count(call: &FunctionCall) -> usize {
     }
 }
 
-pub fn nth_arg<'a>(call: &'a FunctionCall, n: usize) -> Option<&'a Expression> {
+pub fn nth_arg(call: &FunctionCall, n: usize) -> Option<&Expression> {
     match call_args(call)? {
         FunctionArgs::Parentheses { arguments, .. } => arguments.iter().nth(n),
         _ => None,
@@ -213,10 +256,10 @@ pub fn first_string_arg(call: &FunctionCall) -> Option<String> {
 pub fn expr_to_string(expr: &Expression) -> Option<String> {
     let s = format!("{expr}");
     let s = s.trim();
-    if s.len() >= 2 {
-        if (s.starts_with('"') && s.ends_with('"')) || (s.starts_with('\'') && s.ends_with('\'')) {
-            return Some(s[1..s.len() - 1].to_string());
-        }
+    if s.len() >= 2
+        && ((s.starts_with('"') && s.ends_with('"')) || (s.starts_with('\'') && s.ends_with('\'')))
+    {
+        return Some(s[1..s.len() - 1].to_string());
     }
     None
 }
@@ -245,10 +288,26 @@ pub fn each_stmt_ctx(block: &Block, ctx: StmtCtx, f: &mut impl FnMut(&Stmt, &Stm
 
 fn walk_children_ctx(stmt: &Stmt, ctx: &StmtCtx, f: &mut impl FnMut(&Stmt, &StmtCtx)) {
     let fd = ctx.func_depth;
-    let hot = StmtCtx { in_loop: true, in_for_in: false, func_depth: fd };
-    let for_in = StmtCtx { in_loop: true, in_for_in: true, func_depth: fd };
-    let same = StmtCtx { in_loop: ctx.in_loop, in_for_in: ctx.in_for_in, func_depth: fd };
-    let in_func = StmtCtx { in_loop: false, in_for_in: false, func_depth: fd + 1 };
+    let hot = StmtCtx {
+        in_loop: true,
+        in_for_in: false,
+        func_depth: fd,
+    };
+    let for_in = StmtCtx {
+        in_loop: true,
+        in_for_in: true,
+        func_depth: fd,
+    };
+    let same = StmtCtx {
+        in_loop: ctx.in_loop,
+        in_for_in: ctx.in_for_in,
+        func_depth: fd,
+    };
+    let in_func = StmtCtx {
+        in_loop: false,
+        in_for_in: false,
+        func_depth: fd + 1,
+    };
     match stmt {
         Stmt::Do(s) => each_stmt_ctx(s.block(), same, f),
         Stmt::While(s) => each_stmt_ctx(s.block(), hot, f),
@@ -256,14 +315,38 @@ fn walk_children_ctx(stmt: &Stmt, ctx: &StmtCtx, f: &mut impl FnMut(&Stmt, &Stmt
         Stmt::NumericFor(s) => each_stmt_ctx(s.block(), hot, f),
         Stmt::GenericFor(s) => each_stmt_ctx(s.block(), for_in, f),
         Stmt::If(s) => {
-            each_stmt_ctx(s.block(), StmtCtx { in_loop: ctx.in_loop, in_for_in: ctx.in_for_in, func_depth: fd }, f);
+            each_stmt_ctx(
+                s.block(),
+                StmtCtx {
+                    in_loop: ctx.in_loop,
+                    in_for_in: ctx.in_for_in,
+                    func_depth: fd,
+                },
+                f,
+            );
             if let Some(eis) = s.else_if() {
                 for ei in eis {
-                    each_stmt_ctx(ei.block(), StmtCtx { in_loop: ctx.in_loop, in_for_in: ctx.in_for_in, func_depth: fd }, f);
+                    each_stmt_ctx(
+                        ei.block(),
+                        StmtCtx {
+                            in_loop: ctx.in_loop,
+                            in_for_in: ctx.in_for_in,
+                            func_depth: fd,
+                        },
+                        f,
+                    );
                 }
             }
             if let Some(eb) = s.else_block() {
-                each_stmt_ctx(eb, StmtCtx { in_loop: ctx.in_loop, in_for_in: ctx.in_for_in, func_depth: fd }, f);
+                each_stmt_ctx(
+                    eb,
+                    StmtCtx {
+                        in_loop: ctx.in_loop,
+                        in_for_in: ctx.in_for_in,
+                        func_depth: fd,
+                    },
+                    f,
+                );
             }
         }
         Stmt::FunctionDeclaration(s) => each_stmt_ctx(s.body().block(), in_func, f),
@@ -315,19 +398,27 @@ pub fn build_comment_ranges(source: &str) -> Vec<(usize, usize)> {
         if bytes[i] == b'"' {
             i += 1;
             while i < len && bytes[i] != b'"' {
-                if bytes[i] == b'\\' { i += 1; }
+                if bytes[i] == b'\\' {
+                    i += 1;
+                }
                 i += 1;
             }
-            if i < len { i += 1; }
+            if i < len {
+                i += 1;
+            }
             continue;
         }
         if bytes[i] == b'\'' {
             i += 1;
             while i < len && bytes[i] != b'\'' {
-                if bytes[i] == b'\\' { i += 1; }
+                if bytes[i] == b'\\' {
+                    i += 1;
+                }
                 i += 1;
             }
-            if i < len { i += 1; }
+            if i < len {
+                i += 1;
+            }
             continue;
         }
         if bytes[i] == b'[' {
@@ -366,7 +457,9 @@ fn try_block_close(source: &str, bracket_pos: usize) -> (bool, usize) {
     }
     if j < bytes.len() && bytes[j] == b'[' {
         let mut close = String::from("]");
-        for _ in 0..eq_count { close.push('='); }
+        for _ in 0..eq_count {
+            close.push('=');
+        }
         close.push(']');
         if let Some(end) = source[j + 1..].find(&close) {
             return (true, j + 1 + end + close.len());
@@ -386,13 +479,12 @@ pub fn floor_char(s: &str, i: usize) -> usize {
 }
 
 pub fn is_return_function_module(ast: &Ast) -> bool {
-    if let Some(last) = ast.nodes().last_stmt() {
-        if let LastStmt::Return(ret) = last {
-            let returns: Vec<_> = ret.returns().iter().collect();
-            if returns.len() == 1 {
-                let s = format!("{}", returns[0]);
-                return s.trim_start().starts_with("function(") || s.trim_start().starts_with("function (");
-            }
+    if let Some(LastStmt::Return(ret)) = ast.nodes().last_stmt() {
+        let returns: Vec<_> = ret.returns().iter().collect();
+        if returns.len() == 1 {
+            let s = format!("{}", returns[0]);
+            return s.trim_start().starts_with("function(")
+                || s.trim_start().starts_with("function (");
         }
     }
     false

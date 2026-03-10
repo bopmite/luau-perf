@@ -45,14 +45,19 @@ fn main() {
     }
 
     let cfg = config::load(&path);
-    let level = parse_level_flag(&args).unwrap_or_else(|| {
-        cfg.level.unwrap_or(lint::Level::Default)
-    });
+    let level =
+        parse_level_flag(&args).unwrap_or_else(|| cfg.level.unwrap_or(lint::Level::Default));
     let t = Instant::now();
     let result = scanner::run(&path, &cfg, fix_mode, dry_run, level);
     let elapsed = t.elapsed();
 
-    let scanner::RunResult { n_files, diags, files_fixed, fixes_applied, parse_errors } = result;
+    let scanner::RunResult {
+        n_files,
+        diags,
+        files_fixed,
+        fixes_applied,
+        parse_errors,
+    } = result;
 
     if fix_mode && dry_run {
         let fixable = diags.iter().filter(|d| d.fix.is_some()).count();
@@ -65,7 +70,11 @@ fn main() {
         eprintln!(
             "\n \x1b[1;32mFixed\x1b[0m {} {} in {} {}",
             fixes_applied,
-            if fixes_applied == 1 { "issue" } else { "issues" },
+            if fixes_applied == 1 {
+                "issue"
+            } else {
+                "issues"
+            },
             files_fixed,
             if files_fixed == 1 { "file" } else { "files" },
         );
@@ -92,7 +101,10 @@ fn main() {
     }
 
     if let Some(max) = max_warnings {
-        let warn_count = diags.iter().filter(|d| d.severity == lint::Severity::Warn).count();
+        let warn_count = diags
+            .iter()
+            .filter(|d| d.severity == lint::Severity::Warn)
+            .count();
         if warn_count > max {
             eprintln!(
                 "\n \x1b[1;31merror\x1b[0m: {} warnings exceed --max-warnings {}",

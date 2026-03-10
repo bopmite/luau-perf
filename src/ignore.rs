@@ -91,10 +91,13 @@ fn find_comment_start(line: &str) -> Option<usize> {
             in_single = !in_single;
         } else if b == b'"' && !in_single {
             in_double = !in_double;
-        } else if b == b'-' && !in_single && !in_double {
-            if i + 1 < bytes.len() && bytes[i + 1] == b'-' {
-                return Some(i);
-            }
+        } else if b == b'-'
+            && !in_single
+            && !in_double
+            && i + 1 < bytes.len()
+            && bytes[i + 1] == b'-'
+        {
+            return Some(i);
         }
         i += 1;
     }
@@ -150,21 +153,16 @@ fn merge(
         std::collections::hash_map::Entry::Vacant(e) => {
             e.insert(rules);
         }
-        std::collections::hash_map::Entry::Occupied(mut e) => {
-            match (e.get_mut(), rules) {
-                (None, _) => {}
-                (existing, None) => *existing = None,
-                (Some(existing), Some(new)) => existing.extend(new),
-            }
-        }
+        std::collections::hash_map::Entry::Occupied(mut e) => match (e.get_mut(), rules) {
+            (None, _) => {}
+            (existing, None) => *existing = None,
+            (Some(existing), Some(new)) => existing.extend(new),
+        },
     }
 }
 
 /// Merge into an Option<Option<HashSet>> for file-level ignores.
-fn merge_option(
-    target: &mut Option<Option<HashSet<String>>>,
-    rules: Option<HashSet<String>>,
-) {
+fn merge_option(target: &mut Option<Option<HashSet<String>>>, rules: Option<HashSet<String>>) {
     match target {
         None => *target = Some(rules),
         Some(None) => {}
@@ -441,7 +439,8 @@ local d = wait()
 
     #[test]
     fn whitespace_around_rules() {
-        let src = "foo() -- luauperf-ignore:  roblox::deprecated_wait ,  alloc::closure_in_loop  \n";
+        let src =
+            "foo() -- luauperf-ignore:  roblox::deprecated_wait ,  alloc::closure_in_loop  \n";
         let ig = Ignores::parse(src);
         assert!(ig.is_ignored(1, "roblox::deprecated_wait"));
         assert!(ig.is_ignored(1, "alloc::closure_in_loop"));
@@ -650,7 +649,8 @@ local d = wait()
 
     #[test]
     fn file_ignore_with_reason() {
-        let src = "-- luauperf-ignore-file: roblox::deprecated_wait -- legacy module\nlocal x = wait()\n";
+        let src =
+            "-- luauperf-ignore-file: roblox::deprecated_wait -- legacy module\nlocal x = wait()\n";
         let ig = Ignores::parse(src);
         assert!(ig.is_ignored(2, "roblox::deprecated_wait"));
         assert!(!ig.is_ignored(2, "alloc::closure_in_loop"));
