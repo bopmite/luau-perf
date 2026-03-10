@@ -620,14 +620,15 @@ impl Rule for FormatRedundantTostring {
             let args_str = &after[close_quote + 1..];
             let line_end = args_str.find('\n').unwrap_or(args_str.len());
             let args_line = &args_str[..line_end];
-            if args_line.contains("tostring(") {
-                let tostring_pos = source[pos..].find("tostring(").map(|i| pos + i);
-                if let Some(tp) = tostring_pos {
-                    hits.push(Hit {
-                        pos: tp,
-                        msg: "tostring() inside string.format with %s is redundant - %s already calls tostring".into(),
-                    });
-                }
+            let args_base = pos + "string.format(".len() + close_quote + 1;
+            let mut search_from = 0;
+            while let Some(rel) = args_line[search_from..].find("tostring(") {
+                let tp = args_base + search_from + rel;
+                hits.push(Hit {
+                    pos: tp,
+                    msg: "tostring() inside string.format with %s is redundant - %s already calls tostring".into(),
+                });
+                search_from += rel + "tostring(".len();
             }
         }
         hits

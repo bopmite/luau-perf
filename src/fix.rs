@@ -111,6 +111,11 @@ fn fix_missing_header(source: &str, header: &str) -> Option<Fix> {
         "--!native"
     };
 
+    let mut text = format!("{header}\n");
+    if header == "--!native" && !source.contains("--!optimize 2") {
+        text.push_str("--!optimize 2\n");
+    }
+
     let trimmed = source.trim_start();
     if trimmed.starts_with(other) {
         let other_start = source.find(other)?;
@@ -120,13 +125,13 @@ fn fix_missing_header(source: &str, header: &str) -> Option<Fix> {
         Some(Fix {
             start: line_end,
             end: line_end,
-            replacement: format!("{header}\n"),
+            replacement: text,
         })
     } else {
         Some(Fix {
             start: 0,
             end: 0,
-            replacement: format!("{header}\n"),
+            replacement: text,
         })
     }
 }

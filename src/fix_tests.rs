@@ -44,7 +44,7 @@ fn test_fix_missing_native_alone() {
     let fix = compute_fix("roblox::missing_native", src, 0).unwrap();
     assert_eq!(fix.start, 0);
     assert_eq!(fix.end, 0);
-    assert_eq!(fix.replacement, "--!native\n");
+    assert_eq!(fix.replacement, "--!native\n--!optimize 2\n");
 }
 
 #[test]
@@ -53,6 +53,13 @@ fn test_fix_missing_native_after_strict() {
     let fix = compute_fix("roblox::missing_native", src, 0).unwrap();
     assert_eq!(fix.start, 10); // after "--!strict\n"
     assert_eq!(fix.end, 10);
+    assert_eq!(fix.replacement, "--!native\n--!optimize 2\n");
+}
+
+#[test]
+fn test_fix_missing_native_with_optimize_already() {
+    let src = "--!optimize 2\nlocal x = 1\n";
+    let fix = compute_fix("roblox::missing_native", src, 0).unwrap();
     assert_eq!(fix.replacement, "--!native\n");
 }
 
