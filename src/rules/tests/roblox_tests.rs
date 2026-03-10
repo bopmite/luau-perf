@@ -776,6 +776,46 @@ fn lowercase_connect_in_block_comment_ok() {
     assert_eq!(hits.len(), 0);
 }
 
+#[test]
+fn lowercase_find_first_child_detected() {
+    let src = "local child = workspace:findFirstChild(\"Part\")";
+    let ast = parse(src);
+    let hits = DeprecatedLowercaseMethod.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn lowercase_is_a_detected() {
+    let src = "if obj:isA(\"BasePart\") then end";
+    let ast = parse(src);
+    let hits = DeprecatedLowercaseMethod.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn lowercase_get_children_detected() {
+    let src = "local kids = obj:getChildren()";
+    let ast = parse(src);
+    let hits = DeprecatedLowercaseMethod.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn uppercase_find_first_child_ok() {
+    let src = "local child = workspace:FindFirstChild(\"Part\")";
+    let ast = parse(src);
+    let hits = DeprecatedLowercaseMethod.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn lowercase_instance_method_in_comment_ok() {
+    let src = "-- obj:findFirstChild() is deprecated";
+    let ast = parse(src);
+    let hits = DeprecatedLowercaseMethod.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
 // DeprecatedOnClose
 #[test]
 fn deprecated_on_close_detected() {

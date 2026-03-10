@@ -864,6 +864,16 @@ fn test_fix_deprecated_lowercase_disconnect() {
 }
 
 #[test]
+fn test_fix_deprecated_lowercase_find_first_child() {
+    let src = "local c = obj:findFirstChild(\"Part\")";
+    let pos = src.find("findFirstChild(").unwrap();
+    let fix = compute_fix("roblox::deprecated_lowercase_method", src, pos).unwrap();
+    let mut result = src.to_string();
+    result.replace_range(fix.start..fix.end, &fix.replacement);
+    assert_eq!(result, "local c = obj:FindFirstChild(\"Part\")");
+}
+
+#[test]
 fn test_fix_deprecated_userid() {
     let src = "local id = player.userId";
     let pos = src.find("userId").unwrap();

@@ -2192,10 +2192,17 @@ impl Rule for DeprecatedLowercaseMethod {
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
-        let deprecated = [
+        let event_deprecated = [
             (":connect(", "Connect"),
             (":disconnect(", "Disconnect"),
             (":wait(", "Wait"),
+        ];
+        let instance_deprecated = [
+            (":findFirstChild(", "FindFirstChild"),
+            (":isDescendantOf(", "IsDescendantOf"),
+            (":isAncestorOf(", "IsAncestorOf"),
+            (":isA(", "IsA"),
+            (":getChildren()", "GetChildren"),
         ];
         let mut in_block = false;
         for (line_no, line) in source.lines().enumerate() {
@@ -2219,12 +2226,10 @@ impl Rule for DeprecatedLowercaseMethod {
                 Some(i) => &line[..i],
                 None => line,
             };
-            for &(pat, replacement) in &deprecated {
+            for &(pat, replacement) in &event_deprecated {
                 let mut search_from = 0;
                 while let Some(rel) = code[search_from..].find(pat) {
                     let abs = search_from + rel;
-                    // Check that preceding char is an uppercase letter (event name)
-                    // e.g. .Changed:connect( or .Touched:connect(
                     let before = &line[..abs];
                     let is_event = before
                         .rfind('.')
@@ -2237,7 +2242,7 @@ impl Rule for DeprecatedLowercaseMethod {
                         let line_start: usize =
                             source.lines().take(line_no).map(|l| l.len() + 1).sum();
                         hits.push(Hit {
-                            pos: line_start + abs + 1, // +1 to skip the ':'
+                            pos: line_start + abs + 1,
                             msg: format!(
                                 "{}() is deprecated - use :{}() (PascalCase)",
                                 &pat[1..pat.len() - 1],
@@ -2245,6 +2250,22 @@ impl Rule for DeprecatedLowercaseMethod {
                             ),
                         });
                     }
+                    search_from = abs + pat.len();
+                }
+            }
+            for &(pat, replacement) in &instance_deprecated {
+                let mut search_from = 0;
+                while let Some(rel) = code[search_from..].find(pat) {
+                    let abs = search_from + rel;
+                    let method_name = pat[1..].split('(').next().unwrap_or(&pat[1..]);
+                    let line_start: usize =
+                        source.lines().take(line_no).map(|l| l.len() + 1).sum();
+                    hits.push(Hit {
+                        pos: line_start + abs + 1,
+                        msg: format!(
+                            "{method_name}() is deprecated - use :{replacement}() (PascalCase)"
+                        ),
+                    });
                     search_from = abs + pat.len();
                 }
             }

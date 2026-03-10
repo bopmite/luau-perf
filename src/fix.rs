@@ -1470,6 +1470,11 @@ fn fix_deprecated_lowercase_method(source: &str, pos: usize) -> Option<Fix> {
         ("connect(", "Connect("),
         ("disconnect(", "Disconnect("),
         ("wait(", "Wait("),
+        ("findFirstChild(", "FindFirstChild("),
+        ("isDescendantOf(", "IsDescendantOf("),
+        ("isAncestorOf(", "IsAncestorOf("),
+        ("isA(", "IsA("),
+        ("getChildren()", "GetChildren()"),
     ];
     for &(old, new) in &methods {
         if source.get(pos..pos + old.len()) == Some(old) {
