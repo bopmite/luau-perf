@@ -243,8 +243,20 @@ fn is_in_player_callback(source: &str, pos: usize) -> bool {
 fn is_stored_result(source: &str, pos: usize) -> bool {
     let before = &source[..pos];
     let line_start = before.rfind('\n').map(|i| i + 1).unwrap_or(0);
-    let line_prefix = &source[line_start..pos].trim_start();
-    line_prefix.contains('=')
+    let line_prefix = source[line_start..pos].trim_start();
+    if line_prefix.contains('=') {
+        return true;
+    }
+    // Check if wrapped in a tracker call like maid:GiveTask(task.spawn(...))
+    for tracker in &[
+        "GiveTask(", "AddTask(", "Add(", "add(", "giveTask(",
+        "table.insert(", "push(",
+    ] {
+        if line_prefix.ends_with(tracker) || line_prefix.contains(tracker) {
+            return true;
+        }
+    }
+    false
 }
 
 fn spawned_function_has_loop(source: &str, pos: usize) -> bool {

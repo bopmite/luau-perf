@@ -214,6 +214,22 @@ fn tracked_task_spawn_with_loop_ok() {
 }
 
 #[test]
+fn task_spawn_in_give_task_ok() {
+    let src = "maid:GiveTask(task.spawn(function()\n  while true do\n    task.wait(1)\n  end\nend))";
+    let ast = parse(src);
+    let hits = UntrackedTaskSpawn.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn task_spawn_in_table_insert_ok() {
+    let src = "table.insert(threads, task.spawn(function()\n  while true do\n    task.wait(1)\n  end\nend))";
+    let ast = parse(src);
+    let hits = UntrackedTaskSpawn.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
 fn collection_tag_no_cleanup_detected() {
     let src = "CollectionService:GetInstanceAddedSignal(\"Enemy\"):Connect(function(inst)\n  print(inst)\nend)";
     let ast = parse(src);
