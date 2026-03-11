@@ -96,6 +96,16 @@ impl Rule for UntrackedConnection {
                     if src.contains("OnClientEvent") || src.contains("OnServerEvent") {
                         return;
                     }
+                    if src.contains("PlayerAdded")
+                        || src.contains("PlayerRemoving")
+                        || src.contains("CharacterAdded")
+                        || src.contains("CharacterRemoving")
+                    {
+                        return;
+                    }
+                    if is_in_player_callback(source, pos) {
+                        return;
+                    }
                     hits.push(Hit {
                     pos,
                     msg: ":Connect() result not stored - track for cleanup to prevent memory leaks".into(),
@@ -199,6 +209,32 @@ fn is_in_service_init(source: &str, pos: usize) -> bool {
             {
                 return true;
             }
+        }
+    }
+    false
+}
+
+fn is_in_player_callback(source: &str, pos: usize) -> bool {
+    let before = &source[..pos];
+    for line in before.lines().rev() {
+        let t = line.trim();
+        if t.starts_with("function ") || t.starts_with("local function ") {
+            if t.contains("PlayerAdded")
+                || t.contains("PlayerRemoving")
+                || t.contains("playerAdded")
+                || t.contains("playerRemoving")
+                || t.contains("onPlayerAdded")
+                || t.contains("onPlayerJoin")
+            {
+                return true;
+            }
+            break;
+        }
+        if t.contains("PlayerAdded") && t.contains(":Connect") {
+            return true;
+        }
+        if t.contains("PlayerAdded") && t.contains(":connect") {
+            return true;
         }
     }
     false
