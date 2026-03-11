@@ -723,6 +723,13 @@ impl Rule for MaxMinSingleArg {
                 return;
             }
             if visit::call_arg_count(call) == 1 {
+                if let Some(arg) = visit::nth_arg(call, 0) {
+                    let arg_str = format!("{arg}");
+                    let t = arg_str.trim();
+                    if t.starts_with("unpack(") || t.starts_with("table.unpack(") {
+                        return;
+                    }
+                }
                 let name = if is_max { "math.max" } else { "math.min" };
                 hits.push(Hit {
                     pos: visit::call_pos(call),
