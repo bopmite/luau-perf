@@ -521,11 +521,9 @@ pub fn rule_level(id: &str) -> crate::lint::Level {
 
         // allocation in loops
         "alloc::string_concat_in_loop"
-        | "alloc::string_format_in_loop"
         | "alloc::closure_in_loop"
         | "alloc::coroutine_wrap_in_loop"
         | "alloc::excessive_string_split"
-        | "alloc::string_interp_in_loop"
         | "alloc::unpack_in_loop"
         | "alloc::repeated_gsub"
         | "alloc::table_create_for_dict"

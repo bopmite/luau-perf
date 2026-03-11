@@ -262,7 +262,7 @@ impl Rule for StringFormatInLoop {
         "alloc::string_format_in_loop"
     }
     fn severity(&self) -> Severity {
-        Severity::Warn
+        Severity::Allow
     }
 
     fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
@@ -680,7 +680,7 @@ impl Rule for StringInterpInLoop {
         "alloc::string_interp_in_loop"
     }
     fn severity(&self) -> Severity {
-        Severity::Warn
+        Severity::Allow
     }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
