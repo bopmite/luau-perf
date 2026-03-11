@@ -289,10 +289,10 @@ impl Rule for CFrameNewInLoop {
                 || visit::is_dot_call(call, "CFrame", "Angles")
                 || visit::is_dot_call(call, "CFrame", "fromEulerAnglesXYZ")
                 || visit::is_dot_call(call, "CFrame", "fromOrientation");
-            if is_cframe {
+            if is_cframe && all_args_constant(call) {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
-                    msg: "CFrame constructor in loop - cache if arguments are loop-invariant"
+                    msg: "CFrame constructor with constant args in loop - cache outside the loop"
                         .into(),
                 });
             }
