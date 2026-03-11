@@ -678,7 +678,7 @@ impl Rule for ServerPropertyInHeartbeat {
     }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
-        let runservice_signals = ["Heartbeat:Connect(", "Stepped:Connect("];
+        let runservice_signals = ["Heartbeat:Connect(", ".Stepped:Connect("];
         let mut connect_positions: Vec<usize> = Vec::new();
 
         for signal in &runservice_signals {
