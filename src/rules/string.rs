@@ -617,6 +617,9 @@ impl Rule for FormatRedundantTostring {
             if s_count == 0 {
                 continue;
             }
+            if fmt_str.contains("%q") {
+                continue;
+            }
             let args_str = &after[close_quote + 1..];
             let line_end = args_str.find('\n').unwrap_or(args_str.len());
             let args_line = &args_str[..line_end];
