@@ -339,11 +339,14 @@ impl Rule for PropertyBeforeParent {
                     && trimmed.contains(" = ")
                     && !trimmed.contains(".Parent")
                 {
-                    let dot_part = trimmed[var_prefix.len()..]
-                        .split(|c: char| !c.is_alphanumeric())
-                        .next()
-                        .unwrap_or("");
-                    if dot_part.starts_with(|c: char| c.is_uppercase()) {
+                    let rest = &trimmed[var_prefix.len()..];
+                    let prop_end = rest
+                        .find(|c: char| !c.is_alphanumeric() && c != '_')
+                        .unwrap_or(rest.len());
+                    let prop = &rest[..prop_end];
+                    if prop.starts_with(|c: char| c.is_uppercase())
+                        && (prop_end >= rest.len() || !rest[prop_end..].starts_with('.'))
+                    {
                         props_after += 1;
                     }
                 }
@@ -394,6 +397,10 @@ impl Rule for RepeatedFindFirstChild {
             if let Some(&first_pos) = seen.get(&key) {
                 if pos - first_pos < 1000 {
                     let between = &source[first_pos..*pos];
+                    let same_line = !between.contains('\n');
+                    if same_line {
+                        continue;
+                    }
                     let has_scope_break = between.lines().any(|l| {
                         let t = l.trim();
                         t == "return"
@@ -401,6 +408,7 @@ impl Rule for RepeatedFindFirstChild {
                             || t == "return;"
                             || t == "else"
                             || t.starts_with("elseif ")
+                            || t.starts_with("if ")
                             || t.starts_with("function ")
                             || t.starts_with("local function ")
                             || t.starts_with("for ")

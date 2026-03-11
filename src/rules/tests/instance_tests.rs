@@ -55,6 +55,30 @@ fn different_find_first_child_not_flagged() {
 }
 
 #[test]
+fn repeated_find_first_child_same_line_ok() {
+    let src = "if obj:FindFirstChild(\"X\") == nil or obj:FindFirstChild(\"X\") ~= player then end";
+    let ast = parse(src);
+    let hits = RepeatedFindFirstChild.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn repeated_find_first_child_nested_if_ok() {
+    let src = "if obj:FindFirstChild(\"X\") then\n  local v = obj.X.Value\n  if obj:FindFirstChild(\"X\") then\n    print(v)\n  end\nend";
+    let ast = parse(src);
+    let hits = RepeatedFindFirstChild.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn property_before_parent_child_props_ok() {
+    let src = "local btn = Instance.new(\"TextButton\")\nbtn.Parent = frame\nbtn.Icon.Image = \"rbx://\"\nbtn.Title.Text = \"hello\"";
+    let ast = parse(src);
+    let hits = PropertyBeforeParent.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
 fn changed_on_part_detected() {
     let src = "local part = workspace.Part\npart.Changed:Connect(function() end)";
     let ast = parse(src);
