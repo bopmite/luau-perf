@@ -573,7 +573,6 @@ pub fn rule_level(id: &str) -> crate::lint::Level {
         | "memory::untracked_task_spawn"
         | "memory::task_delay_in_loop"
         | "memory::heartbeat_allocation"
-        | "memory::circular_connection_ref"
         | "memory::tween_completed_connect"
         | "memory::set_attribute_in_heartbeat"
         | "memory::sound_not_destroyed"
