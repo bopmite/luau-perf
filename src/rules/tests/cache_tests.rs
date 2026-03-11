@@ -222,6 +222,14 @@ fn magnitude_squared_ok() {
 }
 
 #[test]
+fn magnitude_both_sides_one_hit() {
+    let src = "if a.Magnitude > b.Magnitude then end";
+    let ast = parse(src);
+    let hits = MagnitudeOverSquared.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
 fn tween_info_in_function_detected() {
     let src = "local function animate()\n  local info = TweenInfo.new(0.5)\n  TweenService:Create(part, info, goal):Play()\nend";
     let ast = parse(src);

@@ -240,19 +240,26 @@ impl Rule for VectorNormalizeManual {
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
-        for pos in visit::find_pattern_positions(source, "/ ") {
-            let after_start = pos + 2;
-            let line_end = source[after_start..]
-                .find('\n')
-                .map(|i| after_start + i)
-                .unwrap_or(source.len());
-            let after = &source[after_start..line_end];
-            if after.contains(".Magnitude") {
-                let line_start = source[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
-                let before = &source[line_start..pos];
-                if before.ends_with(' ') || before.ends_with('(') {
+        for pos in visit::find_pattern_positions(source, ".Magnitude") {
+            let line_start = source[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
+            let before = &source[line_start..pos];
+            let var_start = before
+                .rfind(|c: char| !c.is_alphanumeric() && c != '_' && c != '.')
+                .map(|i| i + 1)
+                .unwrap_or(0);
+            let var_name = &before[var_start..];
+            if var_name.is_empty() {
+                continue;
+            }
+            if !before[..var_start].contains("/ ") && !before[..var_start].contains("/\t") {
+                continue;
+            }
+            let div_pos = before[..var_start].rfind("/ ").or_else(|| before[..var_start].rfind("/\t"));
+            if let Some(dp) = div_pos {
+                let lhs = before[..dp].trim_end();
+                if lhs.ends_with(var_name) || lhs.ends_with(&format!("{var_name})")) {
                     hits.push(Hit {
-                        pos,
+                        pos: line_start + dp,
                         msg: "v / v.Magnitude - use v.Unit for normalized vector (avoids manual division)".into(),
                     });
                 }

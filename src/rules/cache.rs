@@ -110,35 +110,37 @@ impl Rule for MagnitudeOverSquared {
     }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
-        visit::find_pattern_positions(source, ".Magnitude")
-            .into_iter()
-            .filter(|&pos| {
-                let after_start = pos + ".Magnitude".len();
-                let after_end = visit::ceil_char(source, (after_start + 30).min(source.len()));
-                let after = source[after_start..after_end].trim_start();
-                if !(after.starts_with('<') || after.starts_with('>')
-                    || after.starts_with("==") || after.starts_with("~=")
-                    || after.starts_with("then")) {
-                    return false;
-                }
-                let line_start = source[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
-                let line_end = source[pos..].find('\n').map(|i| pos + i).unwrap_or(source.len());
-                let line = &source[line_start..line_end];
-                if line.contains(".Unit") {
-                    return false;
-                }
-                let cmp_val = after.trim_start_matches(['<', '>', '=', '~'])
-                    .trim_start();
-                if cmp_val.starts_with('0') && !cmp_val[1..].starts_with(|c: char| c.is_ascii_digit() || c == '.') {
-                    return false;
-                }
-                true
-            })
-            .map(|pos| Hit {
+        let mut hits: Vec<Hit> = Vec::new();
+        let mut last_hit_line = usize::MAX;
+        for pos in visit::find_pattern_positions(source, ".Magnitude") {
+            let after_start = pos + ".Magnitude".len();
+            let after_end = visit::ceil_char(source, (after_start + 30).min(source.len()));
+            let after = source[after_start..after_end].trim_start();
+            if !(after.starts_with('<') || after.starts_with('>')
+                || after.starts_with("==") || after.starts_with("~=")) {
+                continue;
+            }
+            let line_start = source[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
+            if line_start == last_hit_line {
+                continue;
+            }
+            let line_end = source[pos..].find('\n').map(|i| pos + i).unwrap_or(source.len());
+            let line = &source[line_start..line_end];
+            if line.contains(".Unit") {
+                continue;
+            }
+            let cmp_val = after.trim_start_matches(['<', '>', '=', '~'])
+                .trim_start();
+            if cmp_val.starts_with('0') && !cmp_val[1..].starts_with(|c: char| c.is_ascii_digit() || c == '.') {
+                continue;
+            }
+            last_hit_line = line_start;
+            hits.push(Hit {
                 pos,
                 msg: ".Magnitude in comparison uses sqrt - compare squared distances with .Magnitude^2 or dot product".into(),
-            })
-            .collect()
+            });
+        }
+        hits
     }
 }
 

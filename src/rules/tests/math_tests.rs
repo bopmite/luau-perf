@@ -126,6 +126,22 @@ fn vector_unit_not_flagged() {
 }
 
 #[test]
+fn vector_normalize_different_vars_ok() {
+    let src = "local n = x / y.Magnitude";
+    let ast = parse(src);
+    let hits = VectorNormalizeManual.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn vector_normalize_scalar_div_magnitude() {
+    let src = "local offset = 1e-3 / direction.Magnitude * direction";
+    let ast = parse(src);
+    let hits = VectorNormalizeManual.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
 fn unnecessary_tonumber_detected() {
     let src = "local x = tonumber(42)";
     let ast = parse(src);
