@@ -43,6 +43,12 @@ impl Rule for EmptyFunctionBody {
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         for pos in visit::find_pattern_positions(source, "function()") {
+            if pos > 0 {
+                let prev = source.as_bytes()[pos - 1];
+                if prev.is_ascii_alphanumeric() || prev == b'_' {
+                    continue;
+                }
+            }
             let after = &source[pos + "function()".len()..];
             let trimmed = after.trim_start();
             if trimmed.starts_with("end") {

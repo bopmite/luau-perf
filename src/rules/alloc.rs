@@ -438,6 +438,12 @@ impl Rule for MutableUpvalueClosure {
         // This forces NEWCLOSURE instead of DUPCLOSURE
         let mut hits = Vec::new();
         for pos in visit::find_pattern_positions(source, "function(") {
+            if pos > 0 {
+                let prev = source.as_bytes()[pos - 1];
+                if prev.is_ascii_alphanumeric() || prev == b'_' {
+                    continue;
+                }
+            }
             let before_start = visit::floor_char(source, pos.saturating_sub(500));
             let before = &source[before_start..pos];
 
