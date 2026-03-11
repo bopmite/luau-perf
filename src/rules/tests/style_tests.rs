@@ -471,3 +471,136 @@ fn next_comma_in_comment_ok() {
     let hits = NextCommaIteration.check(src, &ast);
     assert_eq!(hits.len(), 0);
 }
+
+#[test]
+fn empty_function_body_detected() {
+    let src = "local noop = function() end";
+    let ast = parse(src);
+    let hits = EmptyFunctionBody.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn function_with_body_ok() {
+    let src = "local fn = function()\n  return 1\nend";
+    let ast = parse(src);
+    let hits = EmptyFunctionBody.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn nested_ternary_detected() {
+    let src = "local x = if a then if b then if c then 1 else 2 else 3 else 4";
+    let ast = parse(src);
+    let hits = NestedTernary.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn simple_ternary_ok() {
+    let src = "local x = if a then 1 else 2";
+    let ast = parse(src);
+    let hits = NestedTernary.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn long_function_body_detected() {
+    let mut lines = vec!["local function big()".to_string()];
+    for i in 0..85 {
+        lines.push(format!("  local x{i} = {i}"));
+    }
+    lines.push("end".to_string());
+    let src = lines.join("\n");
+    let ast = parse(&src);
+    let hits = LongFunctionBody.check(&src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn short_function_body_ok() {
+    let src = "local function small()\n  local x = 1\n  return x\nend";
+    let ast = parse(src);
+    let hits = LongFunctionBody.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn multiple_returns_in_heartbeat_detected() {
+    let src = "RunService.Heartbeat:Connect(function()\n  return a, b, c, d\nend)";
+    let ast = parse(src);
+    let hits = MultipleReturns.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn single_return_in_heartbeat_ok() {
+    let src = "RunService.Heartbeat:Connect(function()\n  return result\nend)";
+    let ast = parse(src);
+    let hits = MultipleReturns.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn type_over_typeof_detected() {
+    let src = "local t = type(obj)";
+    let ast = parse(src);
+    let hits = TypeOverTypeof.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn typeof_ok() {
+    let src = "local t = typeof(obj)";
+    let ast = parse(src);
+    let hits = TypeOverTypeof.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn unused_variable_in_loop_detected() {
+    let src = "while true do\n  local part = Instance.new(\"Part\")\nend";
+    let ast = parse(src);
+    let hits = UnusedVariable.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn used_variable_in_loop_ok() {
+    let src = "while true do\n  local part = Instance.new(\"Part\")\n  part.Parent = workspace\nend";
+    let ast = parse(src);
+    let hits = UnusedVariable.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn deprecated_global_rawget_detected() {
+    let src = "local v = rawget(t, \"key\")";
+    let ast = parse(src);
+    let hits = DeprecatedGlobalCall.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn table_index_ok() {
+    let src = "local v = t.key";
+    let ast = parse(src);
+    let hits = DeprecatedGlobalCall.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn type_check_in_loop_detected() {
+    let src = "for i = 1, 10 do\n  if typeof(v) == \"Instance\" then end\nend";
+    let ast = parse(src);
+    let hits = TypeCheckInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn type_check_outside_loop_ok() {
+    let src = "local t = typeof(obj)";
+    let ast = parse(src);
+    let hits = TypeCheckInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}

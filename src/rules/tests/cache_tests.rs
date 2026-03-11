@@ -348,3 +348,51 @@ fn overlap_params_factory_ok() {
     let hits = OverlapParamsInFunction.check(src, &ast);
     assert_eq!(hits.len(), 0);
 }
+
+#[test]
+fn color_sequence_in_function_detected() {
+    let src = "function makeEffect()\n  local cs = ColorSequence.new(RED, BLUE)\nend";
+    let ast = parse(src);
+    let hits = ColorSequenceInFunction.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn color_sequence_at_module_level_ok() {
+    let src = "local cs = ColorSequence.new(RED, BLUE)";
+    let ast = parse(src);
+    let hits = ColorSequenceInFunction.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn number_sequence_in_function_detected() {
+    let src = "function emit()\n  local ns = NumberSequence.new(0, 1)\nend";
+    let ast = parse(src);
+    let hits = NumberSequenceInFunction.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn number_sequence_at_module_level_ok() {
+    let src = "local ns = NumberSequence.new(0, 1)";
+    let ast = parse(src);
+    let hits = NumberSequenceInFunction.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn number_range_in_function_detected() {
+    let src = "function setup()\n  local nr = NumberRange.new(0, 10)\nend";
+    let ast = parse(src);
+    let hits = NumberRangeInFunction.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn number_range_at_module_level_ok() {
+    let src = "local nr = NumberRange.new(0, 10)";
+    let ast = parse(src);
+    let hits = NumberRangeInFunction.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}

@@ -1087,3 +1087,203 @@ fn model_pivot_to_ok() {
     assert_eq!(hits.len(), 0);
 }
 
+#[test]
+fn deprecated_body_movers_detected() {
+    let src = "local bv = part:FindFirstChildOfClass(\"BodyVelocity\")\nlocal force: BodyVelocity = bv";
+    let ast = parse(src);
+    let hits = DeprecatedBodyMovers.check(src, &ast);
+    assert!(hits.len() >= 1);
+}
+
+#[test]
+fn linear_velocity_ok() {
+    let src = "local lv: LinearVelocity = part.LinearVelocity";
+    let ast = parse(src);
+    let hits = DeprecatedBodyMovers.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn deprecated_physics_service_detected() {
+    let src = "PhysicsService:SetPartCollisionGroup(part, \"Players\")";
+    let ast = parse(src);
+    let hits = DeprecatedPhysicsService.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn collision_group_property_ok() {
+    let src = "part.CollisionGroup = \"Players\"";
+    let ast = parse(src);
+    let hits = DeprecatedPhysicsService.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn deprecated_udim_offset_detected() {
+    let src = "local u = UDim2.new(0, 10, 0, 20)";
+    let ast = parse(src);
+    let hits = DeprecatedUdim.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn deprecated_udim_scale_detected() {
+    let src = "local u = UDim2.new(0.5, 0, 1, 0)";
+    let ast = parse(src);
+    let hits = DeprecatedUdim.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn udim2_mixed_ok() {
+    let src = "local u = UDim2.new(0.5, 10, 0.5, 20)";
+    let ast = parse(src);
+    let hits = DeprecatedUdim.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn destroy_children_manual_detected() {
+    let src = "for _, child in obj:GetChildren() do\n  child:Destroy()\nend";
+    let ast = parse(src);
+    let hits = DestroyChildrenManual.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn destroy_with_filter_ok() {
+    let src = "for _, child in obj:GetChildren() do\n  if child:IsA(\"Part\") then\n    child:Destroy()\n  end\nend";
+    let ast = parse(src);
+    let hits = DestroyChildrenManual.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn debris_add_item_detected() {
+    let src = "Debris:AddItem(part, 5)";
+    let ast = parse(src);
+    let hits = DebrisAddItem.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn task_delay_destroy_ok() {
+    let src = "task.delay(5, function() part:Destroy() end)";
+    let ast = parse(src);
+    let hits = DebrisAddItem.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn string_value_over_attribute_detected() {
+    let src = "local sv = Instance.new(\"StringValue\")";
+    let ast = parse(src);
+    let hits = StringValueOverAttribute.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn instance_new_part_ok() {
+    let src = "local p = Instance.new(\"Part\")";
+    let ast = parse(src);
+    let hits = StringValueOverAttribute.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn insert_service_load_asset_detected() {
+    let src = "function loadModel()\n  local model = InsertService:LoadAsset(id)\nend";
+    let ast = parse(src);
+    let hits = InsertServiceLoadAsset.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn insert_service_load_asset_module_level_ok() {
+    let src = "local model = InsertService:LoadAsset(id)";
+    let ast = parse(src);
+    let hits = InsertServiceLoadAsset.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn require_in_connect_detected() {
+    let src = "event:Connect(function()\n  local m = require(script.Module)\nend)";
+    let ast = parse(src);
+    let hits = RequireInConnect.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn require_at_module_level_ok() {
+    let src = "local m = require(script.Module)";
+    let ast = parse(src);
+    let hits = RequireInConnect.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn render_stepped_on_server_detected() {
+    let src = "local ServerScriptService = game:GetService(\"ServerScriptService\")\nRunService.RenderStepped:Connect(function() end)";
+    let ast = parse(src);
+    let hits = RenderSteppedOnServer.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn render_stepped_on_client_ok() {
+    let src = "RunService.RenderStepped:Connect(function() end)";
+    let ast = parse(src);
+    let hits = RenderSteppedOnServer.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn touched_event_unfiltered_detected() {
+    let src = "part.Touched:Connect(function(other)\n  other:Destroy()\nend)";
+    let ast = parse(src);
+    let hits = TouchedEventUnfiltered.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn touched_event_with_isa_ok() {
+    let src = "part.Touched:Connect(function(other)\n  if other:IsA(\"BasePart\") then end\nend)";
+    let ast = parse(src);
+    let hits = TouchedEventUnfiltered.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn missing_native_detected() {
+    let src = "local Players = game:GetService(\"Players\")\nlocal workspace = workspace\nlocal a = 1\nlocal b = 2\nlocal c = 3\nlocal d = 4\nlocal e = 5\nlocal f = 6\nlocal g = 7\nlocal h = 8";
+    let ast = parse(src);
+    let hits = MissingNative.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn missing_native_with_header_ok() {
+    let src = "--!native\nlocal Players = game:GetService(\"Players\")\nlocal workspace = workspace\nlocal a = 1\nlocal b = 2\nlocal c = 3\nlocal d = 4\nlocal e = 5\nlocal f = 6\nlocal g = 7\nlocal h = 8";
+    let ast = parse(src);
+    let hits = MissingNative.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn missing_strict_detected() {
+    let src = "local Players = game:GetService(\"Players\")\nlocal workspace = workspace";
+    let ast = parse(src);
+    let hits = MissingStrict.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn missing_strict_with_header_ok() {
+    let src = "--!strict\nlocal Players = game:GetService(\"Players\")\nlocal workspace = workspace";
+    let ast = parse(src);
+    let hits = MissingStrict.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+

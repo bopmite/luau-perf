@@ -341,3 +341,35 @@ fn remove_outside_ipairs_ok() {
     let hits = RemoveInIpairs.check(src, &ast);
     assert_eq!(hits.len(), 0);
 }
+
+#[test]
+fn table_move_over_loop_detected() {
+    let src = "for i = 1, #src do\n  dst[i] = src[i]\nend";
+    let ast = parse(src);
+    let hits = TableMoveOverLoop.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn table_move_multiple_assignments_ok() {
+    let src = "for i = 1, #src do\n  dst[i] = src[i]\n  other[i] = src[i]\nend";
+    let ast = parse(src);
+    let hits = TableMoveOverLoop.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn next_t_nil_detected() {
+    let src = "if next(t, nil) then end";
+    let ast = parse(src);
+    let hits = NextTNilOverPairs.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn next_t_ok() {
+    let src = "if next(t) then end";
+    let ast = parse(src);
+    let hits = NextTNilOverPairs.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}

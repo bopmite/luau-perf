@@ -228,3 +228,27 @@ fn spatial_query_render_stepped() {
     let hits = SpatialQueryPerFrame.check(src, &ast);
     assert_eq!(hits.len(), 1);
 }
+
+#[test]
+fn massless_not_set_detected() {
+    let src = "local weld = Instance.new(\"WeldConstraint\")\npart.Massless = true";
+    let ast = parse(src);
+    let hits = MasslessNotSet.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn massless_with_anchored_ok() {
+    let src = "part.Anchored = true\npart.Massless = true";
+    let ast = parse(src);
+    let hits = MasslessNotSet.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn massless_no_weld_ok() {
+    let src = "part.Massless = true";
+    let ast = parse(src);
+    let hits = MasslessNotSet.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}

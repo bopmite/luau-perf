@@ -407,3 +407,67 @@ fn tostring_outside_loop_ok() {
     let hits = TostringInLoop.check(src, &ast);
     assert_eq!(hits.len(), 0);
 }
+
+#[test]
+fn repeated_gsub_detected() {
+    let src = "local s = str:gsub(\"a\", \"b\")\nlocal t = str:gsub(\"c\", \"d\")";
+    let ast = parse(src);
+    let hits = RepeatedGsub.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn single_gsub_ok() {
+    let src = "local s = str:gsub(\"a\", \"b\")";
+    let ast = parse(src);
+    let hits = RepeatedGsub.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn table_create_preferred_in_loop_detected() {
+    let src = "while true do\n  local t = {}\nend";
+    let ast = parse(src);
+    let hits = TableCreatePreferred.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn table_create_preferred_outside_loop_ok() {
+    let src = "local t = {}";
+    let ast = parse(src);
+    let hits = TableCreatePreferred.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn excessive_string_split_in_loop_detected() {
+    let src = "for i = 1, 10 do\n  local parts = string.split(s, \",\")\nend";
+    let ast = parse(src);
+    let hits = ExcessiveStringSplit.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn excessive_string_split_outside_loop_ok() {
+    let src = "local parts = string.split(s, \",\")";
+    let ast = parse(src);
+    let hits = ExcessiveStringSplit.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn repeated_string_byte_in_loop_detected() {
+    let src = "for i = 1, 10 do\n  local a = string.byte(s, 1)\n  local b = string.byte(s, 2)\n  local c = string.byte(s, 3)\nend";
+    let ast = parse(src);
+    let hits = RepeatedStringByte.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn repeated_string_byte_outside_loop_ok() {
+    let src = "local a = string.byte(s, 1)\nlocal b = string.byte(s, 2)\nlocal c = string.byte(s, 3)";
+    let ast = parse(src);
+    let hits = RepeatedStringByte.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}

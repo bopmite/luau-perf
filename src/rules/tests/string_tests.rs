@@ -372,3 +372,27 @@ fn split_function_form_normal_separator_ok() {
     let hits = SplitEmptySeparator.check(src, &ast);
     assert_eq!(hits.len(), 0);
 }
+
+#[test]
+fn sub_for_single_char_first_detected() {
+    let src = "local c = string.sub(s, 1)";
+    let ast = parse(src);
+    let hits = SubForSingleChar.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn sub_for_single_char_last_detected() {
+    let src = "local c = string.sub(s, -1)";
+    let ast = parse(src);
+    let hits = SubForSingleChar.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn sub_with_range_ok() {
+    let src = "local part = string.sub(s, 1, 5)";
+    let ast = parse(src);
+    let hits = SubForSingleChar.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}

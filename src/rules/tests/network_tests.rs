@@ -204,3 +204,67 @@ fn invoke_server_outside_loop_ok() {
     let hits = InvokeServerInLoop.check(src, &ast);
     assert_eq!(hits.len(), 0);
 }
+
+#[test]
+fn remote_event_string_data_tostring_detected() {
+    let src = "remote:FireServer(tostring(value))";
+    let ast = parse(src);
+    let hits = RemoteEventStringData.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn remote_event_string_data_format_detected() {
+    let src = "remote:FireClient(player, string.format(\"%d\", n))";
+    let ast = parse(src);
+    let hits = RemoteEventStringData.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn remote_event_raw_data_ok() {
+    let src = "remote:FireServer(42)";
+    let ast = parse(src);
+    let hits = RemoteEventStringData.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn dict_keys_in_remote_data_detected() {
+    let src = "RunService.Heartbeat:Connect(function()\n  remote:FireServer({position = pos, velocity = vel})\nend)";
+    let ast = parse(src);
+    let hits = DictKeysInRemoteData.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn dict_keys_outside_heartbeat_ok() {
+    let src = "remote:FireServer({position = pos})";
+    let ast = parse(src);
+    let hits = DictKeysInRemoteData.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn unreliable_remote_preferred_detected() {
+    let src = "RunService.Heartbeat:Connect(function()\n  remote:FireAllClients(data)\nend)";
+    let ast = parse(src);
+    let hits = UnreliableRemotePreferred.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn unreliable_remote_already_unreliable_ok() {
+    let src = "RunService.Heartbeat:Connect(function()\n  unreliableRemote:FireAllClients(data)\nend)";
+    let ast = parse(src);
+    let hits = UnreliableRemotePreferred.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn unreliable_remote_outside_heartbeat_ok() {
+    let src = "remote:FireAllClients(data)";
+    let ast = parse(src);
+    let hits = UnreliableRemotePreferred.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}

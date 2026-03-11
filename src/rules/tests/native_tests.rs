@@ -261,3 +261,115 @@ fn getfenv_method_ok() {
     let hits = GetfenvSetfenv.check(src, &ast);
     assert_eq!(hits.len(), 0);
 }
+
+#[test]
+fn coroutine_in_native_detected() {
+    let src = "--!native\nlocal co = coroutine.wrap(fn)";
+    let ast = parse(src);
+    let hits = CoroutineInNative.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn coroutine_without_native_ok() {
+    let src = "local co = coroutine.wrap(fn)";
+    let ast = parse(src);
+    let hits = CoroutineInNative.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn vararg_in_native_detected() {
+    let src = "--!native\nfor i = 1, 10 do\n  local v = select(i, args)\nend";
+    let ast = parse(src);
+    let hits = VarargInNative.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn vararg_in_native_no_loop_ok() {
+    let src = "--!native\nlocal v = select(1, args)";
+    let ast = parse(src);
+    let hits = VarargInNative.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn dynamic_table_key_in_native_detected() {
+    let src = "--!native\nfor i = 1, 10 do\n  local v = t[key]\nend";
+    let ast = parse(src);
+    let hits = DynamicTableKeyInNative.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn dynamic_table_key_no_native_ok() {
+    let src = "for i = 1, 10 do\n  local v = t[key]\nend";
+    let ast = parse(src);
+    let hits = DynamicTableKeyInNative.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn string_pattern_in_native_detected() {
+    let src = "--!native\nfor i = 1, 10 do\n  string.match(s, pat)\nend";
+    let ast = parse(src);
+    let hits = StringPatternInNative.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn string_pattern_in_native_no_loop_ok() {
+    let src = "--!native\nlocal m = string.match(s, pat)";
+    let ast = parse(src);
+    let hits = StringPatternInNative.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn math_huge_comparison_eq_detected() {
+    let src = "if val == math.huge then end";
+    let ast = parse(src);
+    let hits = MathHugeComparison.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn math_huge_comparison_neq_detected() {
+    let src = "if val ~= math.huge then end";
+    let ast = parse(src);
+    let hits = MathHugeComparison.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn math_huge_no_comparison_ok() {
+    let src = "local INF = math.huge";
+    let ast = parse(src);
+    let hits = MathHugeComparison.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn dynamic_require_bracket_detected() {
+    let src = "local m = require(modules[name])";
+    let ast = parse(src);
+    let hits = DynamicRequire.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn dynamic_require_string_bracket_ok() {
+    let src = "local m = require(modules[\"Name\"])";
+    let ast = parse(src);
+    let hits = DynamicRequire.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn static_require_ok() {
+    let src = "local m = require(script.Parent.Module)";
+    let ast = parse(src);
+    let hits = DynamicRequire.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
