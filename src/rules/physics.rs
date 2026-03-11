@@ -86,12 +86,28 @@ impl Rule for TouchedWithoutDebounce {
                 let after_start = pos + pat.len();
                 let after_end = visit::ceil_char(source, (after_start + 300).min(source.len()));
                 let callback = &source[after_start..after_end];
-                let body_lines: Vec<&str> = callback.lines().take(8).collect();
+                let body_lines: Vec<&str> = callback.lines().take(15).collect();
                 let early_body = body_lines.join("\n");
+                let line_start = source[..pos]
+                    .rfind('\n')
+                    .map(|i| i + 1)
+                    .unwrap_or(0);
+                let line_prefix = source[line_start..pos].trim();
+                if line_prefix.starts_with("local ") || line_prefix.contains(" = ") {
+                    let after_wide =
+                        &source[after_start..(after_start + 500).min(source.len())];
+                    if after_wide.contains(":Disconnect()")
+                        || after_wide.contains(":disconnect()")
+                    {
+                        continue;
+                    }
+                }
                 let has_debounce = early_body.contains("debounce")
                     || early_body.contains("cooldown")
                     || early_body.contains("if not ")
                     || early_body.contains("if db")
+                    || early_body.contains("if Enabled")
+                    || early_body.contains("if enabled")
                     || early_body.contains("tick()")
                     || early_body.contains("os.clock()")
                     || early_body.contains("task.wait");
