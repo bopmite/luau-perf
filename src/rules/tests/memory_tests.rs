@@ -167,7 +167,7 @@ fn debris_positive_duration_ok() {
 
 #[test]
 fn untracked_task_spawn_with_loop_detected() {
-    let src = "task.spawn(function()\n  while true do\n    task.wait(1)\n  end\nend)";
+    let src = "local function setup()\n  task.spawn(function()\n    while true do\n      task.wait(1)\n    end\n  end)\nend";
     let ast = parse(src);
     let hits = UntrackedTaskSpawn.check(src, &ast);
     assert_eq!(hits.len(), 1);

@@ -121,13 +121,16 @@ impl Rule for UntrackedTaskSpawn {
         "memory::untracked_task_spawn"
     }
     fn severity(&self) -> Severity {
-        Severity::Warn
+        Severity::Allow
     }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         for pos in visit::find_pattern_positions(source, "task.spawn(function") {
             if is_stored_result(source, pos) {
+                continue;
+            }
+            if is_at_module_scope(source, pos) {
                 continue;
             }
             if spawned_function_has_loop(source, pos) {
@@ -1047,7 +1050,7 @@ impl Rule for TaskDelayInLoop {
         "memory::task_delay_in_loop"
     }
     fn severity(&self) -> Severity {
-        Severity::Warn
+        Severity::Allow
     }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
