@@ -1407,3 +1407,19 @@ fn while_task_wait_bare_detected() {
     assert_eq!(hits.len(), 1);
 }
 
+#[test]
+fn render_stepped_method_name_ok() {
+    let src = "local ServerScriptService = game:GetService(\"ServerScriptService\")\nfunction Component:RenderSteppedUpdate(dt)\n  print(dt)\nend";
+    let ast = parse(src);
+    let hits = RenderSteppedOnServer.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn touched_dummy_connection_ok() {
+    let src = "local conn = part.Touched:Connect(function() end)\nlocal parts = part:GetTouchingParts()\nconn:Disconnect()";
+    let ast = parse(src);
+    let hits = TouchedEventUnfiltered.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+

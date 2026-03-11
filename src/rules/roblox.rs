@@ -527,7 +527,9 @@ impl Rule for TouchedEventUnfiltered {
                 || body.contains("tick()")
                 || body.contains("os.clock()")
                 || body.contains(":IsA(")
-                || body.contains("FindFirstAncestor");
+                || body.contains("FindFirstAncestor")
+                || body.contains(":Disconnect()")
+                || body.contains("GetTouchingParts");
             if !has_guard {
                 hits.push(Hit {
                     pos,
@@ -600,7 +602,7 @@ impl Rule for BindableSameScript {
         "roblox::bindable_same_script"
     }
     fn severity(&self) -> Severity {
-        Severity::Warn
+        Severity::Allow
     }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
@@ -1312,25 +1314,28 @@ impl Rule for RenderSteppedOnServer {
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
-        for pos in visit::find_pattern_positions(source, "RenderStepped") {
-            let line_start = source[..pos].rfind('\n').map(|p| p + 1).unwrap_or(0);
-            let line = &source[line_start
-                ..source[pos..]
-                    .find('\n')
-                    .map(|p| pos + p)
-                    .unwrap_or(source.len())];
-            if line.contains("Server") || line.contains("server") {
-                continue;
-            }
-            let is_server = source.contains("local ServerScriptService")
-                || source.contains("local ServerStorage")
-                || source.contains("local serverScriptService")
-                || source.contains("local serverStorage");
-            if is_server {
-                hits.push(Hit {
-                    pos,
-                    msg: "RenderStepped does not fire on the server - use Heartbeat or Stepped instead".into(),
-                });
+        let patterns = [".RenderStepped:", ".RenderStepped."];
+        for pat in &patterns {
+            for pos in visit::find_pattern_positions(source, pat) {
+                let line_start = source[..pos].rfind('\n').map(|p| p + 1).unwrap_or(0);
+                let line = &source[line_start
+                    ..source[pos..]
+                        .find('\n')
+                        .map(|p| pos + p)
+                        .unwrap_or(source.len())];
+                if line.contains("Server") || line.contains("server") {
+                    continue;
+                }
+                let is_server = source.contains("local ServerScriptService")
+                    || source.contains("local ServerStorage")
+                    || source.contains("local serverScriptService")
+                    || source.contains("local serverStorage");
+                if is_server {
+                    hits.push(Hit {
+                        pos,
+                        msg: "RenderStepped does not fire on the server - use Heartbeat or Stepped instead".into(),
+                    });
+                }
             }
         }
         hits
