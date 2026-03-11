@@ -460,11 +460,13 @@ impl Rule for ChangedOnMovingPart {
                 continue;
             }
             let al = accessor.to_lowercase();
+            if al == "workspace" || al == "game" {
+                continue;
+            }
             let is_likely_part = al.contains("part")
                 || al.contains("model")
                 || al.contains("mesh")
                 || al.contains("union")
-                || al == "workspace"
                 || al.ends_with("cframe")
                 || al.ends_with("position");
             if is_likely_part {

@@ -345,6 +345,14 @@ fn changed_on_non_part_ok() {
 }
 
 #[test]
+fn changed_on_workspace_ok() {
+    let src = "workspace.Changed:Connect(function() end)";
+    let ast = parse(src);
+    let hits = ChangedOnMovingPart.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
 fn classname_over_isa_detected() {
     let src = "if obj.ClassName == \"Part\" then end";
     let ast = parse(src);
