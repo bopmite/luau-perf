@@ -111,62 +111,6 @@ fn immutable_upvalue_ok() {
 }
 
 #[test]
-fn unpack_in_loop_detected() {
-    let src = "for i = 1, 10 do\n  local a, b = unpack(t)\nend";
-    let ast = parse(src);
-    let hits = UnpackInLoop.check(src, &ast);
-    assert_eq!(hits.len(), 1);
-}
-
-#[test]
-fn unpack_outside_loop_ok() {
-    let src = "local a, b = unpack(t)";
-    let ast = parse(src);
-    let hits = UnpackInLoop.check(src, &ast);
-    assert_eq!(hits.len(), 0);
-}
-
-#[test]
-fn table_unpack_in_loop_detected() {
-    let src = "for i = 1, 10 do\n  local a, b = table.unpack(t)\nend";
-    let ast = parse(src);
-    let hits = UnpackInLoop.check(src, &ast);
-    assert_eq!(hits.len(), 1);
-}
-
-#[test]
-fn unpack_with_range_in_loop_ok() {
-    let src = "for i = 1, n do\n  string.char(table.unpack(data, i, i + 4095))\nend";
-    let ast = parse(src);
-    let hits = UnpackInLoop.check(src, &ast);
-    assert_eq!(hits.len(), 0);
-}
-
-#[test]
-fn string_interp_in_loop_detected() {
-    let src = "for i = 1, 10 do\n  local s = `hello {name}`\nend";
-    let ast = parse(src);
-    let hits = StringInterpInLoop.check(src, &ast);
-    assert_eq!(hits.len(), 1);
-}
-
-#[test]
-fn string_interp_outside_loop_ok() {
-    let src = "local s = `hello {name}`";
-    let ast = parse(src);
-    let hits = StringInterpInLoop.check(src, &ast);
-    assert_eq!(hits.len(), 0);
-}
-
-#[test]
-fn backtick_no_interp_not_flagged() {
-    let src = "for i = 1, 10 do\n  local s = `hello world`\nend";
-    let ast = parse(src);
-    let hits = StringInterpInLoop.check(src, &ast);
-    assert_eq!(hits.len(), 0);
-}
-
-#[test]
 fn select_in_loop_detected() {
     let src = "for i = 1, n do\n  local v = select(i, items)\nend";
     let ast = parse(src);
@@ -267,22 +211,6 @@ fn typeof_outside_loop_ok() {
     let src = "local t = typeof(obj)";
     let ast = parse(src);
     let hits = TypeofInLoop.check(src, &ast);
-    assert_eq!(hits.len(), 0);
-}
-
-#[test]
-fn setmetatable_in_loop_detected() {
-    let src = "for i = 1, 10 do\n  local obj = setmetatable({}, MT)\nend";
-    let ast = parse(src);
-    let hits = SetmetatableInLoop.check(src, &ast);
-    assert_eq!(hits.len(), 1);
-}
-
-#[test]
-fn setmetatable_outside_loop_ok() {
-    let src = "local obj = setmetatable({}, MT)";
-    let ast = parse(src);
-    let hits = SetmetatableInLoop.check(src, &ast);
     assert_eq!(hits.len(), 0);
 }
 
@@ -405,38 +333,6 @@ fn unnecessary_closure_chained_call_not_flagged() {
     let src = "pcall(function()\n  expect(\"hello\").never.customEqual(\"hello\")\nend)";
     let ast = parse(src);
     let hits = UnnecessaryClosure.check(src, &ast);
-    assert_eq!(hits.len(), 0);
-}
-
-#[test]
-fn string_format_in_loop_detected() {
-    let src = "for i = 1, 10 do\n  local s = string.format(\"%d\", i)\nend";
-    let ast = parse(src);
-    let hits = StringFormatInLoop.check(src, &ast);
-    assert_eq!(hits.len(), 1);
-}
-
-#[test]
-fn string_format_outside_loop_ok() {
-    let src = "local s = string.format(\"%d\", 42)";
-    let ast = parse(src);
-    let hits = StringFormatInLoop.check(src, &ast);
-    assert_eq!(hits.len(), 0);
-}
-
-#[test]
-fn tostring_in_loop_detected() {
-    let src = "for i = 1, 10 do\n  local s = tostring(i)\nend";
-    let ast = parse(src);
-    let hits = TostringInLoop.check(src, &ast);
-    assert_eq!(hits.len(), 1);
-}
-
-#[test]
-fn tostring_outside_loop_ok() {
-    let src = "local s = tostring(42)";
-    let ast = parse(src);
-    let hits = TostringInLoop.check(src, &ast);
     assert_eq!(hits.len(), 0);
 }
 

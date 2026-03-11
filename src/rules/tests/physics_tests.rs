@@ -6,22 +6,6 @@ fn parse(src: &str) -> full_moon::ast::Ast {
 }
 
 #[test]
-fn spatial_query_in_loop_detected() {
-    let src = "for i = 1, 10 do\n  workspace:Raycast(origin, dir)\nend";
-    let ast = parse(src);
-    let hits = SpatialQueryInLoop.check(src, &ast);
-    assert_eq!(hits.len(), 1);
-}
-
-#[test]
-fn spatial_query_outside_loop_ok() {
-    let src = "local result = workspace:Raycast(origin, dir)";
-    let ast = parse(src);
-    let hits = SpatialQueryInLoop.check(src, &ast);
-    assert_eq!(hits.len(), 0);
-}
-
-#[test]
 fn move_to_in_loop_detected() {
     let src = "while true do\n  part:MoveTo(pos)\nend";
     let ast = parse(src);

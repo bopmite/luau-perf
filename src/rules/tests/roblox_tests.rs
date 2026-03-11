@@ -1144,22 +1144,6 @@ fn udim2_mixed_ok() {
 }
 
 #[test]
-fn destroy_children_manual_detected() {
-    let src = "for _, child in obj:GetChildren() do\n  child:Destroy()\nend";
-    let ast = parse(src);
-    let hits = DestroyChildrenManual.check(src, &ast);
-    assert_eq!(hits.len(), 1);
-}
-
-#[test]
-fn destroy_with_filter_ok() {
-    let src = "for _, child in obj:GetChildren() do\n  if child:IsA(\"Part\") then\n    child:Destroy()\n  end\nend";
-    let ast = parse(src);
-    let hits = DestroyChildrenManual.check(src, &ast);
-    assert_eq!(hits.len(), 0);
-}
-
-#[test]
 fn debris_add_item_detected() {
     let src = "Debris:AddItem(part, 5)";
     let ast = parse(src);

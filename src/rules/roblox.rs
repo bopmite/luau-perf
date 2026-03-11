@@ -23,7 +23,6 @@ pub struct DeprecatedPhysicsService;
 pub struct SetAttributeInLoop;
 pub struct StringValueOverAttribute;
 pub struct TouchedEventUnfiltered;
-pub struct DestroyChildrenManual;
 pub struct MissingOptimize;
 pub struct DeprecatedRegion3;
 pub struct BindableSameScript;
@@ -536,42 +535,6 @@ impl Rule for TouchedEventUnfiltered {
                 });
             }
         }
-        }
-        hits
-    }
-}
-
-impl Rule for DestroyChildrenManual {
-    fn id(&self) -> &'static str {
-        "roblox::destroy_children_manual"
-    }
-    fn severity(&self) -> Severity {
-        Severity::Allow
-    }
-
-    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
-        let has_iteration = source.contains("GetChildren()") || source.contains("GetDescendants()");
-        if !has_iteration {
-            return vec![];
-        }
-
-        let mut hits = Vec::new();
-        for pos in visit::find_pattern_positions(source, ":Destroy()") {
-            let context_start = visit::floor_char(source, pos.saturating_sub(200));
-            let context = &source[context_start..pos];
-            if context.contains("GetChildren") || context.contains("GetDescendants") {
-                if context.contains(":IsA(")
-                    || context.contains(".ClassName")
-                    || context.contains("if ")
-                {
-                    continue;
-                }
-                hits.push(Hit {
-                    pos,
-                    msg: ":Destroy() in loop over children - use parent:ClearAllChildren()".into(),
-                });
-                break;
-            }
         }
         hits
     }

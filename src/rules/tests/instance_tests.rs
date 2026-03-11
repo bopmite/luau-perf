@@ -80,22 +80,6 @@ fn few_property_sets_not_flagged() {
 }
 
 #[test]
-fn collection_service_in_loop_detected() {
-    let src = "while true do\n  part:AddTag(\"Tagged\")\nend";
-    let ast = parse(src);
-    let hits = CollectionServiceInLoop.check(src, &ast);
-    assert_eq!(hits.len(), 1);
-}
-
-#[test]
-fn collection_service_outside_loop_ok() {
-    let src = "part:AddTag(\"Tagged\")";
-    let ast = parse(src);
-    let hits = CollectionServiceInLoop.check(src, &ast);
-    assert_eq!(hits.len(), 0);
-}
-
-#[test]
 fn name_indexing_in_loop_detected() {
     let src = "for i = 1, 10 do\n  local p = workspace.SpawnLocation\nend";
     let ast = parse(src);

@@ -9,7 +9,6 @@ pub struct PropertyBeforeParent;
 pub struct RepeatedFindFirstChild;
 pub struct ChangedOnMovingPart;
 pub struct BulkPropertySet;
-pub struct CollectionServiceInLoop;
 pub struct NameIndexingInLoop;
 pub struct DestroyInLoop;
 pub struct GetChildrenInLoop;
@@ -521,37 +520,6 @@ impl Rule for BulkPropertySet {
                 i += 1;
             }
         }
-        hits
-    }
-}
-
-impl Rule for CollectionServiceInLoop {
-    fn id(&self) -> &'static str {
-        "instance::collection_service_in_loop"
-    }
-    fn severity(&self) -> Severity {
-        Severity::Allow
-    }
-
-    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
-        let mut hits = Vec::new();
-        visit::each_call(ast, |call, ctx| {
-            if !ctx.in_hot_loop {
-                return;
-            }
-            let pos = visit::call_pos(call);
-            if visit::is_method_call(call, "AddTag") || visit::is_method_call(call, "RemoveTag") {
-                hits.push(Hit {
-                    pos,
-                    msg: "AddTag/RemoveTag in loop - triggers CollectionService event per call, batch outside loop".into(),
-                });
-            } else if visit::is_method_call(call, "HasTag") {
-                hits.push(Hit {
-                    pos,
-                    msg: "HasTag() in loop - consider caching tag state outside loop".into(),
-                });
-            }
-        });
         hits
     }
 }

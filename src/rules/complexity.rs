@@ -1,100 +1,15 @@
 use crate::lint::{Hit, Rule, Severity};
 use crate::visit;
 
-fn is_flatten_pattern(source: &str, pos: usize) -> bool {
-    let after = &source[pos..];
-    let do_idx = match after.find(" do\n").or_else(|| after.find(" do\r\n")) {
-        Some(i) => i,
-        None => return false,
-    };
-    let body_start = do_idx + " do\n".len();
-    let remaining = &after[body_start..];
-    let end_idx = match remaining.find("\n") {
-        Some(first_newline) => {
-            let after_first = &remaining[first_newline + 1..];
-            let next_line = after_first.lines().next().unwrap_or("");
-            let next_trimmed = next_line.trim();
-            if next_trimmed == "end" || next_trimmed.starts_with("end)") {
-                first_newline
-            } else {
-                return false;
-            }
-        }
-        None => return false,
-    };
-    let body_line = remaining[..end_idx].trim();
-    body_line.starts_with("table.insert(") || body_line.ends_with("[#") || body_line.contains("] = ")
-}
-
-fn is_structured_traversal(source: &str, pos: usize) -> bool {
-    let before = &source[..pos];
-    let inner_line_start = before.rfind('\n').map(|i| i + 1).unwrap_or(0);
-    let inner_line = &source[inner_line_start..pos + 50.min(source.len() - pos)];
-    let inner_arg = if let Some(start) = inner_line
-        .rfind("pairs(")
-        .or_else(|| inner_line.rfind("ipairs("))
-    {
-        let arg_start = inner_line[start..]
-            .find('(')
-            .map(|i| start + i + 1)
-            .unwrap_or(0);
-        let arg_end = inner_line[arg_start..]
-            .find(')')
-            .map(|i| arg_start + i)
-            .unwrap_or(inner_line.len());
-        inner_line[arg_start..arg_end].trim()
-    } else {
-        return false;
-    };
-    if inner_arg.is_empty() {
-        return false;
-    }
-    for line in before.lines().rev().skip(1).take(20) {
-        let t = line.trim();
-        if (t.starts_with("for ") && t.contains(" in "))
-            || (t.starts_with("for ") && t.contains(" do"))
-        {
-            if let Some(binding_end) = t.find(" in ") {
-                let binding = &t[4..binding_end];
-                let vars: Vec<&str> = binding.split(',').map(|v| v.trim()).collect();
-                let root = inner_arg.split('.').next().unwrap_or(inner_arg);
-                let root = root.split('[').next().unwrap_or(root);
-                if vars.contains(&root) {
-                    return true;
-                }
-                for var in &vars {
-                    if inner_arg.contains(var) {
-                        let check = |c: char| c.is_alphanumeric() || c == '_';
-                        for (i, _) in inner_arg.match_indices(var) {
-                            let before_ok =
-                                i == 0 || !check(inner_arg.as_bytes()[i - 1] as char);
-                            let after_ok = i + var.len() >= inner_arg.len()
-                                || !check(inner_arg.as_bytes()[i + var.len()] as char);
-                            if before_ok && after_ok {
-                                return true;
-                            }
-                        }
-                    }
-                }
-            }
-            break;
-        }
-    }
-    false
-}
-
 pub struct TableFindInLoop;
 pub struct GetDescendantsInLoop;
 pub struct TableRemoveShift;
 pub struct TableSortInLoop;
 pub struct GetTaggedInLoop;
-pub struct GetPlayersInLoop;
-pub struct CloneInLoop;
 pub struct WaitForChildInLoop;
 pub struct FindFirstChildRecursive;
 pub struct RequireInFunction;
 pub struct DeepMetatableChain;
-pub struct PairsInPairs;
 pub struct GmatchInLoop;
 pub struct DataStoreNoPcall;
 pub struct AccumulatingRebuild;
@@ -237,56 +152,6 @@ impl Rule for GetTaggedInLoop {
     }
 }
 
-impl Rule for GetPlayersInLoop {
-    fn id(&self) -> &'static str {
-        "complexity::get_players_in_loop"
-    }
-    fn severity(&self) -> Severity {
-        Severity::Allow
-    }
-
-    fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
-        let mut hits = Vec::new();
-        visit::each_call(ast, |call, ctx| {
-            if !ctx.in_hot_loop {
-                return;
-            }
-            let pos = visit::call_pos(call);
-            if visit::is_method_call(call, "GetPlayers")
-                && !visit::is_likely_for_iterator(source, pos)
-            {
-                hits.push(Hit {
-                    pos,
-                    msg: ":GetPlayers() in loop - allocates a new table each call, cache outside loop".into(),
-                });
-            }
-        });
-        hits
-    }
-}
-
-impl Rule for CloneInLoop {
-    fn id(&self) -> &'static str {
-        "complexity::clone_in_loop"
-    }
-    fn severity(&self) -> Severity {
-        Severity::Allow
-    }
-
-    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
-        let mut hits = Vec::new();
-        visit::each_call(ast, |call, ctx| {
-            if ctx.in_hot_loop && visit::is_method_call(call, "Clone") {
-                hits.push(Hit {
-                    pos: visit::call_pos(call),
-                    msg: ":Clone() in loop - clones entire instance tree per iteration".into(),
-                });
-            }
-        });
-        hits
-    }
-}
-
 impl Rule for WaitForChildInLoop {
     fn id(&self) -> &'static str {
         "complexity::wait_for_child_in_loop"
@@ -388,39 +253,6 @@ impl Rule for DeepMetatableChain {
             }];
         }
         vec![]
-    }
-}
-
-impl Rule for PairsInPairs {
-    fn id(&self) -> &'static str {
-        "complexity::pairs_in_pairs"
-    }
-    fn severity(&self) -> Severity {
-        Severity::Allow
-    }
-
-    fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
-        let mut hits = Vec::new();
-        visit::each_call(ast, |call, ctx| {
-            if ctx.for_in_depth >= 2 && ctx.in_loop_direct {
-                let is_iter =
-                    visit::is_bare_call(call, "pairs") || visit::is_bare_call(call, "ipairs");
-                if is_iter {
-                    let pos = visit::call_pos(call);
-                    if is_structured_traversal(source, pos) {
-                        return;
-                    }
-                    if is_flatten_pattern(source, pos) {
-                        return;
-                    }
-                    hits.push(Hit {
-                        pos,
-                        msg: "nested pairs/ipairs loop - O(n*m) complexity, consider a lookup table for the inner loop".into(),
-                    });
-                }
-            }
-        });
-        hits
     }
 }
 

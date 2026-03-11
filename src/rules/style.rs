@@ -7,8 +7,6 @@ pub struct EmptyFunctionBody;
 pub struct DeprecatedGlobalCall;
 pub struct TypeCheckInLoop;
 pub struct DeepNesting;
-pub struct DotMethodCall;
-pub struct PrintInHotPath;
 pub struct DebugInHotPath;
 pub struct IndexFunctionMetatable;
 pub struct ConditionalFieldInConstructor;
@@ -146,109 +144,6 @@ impl Rule for DeepNesting {
                 msg: format!("nesting depth of {max_depth} - consider extracting helper functions (max recommended: 5-6)"),
             });
         }
-        hits
-    }
-}
-
-impl Rule for DotMethodCall {
-    fn id(&self) -> &'static str {
-        "style::dot_method_call"
-    }
-    fn severity(&self) -> Severity {
-        Severity::Allow
-    }
-
-    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
-        let mut hits = Vec::new();
-        visit::each_call(ast, |call, _ctx| {
-            let prefix = match visit::prefix_token(call) {
-                Some(t) => t,
-                None => return,
-            };
-            let prefix_name = visit::tok_text(prefix);
-            let suffixes: Vec<_> = call.suffixes().collect();
-            if suffixes.len() < 2 {
-                return;
-            }
-            let field_name = match &suffixes[0] {
-                full_moon::ast::Suffix::Index(full_moon::ast::Index::Dot { name, .. }) => {
-                    visit::tok_text(name)
-                }
-                _ => return,
-            };
-            if !field_name.starts_with(|c: char| c.is_uppercase()) {
-                return;
-            }
-            if let full_moon::ast::Suffix::Call(full_moon::ast::Call::AnonymousCall(
-                full_moon::ast::FunctionArgs::Parentheses { arguments, .. },
-            )) = &suffixes[1]
-            {
-                if let Some(first_arg) = arguments.iter().next() {
-                    let arg_text = format!("{first_arg}").trim().to_string();
-                    if arg_text == prefix_name {
-                        hits.push(Hit {
-                            pos: visit::call_pos(call),
-                            msg: format!("{prefix_name}.{field_name}({prefix_name}, ...) - use {prefix_name}:{field_name}(...) for NAMECALL optimization"),
-                        });
-                    }
-                }
-            }
-        });
-        hits
-    }
-}
-
-impl Rule for PrintInHotPath {
-    fn id(&self) -> &'static str {
-        "style::print_in_hot_path"
-    }
-    fn severity(&self) -> Severity {
-        Severity::Allow
-    }
-
-    fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
-        let mut hits = Vec::new();
-        let has_runservice = source.contains("Heartbeat")
-            || source.contains("RenderStepped")
-            || source.contains("Stepped");
-
-        visit::each_call(ast, |call, ctx| {
-            let is_print = visit::is_bare_call(call, "print") || visit::is_bare_call(call, "warn");
-            if !is_print {
-                return;
-            }
-            if ctx.in_hot_loop {
-                hits.push(Hit {
-                    pos: visit::call_pos(call),
-                    msg: "print/warn in loop - I/O is expensive, remove or guard with a flag for production".into(),
-                });
-            } else if has_runservice && ctx.in_func {
-                let pos = visit::call_pos(call);
-                let before_start = visit::floor_char(source, pos.saturating_sub(300));
-                let before = &source[before_start..pos];
-                let rs_patterns = [
-                    "Heartbeat:Connect(",
-                    "RenderStepped:Connect(",
-                    "Stepped:Connect(",
-                ];
-                let has_rs = rs_patterns.iter().any(|pat| {
-                    if let Some(connect_idx) = before.rfind(pat) {
-                        let between = &before[connect_idx + pat.len()..];
-                        !between.contains("\nend)")
-                            && !between.contains("\n\tend)")
-                            && !between.contains("\n\t\tend)")
-                    } else {
-                        false
-                    }
-                });
-                if has_rs {
-                    hits.push(Hit {
-                        pos,
-                        msg: "print/warn in RunService callback - fires every frame, remove for production".into(),
-                    });
-                }
-            }
-        });
         hits
     }
 }

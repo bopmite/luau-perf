@@ -35,25 +35,20 @@ fn is_in_error_or_debug_path(source: &str, pos: usize) -> bool {
 }
 
 pub struct StringConcatInLoop;
-pub struct StringFormatInLoop;
 pub struct ClosureInLoop;
 pub struct RepeatedGsub;
-pub struct TostringInLoop;
 pub struct TableCreatePreferred;
 pub struct ExcessiveStringSplit;
 pub struct CoroutineWrapInLoop;
 pub struct TableCreateForDict;
 pub struct MutableUpvalueClosure;
-pub struct UnpackInLoop;
 pub struct RepeatedStringByte;
-pub struct StringInterpInLoop;
 pub struct SelectInLoop;
 pub struct TableInsertKnownSize;
 pub struct BufferOverStringPack;
 pub struct TaskSpawnInLoop;
 pub struct GsubFunctionInLoop;
 pub struct TypeofInLoop;
-pub struct SetmetatableInLoop;
 pub struct TableCloneInLoop;
 pub struct UnnecessaryClosure;
 
@@ -257,35 +252,6 @@ fn build_hot_loop_depth_map(source: &str) -> Vec<u32> {
     depths
 }
 
-impl Rule for StringFormatInLoop {
-    fn id(&self) -> &'static str {
-        "alloc::string_format_in_loop"
-    }
-    fn severity(&self) -> Severity {
-        Severity::Allow
-    }
-
-    fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
-        let mut hits = Vec::new();
-        visit::each_call(ast, |call, ctx| {
-            if ctx.in_hot_loop
-                && (visit::is_dot_call(call, "string", "format")
-                    || visit::is_method_call(call, "format"))
-            {
-                let pos = visit::call_pos(call);
-                if is_in_error_or_debug_path(source, pos) {
-                    return;
-                }
-                hits.push(Hit {
-                    pos,
-                    msg: "string.format() in loop - allocates a new string each iteration".into(),
-                });
-            }
-        });
-        hits
-    }
-}
-
 impl Rule for RepeatedGsub {
     fn id(&self) -> &'static str {
         "alloc::repeated_gsub"
@@ -335,32 +301,6 @@ impl Rule for RepeatedGsub {
                 });
             }
         }
-        hits
-    }
-}
-
-impl Rule for TostringInLoop {
-    fn id(&self) -> &'static str {
-        "alloc::tostring_in_loop"
-    }
-    fn severity(&self) -> Severity {
-        Severity::Allow
-    }
-
-    fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
-        let mut hits = Vec::new();
-        visit::each_call(ast, |call, ctx| {
-            if ctx.in_hot_loop && visit::is_bare_call(call, "tostring") {
-                let pos = visit::call_pos(call);
-                if is_in_error_or_debug_path(source, pos) {
-                    return;
-                }
-                hits.push(Hit {
-                    pos,
-                    msg: "tostring() in loop - allocates a new string each call".into(),
-                });
-            }
-        });
         hits
     }
 }
@@ -581,49 +521,6 @@ impl Rule for MutableUpvalueClosure {
     }
 }
 
-impl Rule for UnpackInLoop {
-    fn id(&self) -> &'static str {
-        "alloc::unpack_in_loop"
-    }
-    fn severity(&self) -> Severity {
-        Severity::Allow
-    }
-
-    fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
-        let mut hits = Vec::new();
-        visit::each_call(ast, |call, ctx| {
-            if !ctx.in_hot_loop {
-                return;
-            }
-            if visit::is_bare_call(call, "unpack") || visit::is_dot_call(call, "table", "unpack") {
-                let pos = visit::call_pos(call);
-                let line_start = source[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
-                let line_end = source[pos..]
-                    .find('\n')
-                    .map(|i| pos + i)
-                    .unwrap_or(source.len());
-                let line = &source[line_start..line_end];
-                if line.contains("[i]")
-                    || line.contains("[j]")
-                    || line.contains("[k]")
-                    || line.contains("[index]")
-                    || line.contains("[idx]")
-                    || line.contains("shift(")
-                    || line.contains("remove(")
-                    || visit::call_arg_count(call) >= 3
-                {
-                    return;
-                }
-                hits.push(Hit {
-                    pos,
-                    msg: "unpack() in loop - creates temporary values on stack each iteration, cache results outside loop".into(),
-                });
-            }
-        });
-        hits
-    }
-}
-
 impl Rule for RepeatedStringByte {
     fn id(&self) -> &'static str {
         "alloc::repeated_string_byte"
@@ -669,52 +566,6 @@ impl Rule for RepeatedStringByte {
                     pos: *pos,
                     msg: format!("string.byte({arg}, i) called {count}x in loop - use string.byte({arg}, 1, -1) once to get all bytes"),
                 });
-            }
-        }
-        hits
-    }
-}
-
-impl Rule for StringInterpInLoop {
-    fn id(&self) -> &'static str {
-        "alloc::string_interp_in_loop"
-    }
-    fn severity(&self) -> Severity {
-        Severity::Allow
-    }
-
-    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
-        // Detect backtick string interpolation (`...{expr}...`) inside loops
-        // Backtick strings allocate a new string each time, just like concatenation
-        let backtick_positions = visit::find_pattern_positions(source, "`");
-        if backtick_positions.is_empty() {
-            return vec![];
-        }
-
-        let loop_depth = build_hot_loop_depth_map(source);
-        let line_starts = line_start_offsets(source);
-        let mut hits = Vec::new();
-        let mut skip_until = 0usize;
-
-        for &pos in &backtick_positions {
-            if pos < skip_until {
-                continue;
-            }
-            let line = line_starts.partition_point(|&s| s <= pos).saturating_sub(1);
-            if line >= loop_depth.len() || loop_depth[line] == 0 {
-                continue;
-            }
-            let after_end = visit::ceil_char(source, (pos + 200).min(source.len()));
-            let after = &source[pos + 1..after_end];
-            if let Some(close) = after.find('`') {
-                let interp = &after[..close];
-                if interp.contains('{') {
-                    hits.push(Hit {
-                        pos,
-                        msg: "string interpolation in loop - allocates a new string each iteration, same as concatenation".into(),
-                    });
-                    skip_until = pos + 1 + close + 1;
-                }
             }
         }
         hits
@@ -925,28 +776,6 @@ impl Rule for TypeofInLoop {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
                     msg: "typeof() in loop crosses the Lua-C++ bridge each call - cache outside if checking the same value: local t = typeof(obj)".into(),
-                });
-            }
-        });
-        hits
-    }
-}
-
-impl Rule for SetmetatableInLoop {
-    fn id(&self) -> &'static str {
-        "alloc::setmetatable_in_loop"
-    }
-    fn severity(&self) -> Severity {
-        Severity::Allow
-    }
-
-    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
-        let mut hits = Vec::new();
-        visit::each_call(ast, |call, ctx| {
-            if ctx.in_hot_loop && visit::is_bare_call(call, "setmetatable") {
-                hits.push(Hit {
-                    pos: visit::call_pos(call),
-                    msg: "setmetatable() in loop creates a new metatable-linked object per iteration - consider a constructor pattern or object pooling".into(),
                 });
             }
         });

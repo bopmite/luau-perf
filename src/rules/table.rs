@@ -3,7 +3,6 @@ use crate::visit;
 
 pub struct ForeachDeprecated;
 pub struct GetnDeprecated;
-pub struct MaxnDeprecated;
 pub struct FreezeInLoop;
 pub struct InsertWithPosition;
 pub struct RemoveInIpairs;
@@ -66,28 +65,6 @@ impl Rule for GetnDeprecated {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
                     msg: "table.getn() is deprecated - use #t".into(),
-                });
-            }
-        });
-        hits
-    }
-}
-
-impl Rule for MaxnDeprecated {
-    fn id(&self) -> &'static str {
-        "table::maxn_deprecated"
-    }
-    fn severity(&self) -> Severity {
-        Severity::Allow
-    }
-
-    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
-        let mut hits = Vec::new();
-        visit::each_call(ast, |call, _ctx| {
-            if visit::is_dot_call(call, "table", "maxn") {
-                hits.push(Hit {
-                    pos: visit::call_pos(call),
-                    msg: "table.maxn() is deprecated - use #t or track max index manually".into(),
                 });
             }
         });

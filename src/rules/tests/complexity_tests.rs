@@ -110,46 +110,6 @@ fn shallow_metatable_not_flagged() {
 }
 
 #[test]
-fn pairs_in_pairs_detected() {
-    let src = "for _, a in pairs(t1) do\n  for _, b in pairs(t2) do\n    print(a, b)\n  end\nend";
-    let ast = parse(src);
-    let hits = PairsInPairs.check(src, &ast);
-    assert!(hits.len() >= 1);
-}
-
-#[test]
-fn single_pairs_ok() {
-    let src = "for _, v in pairs(t) do\n  print(v)\nend";
-    let ast = parse(src);
-    let hits = PairsInPairs.check(src, &ast);
-    assert_eq!(hits.len(), 0);
-}
-
-#[test]
-fn pairs_structured_traversal_ok() {
-    let src = "for k, v in pairs(outer) do\n  for k2, v2 in pairs(v) do\n    print(k2, v2)\n  end\nend";
-    let ast = parse(src);
-    let hits = PairsInPairs.check(src, &ast);
-    assert_eq!(hits.len(), 0);
-}
-
-#[test]
-fn pairs_flatten_table_insert_ok() {
-    let src = "for _, list in ipairs(lists) do\n  for _, item in ipairs(list) do\n    table.insert(result, item)\n  end\nend";
-    let ast = parse(src);
-    let hits = PairsInPairs.check(src, &ast);
-    assert_eq!(hits.len(), 0);
-}
-
-#[test]
-fn pairs_in_numeric_for_ok() {
-    let src = "for i = 1, select(\"#\", ...) do\n  for k, v in pairs(sources[i]) do\n    t[k] = v\n  end\nend";
-    let ast = parse(src);
-    let hits = PairsInPairs.check(src, &ast);
-    assert_eq!(hits.len(), 0);
-}
-
-#[test]
 fn gmatch_in_loop_detected() {
     let src = "for i = 1, 10 do\n  for w in string.gmatch(s, \"%w+\") do end\nend";
     let ast = parse(src);
@@ -363,14 +323,6 @@ fn string_concat_no_accumulate_ok() {
 }
 
 #[test]
-fn pairs_in_pairs_dependent_call_ok() {
-    let src = "for tag, comp in pairs(boundTags) do\n  for _, inst in ipairs(CollectionService:GetTagged(tag)) do\n    spawn(inst, comp)\n  end\nend";
-    let ast = parse(src);
-    let hits = PairsInPairs.check(src, &ast);
-    assert_eq!(hits.len(), 0);
-}
-
-#[test]
 fn get_descendants_in_loop_detected() {
     let src = "while true do\n  local d = workspace:GetDescendants()\n  task.wait()\nend";
     let ast = parse(src);
@@ -383,38 +335,6 @@ fn get_descendants_outside_loop_ok() {
     let src = "local d = workspace:GetDescendants()";
     let ast = parse(src);
     let hits = GetDescendantsInLoop.check(src, &ast);
-    assert_eq!(hits.len(), 0);
-}
-
-#[test]
-fn get_players_in_loop_detected() {
-    let src = "while true do\n  local p = Players:GetPlayers()\n  task.wait()\nend";
-    let ast = parse(src);
-    let hits = GetPlayersInLoop.check(src, &ast);
-    assert_eq!(hits.len(), 1);
-}
-
-#[test]
-fn get_players_outside_loop_ok() {
-    let src = "local p = Players:GetPlayers()";
-    let ast = parse(src);
-    let hits = GetPlayersInLoop.check(src, &ast);
-    assert_eq!(hits.len(), 0);
-}
-
-#[test]
-fn clone_in_loop_detected() {
-    let src = "for i = 1, 10 do\n  local c = template:Clone()\nend";
-    let ast = parse(src);
-    let hits = CloneInLoop.check(src, &ast);
-    assert_eq!(hits.len(), 1);
-}
-
-#[test]
-fn clone_outside_loop_ok() {
-    let src = "local c = template:Clone()";
-    let ast = parse(src);
-    let hits = CloneInLoop.check(src, &ast);
     assert_eq!(hits.len(), 0);
 }
 

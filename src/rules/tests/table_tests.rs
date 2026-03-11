@@ -303,14 +303,6 @@ fn hash_length_ok() {
 }
 
 #[test]
-fn maxn_deprecated_detected() {
-    let src = "local n = table.maxn(t)";
-    let ast = parse(src);
-    let hits = MaxnDeprecated.check(src, &ast);
-    assert_eq!(hits.len(), 1);
-}
-
-#[test]
 fn foreach_deprecated_detected() {
     let src = "table.foreach(t, print)";
     let ast = parse(src);

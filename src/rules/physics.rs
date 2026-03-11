@@ -1,7 +1,6 @@
 use crate::lint::{Hit, Rule, Severity};
 use crate::visit;
 
-pub struct SpatialQueryInLoop;
 pub struct MoveToInLoop;
 pub struct TouchedWithoutDebounce;
 pub struct SetNetworkOwnerInLoop;
@@ -16,38 +15,6 @@ pub struct MasslessNotSet;
 pub struct AssemblyVelocityInLoop;
 pub struct SpatialQueryPerFrame;
 pub struct TerrainWriteInLoop;
-
-impl Rule for SpatialQueryInLoop {
-    fn id(&self) -> &'static str {
-        "physics::spatial_query_in_loop"
-    }
-    fn severity(&self) -> Severity {
-        Severity::Allow
-    }
-
-    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
-        let mut hits = Vec::new();
-        visit::each_call(ast, |call, ctx| {
-            if !ctx.in_hot_loop {
-                return;
-            }
-            let is_spatial = visit::is_method_call(call, "Raycast")
-                || visit::is_method_call(call, "GetPartBoundsInBox")
-                || visit::is_method_call(call, "GetPartBoundsInRadius")
-                || visit::is_method_call(call, "GetPartsInPart")
-                || visit::is_method_call(call, "Blockcast")
-                || visit::is_method_call(call, "Spherecast")
-                || visit::is_method_call(call, "Shapecast");
-            if is_spatial {
-                hits.push(Hit {
-                    pos: visit::call_pos(call),
-                    msg: "spatial query in loop - expensive physics operation, consider batching or caching".into(),
-                });
-            }
-        });
-        hits
-    }
-}
 
 impl Rule for MoveToInLoop {
     fn id(&self) -> &'static str {

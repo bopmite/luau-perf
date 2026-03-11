@@ -6,47 +6,6 @@ fn parse(src: &str) -> full_moon::ast::Ast {
 }
 
 #[test]
-fn dot_method_call_detected() {
-    let src = "obj.DoSomething(obj, 1, 2)";
-    let ast = parse(src);
-    let hits = DotMethodCall.check(src, &ast);
-    assert_eq!(hits.len(), 1);
-    assert!(hits[0].msg.contains("NAMECALL"));
-}
-
-#[test]
-fn colon_method_not_flagged() {
-    let src = "obj:DoSomething(1, 2)";
-    let ast = parse(src);
-    let hits = DotMethodCall.check(src, &ast);
-    assert_eq!(hits.len(), 0);
-}
-
-#[test]
-fn dot_lowercase_not_flagged() {
-    let src = "obj.dosomething(obj, 1)";
-    let ast = parse(src);
-    let hits = DotMethodCall.check(src, &ast);
-    assert_eq!(hits.len(), 0);
-}
-
-#[test]
-fn print_in_loop_detected() {
-    let src = "for i = 1, 10 do\n  print(i)\nend";
-    let ast = parse(src);
-    let hits = PrintInHotPath.check(src, &ast);
-    assert_eq!(hits.len(), 1);
-}
-
-#[test]
-fn warn_in_loop_detected() {
-    let src = "while true do\n  warn(\"test\")\nend";
-    let ast = parse(src);
-    let hits = PrintInHotPath.check(src, &ast);
-    assert_eq!(hits.len(), 1);
-}
-
-#[test]
 fn debug_traceback_in_loop_detected() {
     let src = "for i = 1, 10 do\n  debug.traceback()\nend";
     let ast = parse(src);

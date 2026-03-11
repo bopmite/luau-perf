@@ -30,22 +30,6 @@ fn renderstepped_table_create_detected() {
 }
 
 #[test]
-fn circular_connection_ref_detected() {
-    let src = "local part = workspace.Part\npart.Touched:Connect(function()\n  part.Color = Color3.new(1,0,0)\nend)";
-    let ast = parse(src);
-    let hits = CircularConnectionRef.check(src, &ast);
-    assert_eq!(hits.len(), 1);
-}
-
-#[test]
-fn no_circular_ref_different_obj() {
-    let src = "local part = workspace.Part\nother.Touched:Connect(function()\n  part.Color = Color3.new(1,0,0)\nend)";
-    let ast = parse(src);
-    let hits = CircularConnectionRef.check(src, &ast);
-    assert_eq!(hits.len(), 0);
-}
-
-#[test]
 fn weak_table_no_shrink_detected() {
     let src = "setmetatable(cache, {__mode = \"v\"})";
     let ast = parse(src);
@@ -428,22 +412,6 @@ fn player_removing_present_ok() {
     let ast = parse(src);
     let hits = MissingPlayerRemoving.check(src, &ast);
     assert_eq!(hits.len(), 0);
-}
-
-#[test]
-fn circular_ref_elseif_no_false_positive() {
-    let src = "obj.Event:Connect(function(input)\n  if input.A then\n    doA()\n  elseif input.B then\n    doB()\n  end\nend)\nobj.Other:Connect(function()\n  print(\"ok\")\nend)";
-    let ast = parse(src);
-    let hits = CircularConnectionRef.check(src, &ast);
-    assert_eq!(hits.len(), 0);
-}
-
-#[test]
-fn circular_ref_actual_capture_detected() {
-    let src = "textBox.InputBegan:Connect(function(input)\n  print(textBox.Text)\nend)";
-    let ast = parse(src);
-    let hits = CircularConnectionRef.check(src, &ast);
-    assert_eq!(hits.len(), 1);
 }
 
 #[test]
