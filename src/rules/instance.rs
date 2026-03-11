@@ -144,13 +144,10 @@ impl Rule for PropertyChangeSignalWrong {
             if last_word.len() <= 2 && last_word.chars().all(|c| c.is_ascii_lowercase()) {
                 continue;
             }
-            let connect_suffix = if after_connect.starts_with(".Changed:Connect(") {
-                &after_connect[".Changed:Connect(".len()..]
-            } else if after_connect.starts_with(".Changed:connect(") {
-                &after_connect[".Changed:connect(".len()..]
-            } else {
-                ""
-            };
+            let connect_suffix = after_connect
+                .strip_prefix(".Changed:Connect(")
+                .or_else(|| after_connect.strip_prefix(".Changed:connect("))
+                .unwrap_or("");
             if connect_suffix.starts_with("function()")
                 || connect_suffix.starts_with("function ()")
             {
