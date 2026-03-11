@@ -153,6 +153,15 @@ impl Rule for PropertyChangeSignalWrong {
             {
                 continue;
             }
+            if let Some(paren) = connect_suffix.find('(') {
+                let after_paren = &connect_suffix[paren + 1..];
+                if let Some(close) = after_paren.find(')') {
+                    let params = &after_paren[..close];
+                    if params.split(',').count() >= 2 {
+                        continue;
+                    }
+                }
+            }
             if !connect_suffix.is_empty()
                 && !connect_suffix.starts_with("function")
                 && !connect_suffix.starts_with("function ")

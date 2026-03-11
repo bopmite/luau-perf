@@ -1059,33 +1059,34 @@ impl Rule for ChangedEventUnfiltered {
             if is_value_base {
                 continue;
             }
-            if !accessor.contains('.') {
-                let first_char = accessor.chars().next().unwrap_or('A');
-                if first_char.is_ascii_lowercase()
-                    && !matches!(
-                        accessor,
-                        "part"
-                            | "gui"
-                            | "button"
-                            | "frame"
-                            | "label"
-                            | "instance"
-                            | "inst"
-                            | "obj"
-                            | "descendant"
-                            | "child"
-                            | "player"
-                            | "character"
-                            | "humanoid"
-                            | "camera"
-                            | "sound"
-                            | "model"
-                            | "tool"
-                            | "workspace"
-                    )
-                {
-                    continue;
-                }
+            let first_char = last_word.chars().next().unwrap_or('A');
+            if first_char.is_ascii_lowercase()
+                && !matches!(
+                    last_word,
+                    "part"
+                        | "gui"
+                        | "button"
+                        | "frame"
+                        | "label"
+                        | "instance"
+                        | "inst"
+                        | "obj"
+                        | "descendant"
+                        | "child"
+                        | "player"
+                        | "character"
+                        | "humanoid"
+                        | "camera"
+                        | "sound"
+                        | "model"
+                        | "tool"
+                        | "workspace"
+                )
+            {
+                continue;
+            }
+            if last_word.len() <= 2 && last_word.chars().all(|c| c.is_ascii_lowercase()) {
+                continue;
             }
             let after_connect =
                 &source[pos..visit::ceil_char(source, (pos + 500).min(source.len()))];
@@ -1095,6 +1096,30 @@ impl Rule for ChangedEventUnfiltered {
                 || after_connect.contains("if property")
                 || after_connect.contains("if prop ");
             if has_property_filter {
+                continue;
+            }
+            let connect_suffix = after_connect
+                .strip_prefix(".Changed:Connect(")
+                .or_else(|| after_connect.strip_prefix(".Changed:connect("))
+                .unwrap_or("");
+            if connect_suffix.starts_with("function()")
+                || connect_suffix.starts_with("function ()")
+            {
+                continue;
+            }
+            if let Some(paren) = connect_suffix.find('(') {
+                let after_paren = &connect_suffix[paren + 1..];
+                if let Some(close) = after_paren.find(')') {
+                    let params = &after_paren[..close];
+                    if params.split(',').count() >= 2 {
+                        continue;
+                    }
+                }
+            }
+            if !connect_suffix.is_empty()
+                && !connect_suffix.starts_with("function")
+                && !connect_suffix.starts_with("function ")
+            {
                 continue;
             }
             hits.push(Hit {
