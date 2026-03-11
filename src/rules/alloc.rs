@@ -656,7 +656,7 @@ impl Rule for TaskSpawnInLoop {
         "alloc::task_spawn_in_loop"
     }
     fn severity(&self) -> Severity {
-        Severity::Warn
+        Severity::Allow
     }
 
     fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
@@ -906,7 +906,12 @@ impl UnnecessaryClosure {
         let mut depth = 0i32;
         for (i, b) in s[paren..].bytes().enumerate() {
             match b {
-                b'(' => depth += 1,
+                b'(' => {
+                    depth += 1;
+                    if depth > 1 {
+                        return false;
+                    }
+                }
                 b')' => {
                     depth -= 1;
                     if depth == 0 {

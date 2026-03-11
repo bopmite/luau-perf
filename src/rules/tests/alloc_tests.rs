@@ -369,6 +369,22 @@ fn unnecessary_closure_chained_call_not_flagged() {
 }
 
 #[test]
+fn unnecessary_closure_nested_call_args_ok() {
+    let src = "pcall(function()\n  Promise.all(Promise.new(function() end))\nend)";
+    let ast = parse(src);
+    let hits = UnnecessaryClosure.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn unnecessary_closure_yielding_args_ok() {
+    let src = "task.spawn(function()\n  fn(self:Await(timeout))\nend)";
+    let ast = parse(src);
+    let hits = UnnecessaryClosure.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
 fn repeated_gsub_detected() {
     let src = "local s = str:gsub(\"a\", \"b\")\nlocal t = str:gsub(\"c\", \"d\")\nlocal u = str:gsub(\"e\", \"f\")";
     let ast = parse(src);
