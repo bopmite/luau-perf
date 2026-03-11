@@ -625,7 +625,7 @@ impl Rule for UnusedVariable {
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         let lines: Vec<&str> = source.lines().collect();
-        let loop_depth = build_hot_loop_depth_map(source);
+        let loop_depth = visit::build_hot_loop_depth_map(source);
         for (i, line) in lines.iter().enumerate() {
             let trimmed = line.trim();
             if i >= loop_depth.len() || loop_depth[i] == 0 {
@@ -707,47 +707,6 @@ impl Rule for MultipleReturns {
         }
         hits
     }
-}
-
-fn build_hot_loop_depth_map(source: &str) -> Vec<i32> {
-    let lines: Vec<&str> = source.lines().collect();
-    let mut depth = vec![0i32; lines.len()];
-    let mut current: i32 = 0;
-    let mut in_block_comment = false;
-    for (i, line) in lines.iter().enumerate() {
-        if in_block_comment {
-            if line.contains("]=]") || line.contains("]]") {
-                in_block_comment = false;
-            }
-            depth[i] = current;
-            continue;
-        }
-        let t = line.trim();
-        if t.starts_with("--[") && (t.contains("--[[") || t.contains("--[=[")) {
-            if !t.contains("]]") && !t.contains("]=]") {
-                in_block_comment = true;
-            }
-            depth[i] = current;
-            continue;
-        }
-        if t.starts_with("--") {
-            depth[i] = current;
-            continue;
-        }
-        if t.starts_with("while ") || t == "while" || t.starts_with("repeat") || t == "repeat" {
-            current += 1;
-        }
-        depth[i] = current;
-        if (t == "end" || t.starts_with("end ") || t.starts_with("end)") || t.starts_with("end,"))
-            && current > 0
-        {
-            current -= 1;
-        }
-        if t.starts_with("until ") && current > 0 {
-            current -= 1;
-        }
-    }
-    depth
 }
 
 impl Rule for UDim2PreferFromOffset {

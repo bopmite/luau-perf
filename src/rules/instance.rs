@@ -229,8 +229,8 @@ impl Rule for SetParentInLoop {
             return vec![];
         }
 
-        let loop_depth = build_hot_loop_depth_map(source);
-        let line_starts = line_start_offsets(source);
+        let loop_depth = visit::build_hot_loop_depth_map(source);
+        let line_starts = visit::line_start_offsets(source);
         let lines: Vec<&str> = source.lines().collect();
 
         parent_positions
@@ -288,8 +288,8 @@ impl Rule for PropertyBeforeParent {
             return vec![];
         }
 
-        let loop_depth = build_hot_loop_depth_map(source);
-        let line_starts = line_start_offsets(source);
+        let loop_depth = visit::build_hot_loop_depth_map(source);
+        let line_starts = visit::line_start_offsets(source);
 
         let mut hits = Vec::new();
         for &parent_pos in &parent_positions {
@@ -533,8 +533,8 @@ impl Rule for NameIndexingInLoop {
     }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
-        let loop_depth = build_hot_loop_depth_map(source);
-        let line_starts = line_start_offsets(source);
+        let loop_depth = visit::build_hot_loop_depth_map(source);
+        let line_starts = visit::line_start_offsets(source);
         let mut hits = Vec::new();
 
         for pos in visit::find_pattern_positions(source, "workspace.") {
@@ -583,58 +583,6 @@ fn extract_call_object(before: &str) -> String {
         .map(|i| i + 1)
         .unwrap_or(0);
     trimmed[start..].to_string()
-}
-
-fn line_start_offsets(source: &str) -> Vec<usize> {
-    let mut starts = vec![0];
-    for (i, b) in source.bytes().enumerate() {
-        if b == b'\n' {
-            starts.push(i + 1);
-        }
-    }
-    starts
-}
-
-fn build_hot_loop_depth_map(source: &str) -> Vec<u32> {
-    let mut depth: u32 = 0;
-    let mut depths = Vec::new();
-    let mut in_block_comment = false;
-    for line in source.lines() {
-        if in_block_comment {
-            if line.contains("]=]") || line.contains("]]") {
-                in_block_comment = false;
-            }
-            depths.push(depth);
-            continue;
-        }
-        let trimmed = line.trim();
-        if trimmed.starts_with("--[") && (trimmed.contains("--[[") || trimmed.contains("--[=[")) {
-            if !trimmed.contains("]]") && !trimmed.contains("]=]") {
-                in_block_comment = true;
-            }
-            depths.push(depth);
-            continue;
-        }
-        if trimmed.starts_with("--") {
-            depths.push(depth);
-            continue;
-        }
-        if trimmed.starts_with("while ")
-            || trimmed.starts_with("repeat")
-            || (trimmed.starts_with("for ") && !trimmed.contains(" in "))
-        {
-            depth += 1;
-        }
-        depths.push(depth);
-        if trimmed == "end"
-            || trimmed.starts_with("end ")
-            || trimmed.starts_with("until ")
-            || trimmed == "until"
-        {
-            depth = depth.saturating_sub(1);
-        }
-    }
-    depths
 }
 
 impl Rule for DestroyInLoop {
