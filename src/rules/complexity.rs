@@ -320,11 +320,14 @@ impl Rule for FindFirstChildRecursive {
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
-        visit::each_call(ast, |call, _ctx| {
-            if visit::is_method_call(call, "FindFirstChild") && visit::nth_arg_is_true(call, 1) {
+        visit::each_call(ast, |call, ctx| {
+            if ctx.in_func
+                && visit::is_method_call(call, "FindFirstChild")
+                && visit::nth_arg_is_true(call, 1)
+            {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
-                    msg: "FindFirstChild(name, true) is O(n) recursive search - cache result or use GetDescendants + lookup table".into(),
+                    msg: "FindFirstChild(name, true) is O(n) recursive search in loop - cache result or use GetDescendants + lookup table".into(),
                 });
             }
         });

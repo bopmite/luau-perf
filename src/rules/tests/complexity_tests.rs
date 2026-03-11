@@ -71,7 +71,7 @@ fn require_at_module_level_ok() {
 
 #[test]
 fn find_first_child_recursive_detected() {
-    let src = "workspace:FindFirstChild(\"Part\", true)";
+    let src = "local function search()\n  workspace:FindFirstChild(\"Part\", true)\nend";
     let ast = parse(src);
     let hits = FindFirstChildRecursive.check(src, &ast);
     assert_eq!(hits.len(), 1);
@@ -79,7 +79,15 @@ fn find_first_child_recursive_detected() {
 
 #[test]
 fn find_first_child_non_recursive_ok() {
-    let src = "workspace:FindFirstChild(\"Part\")";
+    let src = "local function search()\n  workspace:FindFirstChild(\"Part\")\nend";
+    let ast = parse(src);
+    let hits = FindFirstChildRecursive.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn find_first_child_recursive_module_level_ok() {
+    let src = "local part = workspace:FindFirstChild(\"Part\", true)";
     let ast = parse(src);
     let hits = FindFirstChildRecursive.check(src, &ast);
     assert_eq!(hits.len(), 0);
