@@ -394,6 +394,14 @@ fn nil_check_in_assignment_not_flagged() {
 }
 
 #[test]
+fn nil_check_on_different_var_not_flagged() {
+    let src = "if Spawn ~= nil and Spawn:FindFirstChild(\"Model\") then end";
+    let ast = parse(src);
+    let hits = RedundantNilCheck.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
 fn nil_check_in_return_not_flagged() {
     let src = "return parent:FindFirstChild(\"X\") ~= nil";
     let ast = parse(src);

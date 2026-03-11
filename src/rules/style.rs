@@ -1139,12 +1139,19 @@ impl Rule for RedundantNilCheck {
         ];
         for pat in &truthy_patterns {
             for pos in visit::find_pattern_positions(source, pat) {
+                let after_name = pos + pat.len();
+                let close = match visit::find_balanced_paren(&source[after_name..]) {
+                    Some(c) => after_name + c,
+                    None => continue,
+                };
+                let after_call = &source[close + 1..];
+                let rest = after_call.trim_start();
+                if !rest.starts_with("~= nil") && !rest.starts_with("== nil") {
+                    continue;
+                }
                 let line_start = source[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
                 let line_end = source[pos..].find('\n').map(|i| pos + i).unwrap_or(source.len());
                 let line = &source[line_start..line_end];
-                if !line.contains("~= nil") && !line.contains("== nil") {
-                    continue;
-                }
                 let trimmed = line.trim();
                 let in_condition = trimmed.starts_with("if ")
                     || trimmed.starts_with("elseif ")
