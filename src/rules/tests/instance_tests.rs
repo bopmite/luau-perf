@@ -319,3 +319,19 @@ fn set_parent_after_instance_new_ok() {
     assert_eq!(hits.len(), 0);
 }
 
+#[test]
+fn set_parent_comparison_not_flagged() {
+    let src = "while true do\n  if Player.Parent == game.Players then\n    break\n  end\nend";
+    let ast = parse(src);
+    let hits = SetParentInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn set_parent_not_equal_not_flagged() {
+    let src = "while true do\n  if Player.Parent ~= nil then\n    break\n  end\nend";
+    let ast = parse(src);
+    let hits = SetParentInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+

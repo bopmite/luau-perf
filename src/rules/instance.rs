@@ -237,6 +237,13 @@ impl Rule for SetParentInLoop {
         parent_positions
             .into_iter()
             .filter(|&pos| {
+                let after = pos + ".Parent =".len();
+                if after < source.len() {
+                    let next = source.as_bytes()[after];
+                    if next == b'=' || next == b'~' {
+                        return false;
+                    }
+                }
                 let line = line_starts.partition_point(|&s| s <= pos).saturating_sub(1);
                 if line >= loop_depth.len() || loop_depth[line] == 0 {
                     return false;
