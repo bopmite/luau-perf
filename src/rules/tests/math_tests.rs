@@ -396,3 +396,59 @@ fn random_new_ok() {
     let hits = RandomDeprecated.check(src, &ast);
     assert_eq!(hits.len(), 0);
 }
+
+#[test]
+fn cframe_identity_with_args_ok() {
+    let src = "local cf = CFrame.new(0, 5, 0)";
+    let ast = parse(src);
+    let hits = CFrameIdentityConstant.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn vector2_zero_constant_detected() {
+    let src = "local v = Vector2.new(0, 0)";
+    let ast = parse(src);
+    let hits = Vector2ZeroConstant.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn vector2_nonzero_ok() {
+    let src = "local v = Vector2.new(1, 0)";
+    let ast = parse(src);
+    let hits = Vector2ZeroConstant.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn fmod_nested_ok() {
+    let src = "local r = a % b";
+    let ast = parse(src);
+    let hits = FmodOverModulo.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn max_single_arg_unpack_ok() {
+    let src = "local m = math.max(unpack(values))";
+    let ast = parse(src);
+    let hits = MaxMinSingleArg.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn sqrt_ge_comparison_detected() {
+    let src = "if math.sqrt(d) >= limit then end";
+    let ast = parse(src);
+    let hits = SqrtOverSquared.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn sqrt_assignment_ok() {
+    let src = "local root = math.sqrt(x)";
+    let ast = parse(src);
+    let hits = SqrtOverSquared.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}

@@ -1271,3 +1271,91 @@ fn missing_strict_with_header_ok() {
     assert_eq!(hits.len(), 0);
 }
 
+#[test]
+fn deprecated_lowercase_isa_detected() {
+    let src = "if obj:isA(\"Part\") then end";
+    let ast = parse(src);
+    let hits = DeprecatedLowercaseMethod.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn pascalcase_isa_ok() {
+    let src = "if obj:IsA(\"Part\") then end";
+    let ast = parse(src);
+    let hits = DeprecatedLowercaseMethod.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn character_added_no_wait_detected() {
+    let src = "player.CharacterAdded:Connect(function(char)\n  print(char)\nend)";
+    let ast = parse(src);
+    let hits = CharacterAddedNoWait.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn character_added_with_existing_check_ok() {
+    let src = "local char = player.Character\nplayer.CharacterAdded:Connect(function(c) end)";
+    let ast = parse(src);
+    let hits = CharacterAddedNoWait.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn player_added_race_detected() {
+    let src = "Players.PlayerAdded:Connect(function(player)\n  print(player)\nend)";
+    let ast = parse(src);
+    let hits = PlayerAddedRace.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn raycast_filter_whitelist_detected() {
+    let src = "params.FilterType = Enum.RaycastFilterType.Whitelist";
+    let ast = parse(src);
+    let hits = RaycastFilterDeprecated.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn raycast_filter_include_ok() {
+    let src = "params.FilterType = Enum.RaycastFilterType.Include";
+    let ast = parse(src);
+    let hits = RaycastFilterDeprecated.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn teleport_async_no_pcall_detected() {
+    let src = "TeleportService:TeleportAsync(placeId, players)";
+    let ast = parse(src);
+    let hits = TeleportServiceRace.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn teleport_async_with_pcall_ok() {
+    let src = "local ok, err = pcall(function()\n  TeleportService:TeleportAsync(placeId, players)\nend)";
+    let ast = parse(src);
+    let hits = TeleportServiceRace.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn yield_waitforchild_in_connect_detected() {
+    let src = "event:Connect(function()\n  local obj = script:WaitForChild(\"Value\")\nend)";
+    let ast = parse(src);
+    let hits = YieldInConnectCallback.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn connect_callback_no_yield_ok() {
+    let src = "part.Touched:Connect(function(hit)\n  print(hit)\nend)";
+    let ast = parse(src);
+    let hits = YieldInConnectCallback.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+

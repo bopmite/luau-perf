@@ -319,3 +319,59 @@ fn set_parent_not_equal_not_flagged() {
     assert_eq!(hits.len(), 0);
 }
 
+#[test]
+fn changed_on_model_detected() {
+    let src = "local model = workspace.Model\nmodel.Changed:Connect(function() end)";
+    let ast = parse(src);
+    let hits = ChangedOnMovingPart.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn changed_on_non_part_ok() {
+    let src = "local gui = player.PlayerGui\ngui.Changed:Connect(function() end)";
+    let ast = parse(src);
+    let hits = ChangedOnMovingPart.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn classname_over_isa_detected() {
+    let src = "if obj.ClassName == \"Part\" then end";
+    let ast = parse(src);
+    let hits = ClassNameOverIsA.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn classname_not_equal_detected() {
+    let src = "if obj.ClassName ~= \"Model\" then end";
+    let ast = parse(src);
+    let hits = ClassNameOverIsA.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn isa_call_ok() {
+    let src = "if obj:IsA(\"Part\") then end";
+    let ast = parse(src);
+    let hits = ClassNameOverIsA.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn property_change_signal_wrong_detected() {
+    let src = "part.Changed:Connect(function(prop)\n  print(prop)\nend)";
+    let ast = parse(src);
+    let hits = PropertyChangeSignalWrong.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn property_change_signal_value_base_ok() {
+    let src = "local v: IntValue = obj\nv.Changed:Connect(function(val)\n  print(val)\nend)";
+    let ast = parse(src);
+    let hits = PropertyChangeSignalWrong.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
