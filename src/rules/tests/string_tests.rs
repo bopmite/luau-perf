@@ -254,6 +254,14 @@ fn format_tostring_non_s_ok() {
 }
 
 #[test]
+fn format_tostring_with_q_ok() {
+    let src = "string.format(\"Cannot set %q on %s\", tostring(index), self:GetFullName())";
+    let ast = parse(src);
+    let hits = FormatRedundantTostring.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
 fn format_simple_concat_detected() {
     let src = "local s = string.format(\"%s/%s\", a, b)";
     let ast = parse(src);

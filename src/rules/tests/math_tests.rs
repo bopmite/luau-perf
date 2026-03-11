@@ -70,6 +70,14 @@ fn floor_no_division_ok() {
 }
 
 #[test]
+fn floor_division_nested_call_detected() {
+    let src = "local r = math.floor(getSpeed() / getRate())";
+    let ast = parse(src);
+    let hits = FloorDivision.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
 fn random_new_in_loop_detected() {
     let src = "for i = 1, 10 do\n  local rng = Random.new()\nend";
     let ast = parse(src);
