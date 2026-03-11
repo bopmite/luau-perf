@@ -524,12 +524,10 @@ pub fn rule_level(id: &str) -> crate::lint::Level {
         | "alloc::closure_in_loop"
         | "alloc::coroutine_wrap_in_loop"
         | "alloc::excessive_string_split"
-        | "alloc::unpack_in_loop"
         | "alloc::repeated_gsub"
         | "alloc::table_create_for_dict"
         | "alloc::task_spawn_in_loop"
         | "alloc::gsub_function_in_loop"
-        | "alloc::setmetatable_in_loop"
         | "string::reverse_in_loop"
 
         // caching suggestions
