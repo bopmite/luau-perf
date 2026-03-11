@@ -673,6 +673,26 @@ impl Rule for LocalPlayerUncached {
         if positions.len() < 3 {
             return vec![];
         }
+        // Skip files where accesses are spread across different function scopes
+        // (e.g. service files with many small methods each using LocalPlayer once)
+        let func_boundaries: Vec<usize> = visit::find_pattern_positions(source, "function")
+            .into_iter()
+            .filter(|&p| {
+                let before = if p > 0 { source.as_bytes()[p - 1] } else { b'\n' };
+                !before.is_ascii_alphanumeric() && before != b'_'
+            })
+            .collect();
+        if !func_boundaries.is_empty() {
+            let mut scope_counts = vec![0usize; func_boundaries.len() + 1];
+            for &pos in &positions {
+                let scope = func_boundaries.partition_point(|&f| f <= pos);
+                scope_counts[scope] += 1;
+            }
+            let max_same_scope = scope_counts.iter().copied().max().unwrap_or(0);
+            if max_same_scope < 2 {
+                return vec![];
+            }
+        }
         positions[1..]
             .iter()
             .map(|&pos| Hit {
