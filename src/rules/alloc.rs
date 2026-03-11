@@ -138,6 +138,16 @@ impl Rule for StringConcatInLoop {
             if line == last_hit_line {
                 continue;
             }
+            let line_start = line_starts[line];
+            let line_end = if line + 1 < line_starts.len() {
+                line_starts[line + 1]
+            } else {
+                source.len()
+            };
+            let line_text = &source[line_start..line_end];
+            if !is_accumulative_concat(line_text) {
+                continue;
+            }
             last_hit_line = line;
             hits.push(Hit {
                 pos,
@@ -146,6 +156,53 @@ impl Rule for StringConcatInLoop {
         }
         hits
     }
+}
+
+fn is_accumulative_concat(line: &str) -> bool {
+    let trimmed = line.trim();
+    // x ..= y
+    if trimmed.contains("..=") {
+        return true;
+    }
+    // x = x .. y or x = y .. x (variable appears on both sides of assignment)
+    let eq_pos = match trimmed.find('=') {
+        Some(p) => p,
+        None => return false,
+    };
+    if eq_pos == 0 {
+        return false;
+    }
+    let before_eq = trimmed.as_bytes()[eq_pos - 1];
+    if before_eq == b'~' || before_eq == b'<' || before_eq == b'>' {
+        return false;
+    }
+    if eq_pos + 1 < trimmed.len() && trimmed.as_bytes()[eq_pos + 1] == b'=' {
+        return false;
+    }
+    let lhs = trimmed[..eq_pos].trim();
+    let lhs_var = lhs
+        .rsplit(|c: char| !c.is_alphanumeric() && c != '_' && c != '.')
+        .next()
+        .unwrap_or("");
+    if lhs_var.is_empty() {
+        return false;
+    }
+    let rhs = trimmed[eq_pos + 1..].trim();
+    if !rhs.contains("..") {
+        return false;
+    }
+    // Check if lhs variable appears in rhs as a whole word
+    for (i, _) in rhs.match_indices(lhs_var) {
+        let before_ok =
+            i == 0 || !rhs.as_bytes()[i - 1].is_ascii_alphanumeric() && rhs.as_bytes()[i - 1] != b'_';
+        let after_ok = i + lhs_var.len() >= rhs.len()
+            || (!rhs.as_bytes()[i + lhs_var.len()].is_ascii_alphanumeric()
+                && rhs.as_bytes()[i + lhs_var.len()] != b'_');
+        if before_ok && after_ok {
+            return true;
+        }
+    }
+    false
 }
 
 fn line_start_offsets(source: &str) -> Vec<usize> {

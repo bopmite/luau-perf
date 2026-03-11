@@ -6,11 +6,35 @@ fn parse(src: &str) -> full_moon::ast::Ast {
 }
 
 #[test]
-fn string_concat_in_loop_detected() {
-    let src = "for i = 1, 10 do\n  local s = a .. b\nend";
+fn string_concat_in_loop_accumulative_detected() {
+    let src = "local s = \"\"\nfor i = 1, 10 do\n  s = s .. tostring(i)\nend";
     let ast = parse(src);
     let hits = StringConcatInLoop.check(src, &ast);
     assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn string_concat_in_loop_compound_detected() {
+    let src = "local s = \"\"\nfor i = 1, 10 do\n  s ..= tostring(i)\nend";
+    let ast = parse(src);
+    let hits = StringConcatInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn string_concat_in_loop_non_accumulative_ok() {
+    let src = "for i = 1, 10 do\n  local s = a .. b\nend";
+    let ast = parse(src);
+    let hits = StringConcatInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn string_concat_in_loop_function_arg_ok() {
+    let src = "for i = 1, 10 do\n  print(\"prefix\" .. name)\nend";
+    let ast = parse(src);
+    let hits = StringConcatInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 0);
 }
 
 #[test]
