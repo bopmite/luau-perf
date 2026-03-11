@@ -1104,13 +1104,14 @@ impl UnnecessaryClosure {
         }
 
         let mut depth = 0i32;
-        for b in s[paren..].bytes() {
+        for (i, b) in s[paren..].bytes().enumerate() {
             match b {
                 b'(' => depth += 1,
                 b')' => {
                     depth -= 1;
                     if depth == 0 {
-                        return true;
+                        let after = s[paren + i + 1..].trim();
+                        return after.is_empty();
                     }
                 }
                 _ => {}
