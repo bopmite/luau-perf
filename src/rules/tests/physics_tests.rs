@@ -62,6 +62,14 @@ fn precise_collision_fidelity_detected() {
 }
 
 #[test]
+fn hull_collision_fidelity_ok() {
+    let src = "part.CollisionFidelity = Enum.CollisionFidelity.Hull";
+    let ast = parse(src);
+    let hits = PreciseCollisionFidelity.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
 fn collision_group_in_loop_detected() {
     let src = "while true do\n  part.CollisionGroup = \"Players\"\nend";
     let ast = parse(src);

@@ -14,6 +14,14 @@ fn pack_detected() {
 }
 
 #[test]
+fn table_literal_not_flagged_as_pack() {
+    let src = "local t = {a, b, c}";
+    let ast = parse(src);
+    let hits = PackOverLiteral.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
 fn manual_copy_detected() {
     let src = "for k, v in pairs(src) do dst[k] = v end";
     let ast = parse(src);

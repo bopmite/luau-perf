@@ -166,6 +166,14 @@ fn lerp_manual_detected() {
 }
 
 #[test]
+fn simple_multiply_not_flagged_as_lerp() {
+    let src = "local v = (x - y) * 2";
+    let ast = parse(src);
+    let hits = LerpManual.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
 fn abs_for_sign_check_detected() {
     let src = "if math.abs(x) > 0 then end";
     let ast = parse(src);

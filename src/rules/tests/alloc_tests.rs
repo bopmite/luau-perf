@@ -62,6 +62,14 @@ fn closure_in_loop_callback_ok() {
 }
 
 #[test]
+fn closure_in_loop_assignment_detected() {
+    let src = "for i = 1, 10 do\n  local fn = function() return i end\nend";
+    let ast = parse(src);
+    let hits = ClosureInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
 fn coroutine_wrap_in_loop_detected() {
     let src = "for i = 1, 10 do\n  local co = coroutine.wrap(fn)\nend";
     let ast = parse(src);

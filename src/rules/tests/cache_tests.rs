@@ -30,6 +30,14 @@ fn raycast_params_factory_ok() {
 }
 
 #[test]
+fn raycast_params_in_function_detected() {
+    let src = "function doRaycast()\n  local params = RaycastParams.new()\n  workspace:Raycast(origin, dir, params)\nend";
+    let ast = parse(src);
+    let hits = RaycastParamsInFunction.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
 fn repeated_get_children_detected() {
     let src = "local a = obj:GetChildren()\nfor _, v in obj:GetChildren() do end";
     let ast = parse(src);

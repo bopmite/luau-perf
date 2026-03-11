@@ -14,6 +14,14 @@ fn deprecated_elapsed_time_detected() {
 }
 
 #[test]
+fn os_clock_not_flagged_as_elapsed_time() {
+    let src = "local t = os.clock()";
+    let ast = parse(src);
+    let hits = DeprecatedElapsedTime.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
 fn character_appearance_loaded_detected() {
     let src = "player.CharacterAppearanceLoaded:Connect(function(char) end)";
     let ast = parse(src);
@@ -35,6 +43,14 @@ fn deprecated_version_detected() {
     let ast = parse(src);
     let hits = DeprecatedVersion.check(src, &ast);
     assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn version_as_property_ok() {
+    let src = "local v = game.Version";
+    let ast = parse(src);
+    let hits = DeprecatedVersion.check(src, &ast);
+    assert_eq!(hits.len(), 0);
 }
 
 #[test]
