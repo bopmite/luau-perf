@@ -38,6 +38,14 @@ fn string_concat_in_loop_function_arg_ok() {
 }
 
 #[test]
+fn string_concat_varname_in_string_literal_ok() {
+    let src = "for i = 1, components do\n  local SliderField = Input:FindFirstChild(\"SliderField\" .. tostring(i))\nend";
+    let ast = parse(src);
+    let hits = StringConcatInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
 fn varargs_not_flagged_as_concat() {
     let src = "for i = 1, 10 do\n  local args = ...\nend";
     let ast = parse(src);

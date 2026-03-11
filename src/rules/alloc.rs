@@ -202,7 +202,7 @@ fn is_accumulative_concat(line: &str) -> bool {
     if !rhs.contains("..") {
         return false;
     }
-    // Check if lhs variable appears in rhs as a whole word
+    // Check if lhs variable appears in rhs as a whole word (not inside a string literal)
     for (i, _) in rhs.match_indices(lhs_var) {
         let before_ok =
             i == 0 || !rhs.as_bytes()[i - 1].is_ascii_alphanumeric() && rhs.as_bytes()[i - 1] != b'_';
@@ -210,7 +210,12 @@ fn is_accumulative_concat(line: &str) -> bool {
             || (!rhs.as_bytes()[i + lhs_var.len()].is_ascii_alphanumeric()
                 && rhs.as_bytes()[i + lhs_var.len()] != b'_');
         if before_ok && after_ok {
-            return true;
+            let before_rhs = &rhs[..i];
+            let in_string = before_rhs.matches('"').count() % 2 == 1
+                || before_rhs.matches('\'').count() % 2 == 1;
+            if !in_string {
+                return true;
+            }
         }
     }
     false
