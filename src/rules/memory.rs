@@ -278,7 +278,7 @@ impl Rule for ConnectInLoop {
         "memory::connect_in_loop"
     }
     fn severity(&self) -> Severity {
-        Severity::Error
+        Severity::Allow
     }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
