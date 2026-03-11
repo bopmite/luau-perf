@@ -912,3 +912,80 @@ fn test_fix_direct_service_access_debris() {
     result.replace_range(fix.start..fix.end, &fix.replacement);
     assert_eq!(result, r#"game:GetService("Debris"):AddItem(part, 5)"#);
 }
+
+#[test]
+fn test_fix_getservice_workspace() {
+    let src = r#"game:GetService("Workspace")"#;
+    let fix = compute_fix("roblox::getservice_workspace", src, 4).unwrap();
+    let mut result = src.to_string();
+    result.replace_range(fix.start..fix.end, &fix.replacement);
+    assert_eq!(result, "workspace");
+}
+
+#[test]
+fn test_fix_getservice_workspace_single_quote() {
+    let src = "game:GetService('Workspace')";
+    let fix = compute_fix("roblox::getservice_workspace", src, 4).unwrap();
+    let mut result = src.to_string();
+    result.replace_range(fix.start..fix.end, &fix.replacement);
+    assert_eq!(result, "workspace");
+}
+
+#[test]
+fn test_fix_ypcall() {
+    let src = "ypcall(fn)";
+    let fix = compute_fix("roblox::deprecated_ypcall", src, 0).unwrap();
+    let mut result = src.to_string();
+    result.replace_range(fix.start..fix.end, &fix.replacement);
+    assert_eq!(result, "pcall(fn)");
+}
+
+#[test]
+fn test_fix_vector3_zero_constant() {
+    let src = "local v = Vector3.new(0, 0, 0)";
+    let pos = src.find("Vector3.new(").unwrap();
+    let fix = compute_fix("math::vector3_zero_constant", src, pos).unwrap();
+    let mut result = src.to_string();
+    result.replace_range(fix.start..fix.end, &fix.replacement);
+    assert_eq!(result, "local v = Vector3.zero");
+}
+
+#[test]
+fn test_fix_vector3_one_constant() {
+    let src = "local v = Vector3.new(1, 1, 1)";
+    let pos = src.find("Vector3.new(").unwrap();
+    let fix = compute_fix("math::vector3_zero_constant", src, pos).unwrap();
+    let mut result = src.to_string();
+    result.replace_range(fix.start..fix.end, &fix.replacement);
+    assert_eq!(result, "local v = Vector3.one");
+}
+
+#[test]
+fn test_fix_vector2_zero_constant() {
+    let src = "local v = Vector2.new(0, 0)";
+    let pos = src.find("Vector2.new(").unwrap();
+    let fix = compute_fix("math::vector2_zero_constant", src, pos).unwrap();
+    let mut result = src.to_string();
+    result.replace_range(fix.start..fix.end, &fix.replacement);
+    assert_eq!(result, "local v = Vector2.zero");
+}
+
+#[test]
+fn test_fix_vector2_one_constant() {
+    let src = "local v = Vector2.new(1, 1)";
+    let pos = src.find("Vector2.new(").unwrap();
+    let fix = compute_fix("math::vector2_zero_constant", src, pos).unwrap();
+    let mut result = src.to_string();
+    result.replace_range(fix.start..fix.end, &fix.replacement);
+    assert_eq!(result, "local v = Vector2.one");
+}
+
+#[test]
+fn test_fix_cframe_identity() {
+    let src = "local cf = CFrame.new()";
+    let pos = src.find("CFrame.new()").unwrap();
+    let fix = compute_fix("math::cframe_identity_constant", src, pos).unwrap();
+    let mut result = src.to_string();
+    result.replace_range(fix.start..fix.end, &fix.replacement);
+    assert_eq!(result, "local cf = CFrame.identity");
+}
