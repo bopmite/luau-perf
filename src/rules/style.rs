@@ -294,10 +294,19 @@ impl Rule for IndexFunctionMetatable {
         for pattern in &patterns {
             for pos in visit::find_pattern_positions(source, pattern) {
                 let func_start = pos + pattern.len();
-                let body_end = source[func_start..]
-                    .find("\n\tend")
-                    .or_else(|| source[func_start..].find("\nend"))
-                    .unwrap_or(500.min(source.len() - func_start));
+                let max_body = 500.min(source.len() - func_start);
+                let body_end = source[func_start..func_start + max_body]
+                    .lines()
+                    .enumerate()
+                    .find(|(_, l)| l.trim().starts_with("end"))
+                    .map(|(i, _)| {
+                        source[func_start..]
+                            .lines()
+                            .take(i)
+                            .map(|l| l.len() + 1)
+                            .sum::<usize>()
+                    })
+                    .unwrap_or(max_body);
                 let body = &source[func_start..func_start + body_end];
                 let same_line_end = source[func_start..]
                     .find('\n')
@@ -320,7 +329,8 @@ impl Rule for IndexFunctionMetatable {
                     || body.contains("throw(")
                     || body.contains("warn(")
                     || body.contains("console.")
-                    || body.contains("if index");
+                    || body.contains("if index")
+                    || body.contains("return function");
                 if is_proxy {
                     continue;
                 }
@@ -329,9 +339,35 @@ impl Rule for IndexFunctionMetatable {
                 let param_name = params
                     .split(',')
                     .nth(1)
-                    .map(|s| s.trim().trim_start_matches('_'))
+                    .map(|s| {
+                        let s = s.trim().trim_start_matches('_');
+                        s.split(':').next().unwrap_or(s).trim_end_matches(')')
+                    })
                     .unwrap_or("");
-                if !param_name.is_empty() && body.contains(&format!("[{param_name}]")) {
+                if !param_name.is_empty()
+                    && (body.contains(&format!("[{param_name}]"))
+                        || body.contains(&format!("if {param_name} "))
+                        || body.contains(&format!("if {param_name}=")))
+                {
+                    continue;
+                }
+                if body.contains("self[") || body.contains("self.") {
+                    continue;
+                }
+                let actual_body = body
+                    .find(')')
+                    .map(|i| &body[i + 1..])
+                    .unwrap_or(body);
+                let body_lines: Vec<&str> = actual_body
+                    .lines()
+                    .map(|l| l.trim())
+                    .filter(|l| !l.is_empty())
+                    .collect();
+                if body_lines.len() <= 1
+                    && body_lines
+                        .iter()
+                        .all(|l| l.starts_with("return ") && l.contains('('))
+                {
                     continue;
                 }
                 hits.push(Hit {
