@@ -147,6 +147,7 @@ impl Rule for GetDescendantsInLoop {
             if (visit::is_method_call(call, "GetDescendants")
                 || visit::is_method_call(call, "GetChildren"))
                 && !visit::is_likely_for_iterator(source, pos)
+                && !is_in_for_header(source, pos)
             {
                 hits.push(Hit {
                     pos,
@@ -606,6 +607,9 @@ impl Rule for OneIterationLoop {
             }
             let body = lines[i + 1].trim();
             if body.starts_with("return ") || body == "return" || body == "break" {
+                if trimmed.starts_with("for ") && trimmed.contains(" in ") && body.starts_with("return ") {
+                    continue;
+                }
                 let pos = source.lines().take(i).map(|l| l.len() + 1).sum::<usize>();
                 hits.push(Hit {
                     pos,
@@ -675,6 +679,13 @@ impl Rule for ElseifChainOverTable {
         }
         hits
     }
+}
+
+fn is_in_for_header(source: &str, pos: usize) -> bool {
+    let before = &source[..pos];
+    let line_start = before.rfind('\n').map(|i| i + 1).unwrap_or(0);
+    let line_prefix = source[line_start..pos].trim_start();
+    line_prefix.starts_with("for ")
 }
 
 fn line_start_offsets(source: &str) -> Vec<usize> {

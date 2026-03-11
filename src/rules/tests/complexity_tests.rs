@@ -252,10 +252,18 @@ fn accumulating_rebuild_outside_loop_ok() {
 
 #[test]
 fn one_iteration_loop_detected() {
-    let src = "for _, v in items do\n  return v\nend";
+    let src = "while true do\n  return 1\nend";
     let ast = parse(src);
     let hits = OneIterationLoop.check(src, &ast);
     assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn for_in_first_element_idiom_ok() {
+    let src = "for _, v in items do\n  return v\nend";
+    let ast = parse(src);
+    let hits = OneIterationLoop.check(src, &ast);
+    assert_eq!(hits.len(), 0);
 }
 
 #[test]
