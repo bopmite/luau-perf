@@ -1,6 +1,6 @@
 [package]
 name = "luauperf"
-version = "0.1.21"
+version = "1.0.0"
 edition = "2021"
 description = "A static performance linter for Luau"
 license = "MIT"
