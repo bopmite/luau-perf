@@ -717,10 +717,15 @@ fn fix_random_deprecated(source: &str, pos: usize) -> Option<Fix> {
             }
         }
         let close = close?;
-        let end = pos + "math.randomseed(".len() + close + 1;
+        let call_end = pos + "math.randomseed(".len() + close + 1;
+        let line_start = source[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
+        let line_end = source[call_end..]
+            .find('\n')
+            .map(|i| call_end + i + 1)
+            .unwrap_or(source.len());
         return Some(Fix {
-            start: pos,
-            end,
+            start: line_start,
+            end: line_end,
             replacement: String::new(),
         });
     }
