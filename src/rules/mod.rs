@@ -654,7 +654,6 @@ pub fn rule_level(id: &str) -> crate::lint::Level {
 
         // style with real perf impact
         | "style::dot_method_call"
-        | "style::print_in_hot_path"
         | "style::debug_in_hot_path"
         | "style::index_function_metatable"
         | "style::redundant_condition"

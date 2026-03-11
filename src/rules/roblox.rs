@@ -1918,6 +1918,17 @@ impl Rule for FindFirstChildNoCheck {
                 if line.contains("if ") || line.contains("and ") || line.contains("or ") {
                     continue;
                 }
+                // Check previous line for a guard (multi-line if pattern)
+                if line_start > 0 {
+                    let prev_line_start = source[..line_start - 1]
+                        .rfind('\n')
+                        .map(|i| i + 1)
+                        .unwrap_or(0);
+                    let prev_line = &source[prev_line_start..line_start];
+                    if prev_line.contains("if ") && prev_line.contains("FindFirstChild") {
+                        continue;
+                    }
+                }
                 if line.contains("require")
                     || line.contains("loader")
                     || line.contains("bootstrap")
