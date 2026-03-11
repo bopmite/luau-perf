@@ -5,29 +5,6 @@ fn parse(src: &str) -> full_moon::ast::Ast {
     full_moon::parse(src).unwrap()
 }
 
-#[test]
-fn debug_traceback_in_loop_detected() {
-    let src = "for i = 1, 10 do\n  debug.traceback()\nend";
-    let ast = parse(src);
-    let hits = DebugInHotPath.check(src, &ast);
-    assert_eq!(hits.len(), 1);
-}
-
-#[test]
-fn debug_info_in_loop_detected() {
-    let src = "for i = 1, 10 do\n  debug.info(1, \"s\")\nend";
-    let ast = parse(src);
-    let hits = DebugInHotPath.check(src, &ast);
-    assert_eq!(hits.len(), 1);
-}
-
-#[test]
-fn debug_outside_loop_not_flagged() {
-    let src = "local tb = debug.traceback()";
-    let ast = parse(src);
-    let hits = DebugInHotPath.check(src, &ast);
-    assert_eq!(hits.len(), 0);
-}
 
 #[test]
 fn index_function_detected() {

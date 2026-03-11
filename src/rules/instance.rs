@@ -10,7 +10,6 @@ pub struct RepeatedFindFirstChild;
 pub struct ChangedOnMovingPart;
 pub struct BulkPropertySet;
 pub struct NameIndexingInLoop;
-pub struct DestroyInLoop;
 pub struct GetChildrenInLoop;
 pub struct ClassNameOverIsA;
 pub struct PairsOverGetChildren;
@@ -593,34 +592,6 @@ fn extract_call_object(before: &str) -> String {
     trimmed[start..].to_string()
 }
 
-impl Rule for DestroyInLoop {
-    fn id(&self) -> &'static str {
-        "instance::destroy_in_loop"
-    }
-    fn severity(&self) -> Severity {
-        Severity::Allow
-    }
-
-    fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
-        let src_lower = source.to_lowercase();
-        if src_lower.contains("maid")
-            || src_lower.contains("janitor")
-            || src_lower.contains("trove")
-        {
-            return vec![];
-        }
-        let mut hits = Vec::new();
-        visit::each_call(ast, |call, ctx| {
-            if ctx.in_hot_loop && visit::is_method_call(call, "Destroy") {
-                hits.push(Hit {
-                    pos: visit::call_pos(call),
-                    msg: ":Destroy() in loop triggers ancestry-changed events per call - consider :ClearAllChildren() on the parent or batch with Debris".into(),
-                });
-            }
-        });
-        hits
-    }
-}
 
 impl Rule for GetChildrenInLoop {
     fn id(&self) -> &'static str {

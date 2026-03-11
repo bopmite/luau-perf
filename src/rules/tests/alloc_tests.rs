@@ -198,21 +198,6 @@ fn buffer_over_string_pack_outside_loop_ok() {
     assert_eq!(hits.len(), 0);
 }
 
-#[test]
-fn task_spawn_in_loop_detected() {
-    let src = "for i = 1, 10 do\n  task.spawn(doWork, i)\nend";
-    let ast = parse(src);
-    let hits = TaskSpawnInLoop.check(src, &ast);
-    assert_eq!(hits.len(), 1);
-}
-
-#[test]
-fn task_spawn_outside_loop_ok() {
-    let src = "task.spawn(doWork, 42)";
-    let ast = parse(src);
-    let hits = TaskSpawnInLoop.check(src, &ast);
-    assert_eq!(hits.len(), 0);
-}
 
 #[test]
 fn gsub_function_in_loop_detected() {

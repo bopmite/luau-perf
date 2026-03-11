@@ -67,8 +67,6 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(cache::DuplicateGetService),
         // memory
         Box::new(memory::UntrackedConnection),
-        Box::new(memory::UntrackedTaskSpawn),
-        Box::new(memory::ConnectInLoop),
         Box::new(memory::MissingPlayerRemoving),
         Box::new(memory::WhileTrueNoYield),
         Box::new(memory::ConnectInConnect),
@@ -84,7 +82,6 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(memory::DebrisNegativeDuration),
         Box::new(memory::CollectionTagNoCleanup),
         Box::new(memory::AttributeChangedInLoop),
-        Box::new(memory::TaskDelayInLoop),
         Box::new(memory::ParentNilOverDestroy),
         // roblox
         Box::new(roblox::DeprecatedWait),
@@ -104,7 +101,6 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(roblox::TouchedEventUnfiltered),
         Box::new(roblox::MissingOptimize),
         Box::new(roblox::DeprecatedRegion3),
-        Box::new(roblox::BindableSameScript),
         Box::new(roblox::ServerPropertyInHeartbeat),
         Box::new(roblox::GameLoadedRace),
         Box::new(roblox::HumanoidStatePolling),
@@ -163,7 +159,6 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(alloc::SelectInLoop),
         Box::new(alloc::TableInsertKnownSize),
         Box::new(alloc::BufferOverStringPack),
-        Box::new(alloc::TaskSpawnInLoop),
         Box::new(alloc::GsubFunctionInLoop),
         Box::new(alloc::TypeofInLoop),
         Box::new(alloc::TableCloneInLoop),
@@ -302,7 +297,6 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(instance::ChangedOnMovingPart),
         Box::new(instance::BulkPropertySet),
         Box::new(instance::NameIndexingInLoop),
-        Box::new(instance::DestroyInLoop),
         Box::new(instance::GetChildrenInLoop),
         Box::new(instance::ClassNameOverIsA),
         Box::new(instance::PairsOverGetChildren),
@@ -312,7 +306,6 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(style::DeprecatedGlobalCall),
         Box::new(style::TypeCheckInLoop),
         Box::new(style::DeepNesting),
-        Box::new(style::DebugInHotPath),
         Box::new(style::IndexFunctionMetatable),
         Box::new(style::ConditionalFieldInConstructor),
         Box::new(style::GlobalFunctionNotLocal),
@@ -437,7 +430,6 @@ pub fn rule_level(id: &str) -> crate::lint::Level {
 
         // memory bugs
         "memory::untracked_connection"
-        | "memory::connect_in_loop"
         | "memory::missing_player_removing"
         | "memory::while_true_no_yield"
         | "memory::runservice_no_disconnect"
@@ -509,7 +501,6 @@ pub fn rule_level(id: &str) -> crate::lint::Level {
         | "alloc::excessive_string_split"
         | "alloc::repeated_gsub"
         | "alloc::table_create_for_dict"
-        | "alloc::task_spawn_in_loop"
         | "alloc::gsub_function_in_loop"
         | "string::reverse_in_loop"
 
@@ -544,8 +535,6 @@ pub fn rule_level(id: &str) -> crate::lint::Level {
         | "complexity::find_first_child_recursive"
 
         // memory (important but not always bugs)
-        | "memory::untracked_task_spawn"
-        | "memory::task_delay_in_loop"
         | "memory::heartbeat_allocation"
         | "memory::tween_completed_connect"
         | "memory::set_attribute_in_heartbeat"
@@ -567,7 +556,6 @@ pub fn rule_level(id: &str) -> crate::lint::Level {
         | "instance::property_before_parent"
         | "instance::repeated_find_first_child"
         | "instance::changed_on_moving_part"
-        | "instance::destroy_in_loop"
         | "instance::get_children_in_loop"
         | "instance::classname_over_isa"
         | "instance::pairs_over_getchildren"
@@ -629,7 +617,6 @@ pub fn rule_level(id: &str) -> crate::lint::Level {
         | "native::pcall_in_native"
 
         // style with real perf impact
-        | "style::debug_in_hot_path"
         | "style::index_function_metatable"
         | "style::redundant_condition"
         // string
@@ -735,7 +722,6 @@ fn explain_text(id: &str) -> &'static str {
         "alloc::select_in_loop" => "select(i, ...) walks the vararg list from the start each call, making it O(n). In a loop over varargs, this is O(n^2) total. Cache results: local args = {...}; for i, v in ipairs(args).",
         "alloc::table_insert_known_size" => "table.insert() in a numeric for with known bounds causes incremental table resizing. Use table.create(n) to pre-allocate the array part, then assign by index: t[i] = value.",
         "alloc::buffer_over_string_pack" => "string.pack/unpack in a loop allocates a new string per call. The buffer library (buffer.writeu32/readu32) provides zero-allocation binary I/O using FASTCALL builtins.",
-        "alloc::task_spawn_in_loop" => "task.spawn/defer in a loop creates a new coroutine per iteration (~247x overhead vs direct call). If the function doesn't need to yield, call it directly instead.",
         "alloc::gsub_function_in_loop" => "gsub with a function replacement in a loop invokes the function per match and allocates a closure. Cache the replacement function outside or use buffer-based string building.",
 
         // batch 6 additions
@@ -768,7 +754,6 @@ fn explain_text(id: &str) -> &'static str {
         "render::image_label_in_loop" => "Creating ImageLabel/ImageButton in a loop loads an image asset per instance. Pre-create a template and use :Clone() for better performance.",
         "render::scrolling_frame_in_loop" => "ScrollingFrame creation in a loop triggers expensive layout computation per instance. Pre-create a template and :Clone().",
         "render::gui_property_in_heartbeat" => "Setting GUI properties (Text, Visible, Color) in RunService callbacks runs every frame at 60Hz. Each change triggers layout recalculation. Throttle with dirty-flag pattern: only update when the value actually changes.",
-        "instance::destroy_in_loop" => ":Destroy() in a loop fires ancestry-changed events, Destroying events, and processes connections per call. For clearing children, use :ClearAllChildren() instead.",
         "instance::get_children_in_loop" => ":GetChildren/:GetDescendants allocates a new table of all children each call. In a loop, cache outside: local children = obj:GetChildren().",
         "math::huge_comparison" => "math.huge in a loop requires a GETIMPORT lookup each access. Cache in a local: local INF = math.huge before the loop.",
         "math::exp_over_pow" => "math.exp() in a loop with constant exponent recomputes the same value each iteration. Cache outside: local e = math.exp(k).",
@@ -851,8 +836,6 @@ fn explain_text(id: &str) -> &'static str {
 
         // memory
         "memory::untracked_connection" => ":Connect() returns an RBXScriptConnection. Not storing it means you can never :Disconnect(), causing the callback and everything it captures to stay in memory forever.",
-        "memory::untracked_task_spawn" => "task.spawn/task.delay create threads that can't be cancelled if you don't store the return value. Track threads for cleanup in module destroy/PlayerRemoving handlers.",
-        "memory::connect_in_loop" => ":Connect() in a loop creates N separate connections. Each one fires independently and can never be disconnected. This is almost always a bug.",
         "memory::missing_player_removing" => "PlayerAdded without a corresponding PlayerRemoving handler means per-player data (tables, connections) is never cleaned up when players leave, causing memory growth over time.",
         "memory::while_true_no_yield" => "while true do without any yielding call (wait, task.wait, coroutine.yield) runs forever without giving other threads time. Luau will kill the script after a timeout.",
         "memory::connect_in_connect" => ":Connect() inside another :Connect() callback creates a new inner connection every time the outer event fires. The inner connections are never disconnected, leaking memory.",
@@ -914,7 +897,6 @@ fn explain_text(id: &str) -> &'static str {
         "roblox::touched_event_unfiltered" => ".Touched fires at physics rate (~240Hz per contact pair). Without debounce/filtering in the handler, your callback runs hundreds of times per second.",
         "roblox::missing_optimize" => "The --!optimize 2 directive enables function inlining and loop unrolling at the bytecode level. Should be paired with --!native for maximum performance.",
         "roblox::deprecated_region3" => "FindPartsInRegion3 and variants are deprecated. Use workspace:GetPartBoundsInBox() with OverlapParams for better control and performance.",
-        "roblox::bindable_same_script" => "BindableEvent:Fire() and .Event:Connect() in the same script adds unnecessary serialization overhead. Call the handler function directly.",
         "roblox::server_property_in_heartbeat" => "Property assignments (.Position, .CFrame) inside Heartbeat/Stepped trigger replication every frame. Use UnreliableRemoteEvent for client-driven updates or batch changes.",
 
         // string
@@ -931,7 +913,6 @@ fn explain_text(id: &str) -> &'static str {
         "style::deprecated_global" => "rawget/rawset/rawequal bypass metatables. Verify this is intentional - it may indicate a workaround for incorrect metatable usage.",
         "style::type_check_in_loop" => "typeof() in a loop rechecks the type each iteration. If checking the same value, cache outside: local t = typeof(obj).",
         "style::deep_nesting" => "Deeply nested code (>8 levels) is hard to read and may indicate complex control flow. Extract helper functions to flatten the structure.",
-        "style::debug_in_hot_path" => "debug.traceback/info perform expensive stack introspection, walking the call stack each time. In loops, this overhead accumulates. Move outside or guard with a condition.",
         "style::index_function_metatable" => "__index = function(self, key) prevents Luau's inline caching. Using __index = methodTable allows the VM to cache lookups after the first access.",
         "style::conditional_field_in_constructor" => "Conditionally setting different fields creates objects with different 'shapes'. Luau's inline cache works best when objects have consistent key sets. Initialize all fields, even if nil.",
         "style::global_function_not_local" => "'function foo()' creates a global function, polluting the environment and preventing GETIMPORT optimization. 'local function foo()' enables inlining at --!optimize 2.",
@@ -965,7 +946,6 @@ fn explain_text(id: &str) -> &'static str {
         "cache::local_player_uncached" => "Players.LocalPlayer crosses the Lua-C++ bridge each access. Cache in a module-level local: local localPlayer = Players.LocalPlayer.",
         "cache::workspace_lookup_in_loop" => "workspace:FindFirstChild/WaitForChild in a loop searches the workspace tree each iteration. Cache the result outside: local obj = workspace:FindFirstChild('Name').",
         "memory::task_delay_long_duration" => "task.delay() with very long durations (>5 minutes) keeps the callback and its captures alive in memory for the duration. Consider alternative approaches for long-lived timers.",
-        "memory::task_delay_in_loop" => "task.delay()/task.defer() inside a hot loop spawns untracked threads each iteration. Each thread has scheduler overhead and keeps its closure alive until it runs. Accumulates rapidly in while/repeat loops.",
         "memory::parent_nil_over_destroy" => "Setting .Parent = nil removes an Instance from the hierarchy but does not disconnect event connections, fire .Destroying, or release internal references. Use :Destroy() instead to properly clean up the Instance and prevent memory leaks.",
         "memory::tween_completed_connect" => ".Completed:Connect() creates a permanent connection. Use .Completed:Once() instead - it automatically disconnects after the first fire, preventing memory leaks.",
         "memory::set_attribute_in_heartbeat" => "SetAttribute() in a RunService callback triggers attribute replication at 60Hz. That's 60 replication packets per second per attribute per instance. Use plain Lua tables for per-frame mutable data instead.",

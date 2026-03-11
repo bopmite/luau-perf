@@ -119,21 +119,6 @@ fn name_indexing_outside_loop_ok() {
     assert_eq!(hits.len(), 0);
 }
 
-#[test]
-fn destroy_in_loop_detected() {
-    let src = "while true do\n  child:Destroy()\nend";
-    let ast = parse(src);
-    let hits = DestroyInLoop.check(src, &ast);
-    assert_eq!(hits.len(), 1);
-}
-
-#[test]
-fn destroy_outside_loop_ok() {
-    let src = "part:Destroy()";
-    let ast = parse(src);
-    let hits = DestroyInLoop.check(src, &ast);
-    assert_eq!(hits.len(), 0);
-}
 
 #[test]
 fn get_children_in_loop_detected() {

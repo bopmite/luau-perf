@@ -3,8 +3,6 @@ use crate::visit;
 use full_moon::ast::*;
 
 pub struct UntrackedConnection;
-pub struct UntrackedTaskSpawn;
-pub struct ConnectInLoop;
 pub struct MissingPlayerRemoving;
 pub struct WhileTrueNoYield;
 pub struct ConnectInConnect;
@@ -20,7 +18,6 @@ pub struct UnboundedTableGrowth;
 pub struct DebrisNegativeDuration;
 pub struct CollectionTagNoCleanup;
 pub struct AttributeChangedInLoop;
-pub struct TaskDelayInLoop;
 pub struct ParentNilOverDestroy;
 
 impl Rule for UntrackedConnection {
@@ -116,33 +113,6 @@ impl Rule for UntrackedConnection {
     }
 }
 
-impl Rule for UntrackedTaskSpawn {
-    fn id(&self) -> &'static str {
-        "memory::untracked_task_spawn"
-    }
-    fn severity(&self) -> Severity {
-        Severity::Allow
-    }
-
-    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
-        let mut hits = Vec::new();
-        for pos in visit::find_pattern_positions(source, "task.spawn(function") {
-            if is_stored_result(source, pos) {
-                continue;
-            }
-            if is_at_module_scope(source, pos) {
-                continue;
-            }
-            if spawned_function_has_loop(source, pos) {
-                hits.push(Hit {
-                    pos,
-                    msg: "task.spawn with long-running loop not stored - track thread for cancellation on cleanup".into(),
-                });
-            }
-        }
-        hits
-    }
-}
 
 fn is_at_module_scope(source: &str, pos: usize) -> bool {
     let before = &source[..pos];
@@ -221,98 +191,6 @@ fn is_in_player_callback(source: &str, pos: usize) -> bool {
         }
     }
     false
-}
-
-fn is_stored_result(source: &str, pos: usize) -> bool {
-    let before = &source[..pos];
-    let line_start = before.rfind('\n').map(|i| i + 1).unwrap_or(0);
-    let line_prefix = source[line_start..pos].trim_start();
-    if line_prefix.contains('=') {
-        return true;
-    }
-    // Check if wrapped in a tracker call like maid:GiveTask(task.spawn(...))
-    for tracker in &[
-        "GiveTask(", "AddTask(", "Add(", "add(", "giveTask(",
-        "table.insert(", "push(",
-    ] {
-        if line_prefix.ends_with(tracker) || line_prefix.contains(tracker) {
-            return true;
-        }
-    }
-    false
-}
-
-fn spawned_function_has_loop(source: &str, pos: usize) -> bool {
-    let after = &source[pos..];
-    let func_start = match after.find("function") {
-        Some(i) => i,
-        None => return false,
-    };
-    let body = &after[func_start..];
-    let mut depth: i32 = 0;
-    for line in body.lines() {
-        let t = line.trim();
-        if t.contains("function") {
-            depth += t.matches("function").count() as i32;
-        }
-        if t == "end"
-            || t == "end)"
-            || t == "end))"
-            || t.starts_with("end)")
-            || t.starts_with("end,")
-        {
-            depth -= 1;
-            if depth <= 0 {
-                return false;
-            }
-        }
-        if depth == 1 && (t.starts_with("while ") || t == "repeat" || t.starts_with("repeat")) {
-            return true;
-        }
-    }
-    false
-}
-
-impl Rule for ConnectInLoop {
-    fn id(&self) -> &'static str {
-        "memory::connect_in_loop"
-    }
-    fn severity(&self) -> Severity {
-        Severity::Allow
-    }
-
-    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
-        let mut hits = Vec::new();
-        visit::each_stmt_ctx(
-            ast.nodes(),
-            visit::StmtCtx {
-                in_loop: false,
-                in_for_in: false,
-                func_depth: 0,
-            },
-            &mut |stmt, ctx| {
-                if !ctx.in_loop || ctx.in_for_in {
-                    return;
-                }
-                let call = match stmt {
-                    Stmt::FunctionCall(c) => c,
-                    _ => return,
-                };
-                let is_connect = (visit::is_method_call(call, "Connect")
-                    && visit::method_call_arg_count(call, "Connect") == 1)
-                    || (visit::is_method_call(call, "connect")
-                        && visit::method_call_arg_count(call, "connect") == 1);
-                if is_connect {
-                    hits.push(Hit {
-                        pos: visit::call_pos(call),
-                        msg: ":Connect() in loop - creates N connections, likely a memory leak"
-                            .into(),
-                    });
-                }
-            },
-        );
-        hits
-    }
 }
 
 impl Rule for MissingPlayerRemoving {
@@ -569,8 +447,9 @@ impl Rule for CharacterAddedNoCleanup {
     }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
-        let char_added = visit::find_pattern_positions(source, "CharacterAdded");
-        if char_added.is_empty() {
+        let positions = visit::find_pattern_positions(source, "CharacterAdded:Connect(");
+        let positions_lc = visit::find_pattern_positions(source, "CharacterAdded:connect(");
+        if positions.is_empty() && positions_lc.is_empty() {
             return vec![];
         }
 
@@ -581,9 +460,10 @@ impl Rule for CharacterAddedNoCleanup {
             source.contains("Maid") || source.contains("Trove") || source.contains("Janitor");
 
         if !has_char_removing && !has_disconnect && !has_cleanup {
+            let pos = positions.first().or(positions_lc.first()).copied().unwrap_or(0);
             return vec![Hit {
-                pos: char_added[0],
-                msg: "CharacterAdded without CharacterRemoving/Disconnect - character connections may leak across respawns".into(),
+                pos,
+                msg: "CharacterAdded:Connect() without CharacterRemoving/Disconnect - character connections may leak across respawns".into(),
             }];
         }
         vec![]
@@ -1031,7 +911,11 @@ impl Rule for AttributeChangedInLoop {
         Severity::Warn
     }
 
-    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+    fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let src_lower = source.to_lowercase();
+        if src_lower.contains("maid") || src_lower.contains("janitor") || src_lower.contains("trove") || source.contains("GiveTask") {
+            return vec![];
+        }
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
             if ctx.in_loop && visit::is_method_call(call, "GetAttributeChangedSignal") {
@@ -1045,37 +929,6 @@ impl Rule for AttributeChangedInLoop {
     }
 }
 
-impl Rule for TaskDelayInLoop {
-    fn id(&self) -> &'static str {
-        "memory::task_delay_in_loop"
-    }
-    fn severity(&self) -> Severity {
-        Severity::Allow
-    }
-
-    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
-        let mut hits = Vec::new();
-        visit::each_call(ast, |call, ctx| {
-            if !ctx.in_hot_loop {
-                return;
-            }
-            if visit::is_dot_call(call, "task", "delay")
-                || visit::is_dot_call(call, "task", "defer")
-            {
-                let method = if visit::is_dot_call(call, "task", "delay") {
-                    "task.delay"
-                } else {
-                    "task.defer"
-                };
-                hits.push(Hit {
-                    pos: visit::call_pos(call),
-                    msg: format!("{method}() in loop - spawns an untracked thread per iteration, potential memory leak and scheduling overhead"),
-                });
-            }
-        });
-        hits
-    }
-}
 
 impl Rule for ParentNilOverDestroy {
     fn id(&self) -> &'static str {

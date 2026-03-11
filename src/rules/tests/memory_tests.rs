@@ -165,53 +165,6 @@ fn debris_positive_duration_ok() {
     assert_eq!(hits.len(), 0);
 }
 
-#[test]
-fn untracked_task_spawn_with_loop_detected() {
-    let src = "local function setup()\n  task.spawn(function()\n    while true do\n      task.wait(1)\n    end\n  end)\nend";
-    let ast = parse(src);
-    let hits = UntrackedTaskSpawn.check(src, &ast);
-    assert_eq!(hits.len(), 1);
-}
-
-#[test]
-fn untracked_task_spawn_oneshot_ok() {
-    let src = "task.spawn(function()\n  doSomething()\nend)";
-    let ast = parse(src);
-    let hits = UntrackedTaskSpawn.check(src, &ast);
-    assert_eq!(hits.len(), 0);
-}
-
-#[test]
-fn untracked_task_delay_ok() {
-    let src = "task.delay(5, function()\n  cleanup()\nend)";
-    let ast = parse(src);
-    let hits = UntrackedTaskSpawn.check(src, &ast);
-    assert_eq!(hits.len(), 0);
-}
-
-#[test]
-fn tracked_task_spawn_with_loop_ok() {
-    let src = "local thread = task.spawn(function()\n  while running do\n    task.wait(1)\n  end\nend)";
-    let ast = parse(src);
-    let hits = UntrackedTaskSpawn.check(src, &ast);
-    assert_eq!(hits.len(), 0);
-}
-
-#[test]
-fn task_spawn_in_give_task_ok() {
-    let src = "maid:GiveTask(task.spawn(function()\n  while true do\n    task.wait(1)\n  end\nend))";
-    let ast = parse(src);
-    let hits = UntrackedTaskSpawn.check(src, &ast);
-    assert_eq!(hits.len(), 0);
-}
-
-#[test]
-fn task_spawn_in_table_insert_ok() {
-    let src = "table.insert(threads, task.spawn(function()\n  while true do\n    task.wait(1)\n  end\nend))";
-    let ast = parse(src);
-    let hits = UntrackedTaskSpawn.check(src, &ast);
-    assert_eq!(hits.len(), 0);
-}
 
 #[test]
 fn collection_tag_no_cleanup_detected() {
@@ -269,29 +222,6 @@ fn while_true_with_yield_ok() {
     assert_eq!(hits.len(), 0);
 }
 
-#[test]
-fn task_delay_in_loop_detected() {
-    let src = "while true do\n  task.delay(1, function() end)\n  task.wait(1)\nend";
-    let ast = parse(src);
-    let hits = TaskDelayInLoop.check(src, &ast);
-    assert_eq!(hits.len(), 1);
-}
-
-#[test]
-fn task_defer_in_loop_detected() {
-    let src = "for i = 1, 10 do\n  task.defer(callback)\nend";
-    let ast = parse(src);
-    let hits = TaskDelayInLoop.check(src, &ast);
-    assert_eq!(hits.len(), 1);
-}
-
-#[test]
-fn task_delay_outside_loop_ok() {
-    let src = "task.delay(1, function() print('hi') end)";
-    let ast = parse(src);
-    let hits = TaskDelayInLoop.check(src, &ast);
-    assert_eq!(hits.len(), 0);
-}
 
 #[test]
 fn parent_nil_detected() {
@@ -447,17 +377,10 @@ fn character_added_with_removing_ok() {
 }
 
 #[test]
-fn connect_in_loop_detected() {
-    let src = "for i = 1, 10 do\n  event:Connect(function()\n    print(i)\n  end)\nend";
+fn character_added_wait_ok() {
+    let src = "local char = player.CharacterAdded:Wait()\nlocal humanoid = char:WaitForChild(\"Humanoid\")";
     let ast = parse(src);
-    let hits = ConnectInLoop.check(src, &ast);
-    assert_eq!(hits.len(), 1);
-}
-
-#[test]
-fn connect_outside_loop_ok() {
-    let src = "event:Connect(function()\n  print(\"ok\")\nend)";
-    let ast = parse(src);
-    let hits = ConnectInLoop.check(src, &ast);
+    let hits = CharacterAddedNoCleanup.check(src, &ast);
     assert_eq!(hits.len(), 0);
 }
+

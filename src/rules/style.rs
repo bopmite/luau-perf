@@ -7,7 +7,6 @@ pub struct EmptyFunctionBody;
 pub struct DeprecatedGlobalCall;
 pub struct TypeCheckInLoop;
 pub struct DeepNesting;
-pub struct DebugInHotPath;
 pub struct IndexFunctionMetatable;
 pub struct ConditionalFieldInConstructor;
 pub struct GlobalFunctionNotLocal;
@@ -154,32 +153,6 @@ impl Rule for DeepNesting {
     }
 }
 
-impl Rule for DebugInHotPath {
-    fn id(&self) -> &'static str {
-        "style::debug_in_hot_path"
-    }
-    fn severity(&self) -> Severity {
-        Severity::Allow
-    }
-
-    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
-        let mut hits = Vec::new();
-        visit::each_call(ast, |call, ctx| {
-            if !ctx.in_hot_loop {
-                return;
-            }
-            let is_debug = visit::is_dot_call(call, "debug", "traceback")
-                || visit::is_dot_call(call, "debug", "info");
-            if is_debug {
-                hits.push(Hit {
-                    pos: visit::call_pos(call),
-                    msg: "debug.traceback/info in loop - expensive stack introspection, move outside loop or guard".into(),
-                });
-            }
-        });
-        hits
-    }
-}
 
 impl Rule for IndexFunctionMetatable {
     fn id(&self) -> &'static str {
