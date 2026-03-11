@@ -683,11 +683,18 @@ impl Rule for FloorRoundManual {
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
+        let lines: Vec<&str> = source.lines().collect();
+        let line_starts = line_start_offsets(source);
         for pos in visit::find_pattern_positions(source, "math.floor(") {
             let inner_start = pos + "math.floor(".len();
             if let Some(close) = visit::find_balanced_paren(&source[inner_start..]) {
                 let inner = &source[inner_start..inner_start + close];
                 if inner.contains("+ 0.5") || inner.contains("+0.5") {
+                    let line_idx = line_starts.partition_point(|&s| s <= pos).saturating_sub(1);
+                    let line = lines.get(line_idx).unwrap_or(&"");
+                    if line.contains("math.ceil") {
+                        continue;
+                    }
                     hits.push(Hit {
                         pos,
                         msg: "math.floor(x + 0.5) - use math.round(x) instead".into(),

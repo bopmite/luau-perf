@@ -294,6 +294,14 @@ fn floor_normal_ok() {
 }
 
 #[test]
+fn floor_round_half_away_from_zero_ok() {
+    let src = "local r = (num >= 0 and math.floor(num + 0.5) or math.ceil(num - 0.5))";
+    let ast = parse(src);
+    let hits = FloorRoundManual.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
 fn max_single_arg_detected() {
     let src = "local x = math.max(value)";
     let ast = parse(src);
