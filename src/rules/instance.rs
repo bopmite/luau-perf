@@ -590,7 +590,7 @@ impl Rule for DestroyInLoop {
         "instance::destroy_in_loop"
     }
     fn severity(&self) -> Severity {
-        Severity::Warn
+        Severity::Allow
     }
 
     fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
