@@ -527,7 +527,6 @@ pub fn rule_level(id: &str) -> crate::lint::Level {
         | "alloc::excessive_string_split"
         | "alloc::string_interp_in_loop"
         | "alloc::unpack_in_loop"
-        | "alloc::tostring_in_loop"
         | "alloc::repeated_gsub"
         | "alloc::table_create_for_dict"
         | "alloc::task_spawn_in_loop"
