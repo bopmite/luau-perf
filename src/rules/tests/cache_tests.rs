@@ -396,3 +396,67 @@ fn number_range_at_module_level_ok() {
     let hits = NumberRangeInFunction.check(src, &ast);
     assert_eq!(hits.len(), 0);
 }
+
+#[test]
+fn cframe_new_in_loop_detected() {
+    let src = "while true do\n  local cf = CFrame.new(0, 5, 0)\nend";
+    let ast = parse(src);
+    let hits = CFrameNewInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn cframe_new_outside_loop_ok() {
+    let src = "local cf = CFrame.new(0, 5, 0)";
+    let ast = parse(src);
+    let hits = CFrameNewInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn color3_new_in_loop_detected() {
+    let src = "while true do\n  local c = Color3.fromRGB(255, 0, 0)\nend";
+    let ast = parse(src);
+    let hits = Color3NewInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn color3_new_outside_loop_ok() {
+    let src = "local c = Color3.fromRGB(255, 0, 0)";
+    let ast = parse(src);
+    let hits = Color3NewInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn udim2_new_in_loop_detected() {
+    let src = "while true do\n  local u = UDim2.new(0, 100, 0, 50)\nend";
+    let ast = parse(src);
+    let hits = UDim2NewInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn udim2_new_outside_loop_ok() {
+    let src = "local u = UDim2.new(0, 100, 0, 50)";
+    let ast = parse(src);
+    let hits = UDim2NewInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn vector2_new_in_loop_detected() {
+    let src = "while true do\n  local v = Vector2.new(1, 2)\nend";
+    let ast = parse(src);
+    let hits = Vector2NewInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn vector2_new_outside_loop_ok() {
+    let src = "local v = Vector2.new(1, 2)";
+    let ast = parse(src);
+    let hits = Vector2NewInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}

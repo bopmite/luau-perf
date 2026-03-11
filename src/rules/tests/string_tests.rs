@@ -396,3 +396,19 @@ fn sub_with_range_ok() {
     let hits = SubForSingleChar.check(src, &ast);
     assert_eq!(hits.len(), 0);
 }
+
+#[test]
+fn byte_comparison_detected() {
+    let src = "while true do\n  local c = s:sub(i, i)\nend";
+    let ast = parse(src);
+    let hits = ByteComparison.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn byte_comparison_different_indices_ok() {
+    let src = "while true do\n  local c = s:sub(i, j)\nend";
+    let ast = parse(src);
+    let hits = ByteComparison.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}

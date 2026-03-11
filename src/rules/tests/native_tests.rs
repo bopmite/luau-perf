@@ -373,3 +373,23 @@ fn static_require_ok() {
     let hits = DynamicRequire.check(src, &ast);
     assert_eq!(hits.len(), 0);
 }
+
+#[test]
+fn large_table_literal_detected() {
+    let mut fields = Vec::new();
+    for i in 0..51 {
+        fields.push(format!("  x{i} = {i}"));
+    }
+    let src = format!("--!native\nlocal t = {{\n{}\n}}", fields.join(",\n"));
+    let ast = parse(&src);
+    let hits = LargeTableLiteral.check(&src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn small_table_in_native_ok() {
+    let src = "--!native\nlocal t = { a = 1, b = 2, c = 3 }";
+    let ast = parse(src);
+    let hits = LargeTableLiteral.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}

@@ -445,3 +445,35 @@ fn single_connect_ok() {
     let hits = ConnectInConnect.check(src, &ast);
     assert_eq!(hits.len(), 0);
 }
+
+#[test]
+fn character_added_no_cleanup_detected() {
+    let src = "Players.PlayerAdded:Connect(function(player)\n  player.CharacterAdded:Connect(function(char)\n    print(char)\n  end)\nend)";
+    let ast = parse(src);
+    let hits = CharacterAddedNoCleanup.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn character_added_with_removing_ok() {
+    let src = "player.CharacterAdded:Connect(function(char)\n  print(char)\nend)\nplayer.CharacterRemoving:Connect(function(char)\n  cleanup(char)\nend)";
+    let ast = parse(src);
+    let hits = CharacterAddedNoCleanup.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn connect_in_loop_detected() {
+    let src = "for i = 1, 10 do\n  event:Connect(function()\n    print(i)\n  end)\nend";
+    let ast = parse(src);
+    let hits = ConnectInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn connect_outside_loop_ok() {
+    let src = "event:Connect(function()\n  print(\"ok\")\nend)";
+    let ast = parse(src);
+    let hits = ConnectInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}

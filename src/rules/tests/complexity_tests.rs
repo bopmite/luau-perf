@@ -417,3 +417,51 @@ fn filter_collect_all_ok() {
     let hits = FilterThenFirst.check(src, &ast);
     assert_eq!(hits.len(), 0);
 }
+
+#[test]
+fn get_tagged_in_loop_detected() {
+    let src = "while true do\n  local tagged = CollectionService:GetTagged(\"Enemy\")\nend";
+    let ast = parse(src);
+    let hits = GetTaggedInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn get_tagged_outside_loop_ok() {
+    let src = "local tagged = CollectionService:GetTagged(\"Enemy\")";
+    let ast = parse(src);
+    let hits = GetTaggedInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn promise_chain_in_loop_detected() {
+    let src = "while true do\n  promise:andThen(function()\n    print(\"done\")\n  end)\nend";
+    let ast = parse(src);
+    let hits = PromiseChainInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn promise_chain_outside_loop_ok() {
+    let src = "promise:andThen(function()\n  print(\"done\")\nend)";
+    let ast = parse(src);
+    let hits = PromiseChainInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn wait_for_child_in_loop_detected() {
+    let src = "while true do\n  local child = parent:WaitForChild(\"Part\")\nend";
+    let ast = parse(src);
+    let hits = WaitForChildInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn wait_for_child_outside_loop_ok() {
+    let src = "local child = parent:WaitForChild(\"Part\")";
+    let ast = parse(src);
+    let hits = WaitForChildInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
