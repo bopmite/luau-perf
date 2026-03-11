@@ -22,7 +22,7 @@ pub fn compute_fix(rule_id: &str, source: &str, pos: usize) -> Option<Fix> {
         "math::fmod_over_modulo" => fix_fmod_over_modulo(source, pos),
         "roblox::missing_optimize" => fix_missing_optimize(source),
         "table::foreach_deprecated" => fix_foreach_deprecated(source, pos),
-        "table::maxn_deprecated" => fix_maxn_deprecated(source, pos),
+
         "style::udim2_prefer_from_offset" => fix_udim2_from_offset(source, pos),
         "style::udim2_prefer_from_scale" => fix_udim2_from_scale(source, pos),
         "math::vector3_zero_constant" => fix_vector3_zero_constant(source, pos),
@@ -326,27 +326,6 @@ fn fix_foreach_deprecated(source: &str, pos: usize) -> Option<Fix> {
         replacement: format!(
             "for {k_var}, v in {iter_fn}({table_arg}) do {func_arg}({k_var}, v) end"
         ),
-    })
-}
-
-fn fix_maxn_deprecated(source: &str, pos: usize) -> Option<Fix> {
-    let prefix = "table.maxn(";
-    let slice = source.get(pos..pos + prefix.len())?;
-    if slice != prefix {
-        return None;
-    }
-
-    let after = pos + prefix.len();
-    let close = find_matching_paren(source, after)?;
-    let arg = source.get(after..close)?.trim();
-    if arg.is_empty() {
-        return None;
-    }
-
-    Some(Fix {
-        start: pos,
-        end: close + 1,
-        replacement: format!("#{arg}"),
     })
 }
 

@@ -259,15 +259,6 @@ fn test_fix_foreachi_deprecated() {
 }
 
 #[test]
-fn test_fix_maxn_deprecated() {
-    let src = "table.maxn(myTable)";
-    let fix = compute_fix("table::maxn_deprecated", src, 0).unwrap();
-    let mut result = src.to_string();
-    result.replace_range(fix.start..fix.end, &fix.replacement);
-    assert_eq!(result, "#myTable");
-}
-
-#[test]
 fn test_fix_udim2_from_offset() {
     let src = "local a = UDim2.new(0, 10, 0, 20)";
     let fix = compute_fix("style::udim2_prefer_from_offset", src, 10).unwrap();
