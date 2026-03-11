@@ -1844,6 +1844,7 @@ impl Rule for FindFirstChildNoCheck {
                     || line.contains("loader")
                     || line.contains("bootstrap")
                     || line.contains("expect(")
+                    || line.contains("Expect(")
                     || line.contains("assert(")
                 {
                     continue;

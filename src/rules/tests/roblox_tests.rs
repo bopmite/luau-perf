@@ -615,6 +615,14 @@ fn find_first_child_stored_ok() {
 }
 
 #[test]
+fn find_first_child_in_expect_ok() {
+    let src = "jestExpect(target:FindFirstChild(\"child\").Value).toBe(42)";
+    let ast = parse(src);
+    let hits = FindFirstChildNoCheck.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
 fn get_full_name_in_loop_detected() {
     let src = "for _, inst in items do\n  print(inst:GetFullName())\nend";
     let ast = parse(src);
