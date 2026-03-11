@@ -264,6 +264,22 @@ fn changed_non_value_detected() {
 }
 
 #[test]
+fn changed_no_args_callback_ok() {
+    let src = "script.Parent.Timer.Changed:Connect(function()\n  update()\nend)";
+    let ast = parse(src);
+    let hits = PropertyChangeSignalWrong.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn changed_named_function_ref_ok() {
+    let src = "workspace.Market.TotalStock.Changed:connect(refresh)";
+    let ast = parse(src);
+    let hits = PropertyChangeSignalWrong.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
 fn clear_all_children_loop_detected() {
     let src = "for i = 1, 10 do\n  child:Destroy()\nend";
     let ast = parse(src);

@@ -101,33 +101,31 @@ impl Rule for PropertyChangeSignalWrong {
             if is_value_base {
                 continue;
             }
-            if !accessor.contains('.') {
-                let first_char = accessor.chars().next().unwrap_or('A');
-                if first_char.is_ascii_lowercase()
-                    && !matches!(
-                        accessor,
-                        "part"
-                            | "gui"
-                            | "button"
-                            | "frame"
-                            | "label"
-                            | "instance"
-                            | "inst"
-                            | "obj"
-                            | "descendant"
-                            | "child"
-                            | "player"
-                            | "character"
-                            | "humanoid"
-                            | "camera"
-                            | "sound"
-                            | "model"
-                            | "tool"
-                            | "workspace"
-                    )
-                {
-                    continue;
-                }
+            let first_char = last_word.chars().next().unwrap_or('A');
+            if first_char.is_ascii_lowercase()
+                && !matches!(
+                    last_word,
+                    "part"
+                        | "gui"
+                        | "button"
+                        | "frame"
+                        | "label"
+                        | "instance"
+                        | "inst"
+                        | "obj"
+                        | "descendant"
+                        | "child"
+                        | "player"
+                        | "character"
+                        | "humanoid"
+                        | "camera"
+                        | "sound"
+                        | "model"
+                        | "tool"
+                        | "workspace"
+                )
+            {
+                continue;
             }
             let after_end = visit::ceil_char(source, (pos + 500).min(source.len()));
             let after_connect = &source[pos..after_end];
@@ -141,6 +139,27 @@ impl Rule for PropertyChangeSignalWrong {
             }
             let value_access = format!("{last_word}.Value");
             if after_connect.contains(&value_access) || context.contains(&value_access) {
+                continue;
+            }
+            if last_word.len() <= 2 && last_word.chars().all(|c| c.is_ascii_lowercase()) {
+                continue;
+            }
+            let connect_suffix = if after_connect.starts_with(".Changed:Connect(") {
+                &after_connect[".Changed:Connect(".len()..]
+            } else if after_connect.starts_with(".Changed:connect(") {
+                &after_connect[".Changed:connect(".len()..]
+            } else {
+                ""
+            };
+            if connect_suffix.starts_with("function()")
+                || connect_suffix.starts_with("function ()")
+            {
+                continue;
+            }
+            if !connect_suffix.is_empty()
+                && !connect_suffix.starts_with("function")
+                && !connect_suffix.starts_with("function ")
+            {
                 continue;
             }
             hits.push(Hit {
