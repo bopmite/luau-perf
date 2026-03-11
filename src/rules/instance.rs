@@ -656,6 +656,9 @@ impl Rule for ClassNameOverIsA {
     }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        if source.contains(".ClassName = \"") || source.contains(".ClassName = '") {
+            return vec![];
+        }
         let mut hits = Vec::new();
         let patterns = [".ClassName == ", ".ClassName ~= "];
         for pat in &patterns {
@@ -664,8 +667,8 @@ impl Rule for ClassNameOverIsA {
                 if !after.starts_with('"') && !after.starts_with('\'') {
                     continue;
                 }
-                let fn_start = source[..pos].rfind("function").unwrap_or(0);
-                let context = &source[fn_start..pos];
+                let ctx_start = pos.saturating_sub(500);
+                let context = &source[ctx_start..pos];
                 if context.contains("type(") && context.contains("\"table\"") {
                     continue;
                 }
