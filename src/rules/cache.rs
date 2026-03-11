@@ -1,5 +1,41 @@
 use crate::lint::{Hit, Rule, Severity};
 use crate::visit;
+use full_moon::ast::{Expression, FunctionArgs};
+
+fn is_const_expr(expr: &Expression) -> bool {
+    let s = format!("{expr}");
+    let s = s.trim();
+    if s.is_empty() {
+        return false;
+    }
+    // Number literal (including negative)
+    let num_str = s.strip_prefix('-').unwrap_or(s);
+    if !num_str.is_empty()
+        && num_str
+            .chars()
+            .all(|c| c.is_ascii_digit() || c == '.' || c == 'e' || c == 'E' || c == '+' || c == '_')
+    {
+        return true;
+    }
+    // String literal
+    if (s.starts_with('"') && s.ends_with('"')) || (s.starts_with('\'') && s.ends_with('\'')) {
+        return true;
+    }
+    false
+}
+
+fn all_args_constant(call: &full_moon::ast::FunctionCall) -> bool {
+    let args = match visit::call_args(call) {
+        Some(a) => a,
+        None => return true,
+    };
+    match args {
+        FunctionArgs::Parentheses { arguments, .. } => {
+            arguments.iter().all(|expr| is_const_expr(expr))
+        }
+        _ => false,
+    }
+}
 
 fn is_in_factory_function(source: &str, pos: usize, type_name: &str) -> bool {
     let window_end = (pos + 500).min(source.len());
@@ -276,10 +312,13 @@ impl Rule for Vector3NewInLoop {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_hot_loop && visit::is_dot_call(call, "Vector3", "new") {
+            if ctx.in_hot_loop
+                && visit::is_dot_call(call, "Vector3", "new")
+                && all_args_constant(call)
+            {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
-                    msg: "Vector3.new() in loop - cache if arguments are loop-invariant".into(),
+                    msg: "Vector3.new() with constant args in loop - cache outside the loop".into(),
                 });
             }
         });
@@ -298,10 +337,13 @@ impl Rule for Vector2NewInLoop {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_hot_loop && visit::is_dot_call(call, "Vector2", "new") {
+            if ctx.in_hot_loop
+                && visit::is_dot_call(call, "Vector2", "new")
+                && all_args_constant(call)
+            {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
-                    msg: "Vector2.new() in loop - cache if arguments are loop-invariant".into(),
+                    msg: "Vector2.new() with constant args in loop - cache outside the loop".into(),
                 });
             }
         });
@@ -510,10 +552,10 @@ impl Rule for Color3NewInLoop {
                 || visit::is_dot_call(call, "Color3", "fromRGB")
                 || visit::is_dot_call(call, "Color3", "fromHSV")
                 || visit::is_dot_call(call, "Color3", "fromHex");
-            if is_color3 {
+            if is_color3 && all_args_constant(call) {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
-                    msg: "Color3 constructor in loop - cache if arguments are loop-invariant"
+                    msg: "Color3 constructor with constant args in loop - cache outside the loop"
                         .into(),
                 });
             }
@@ -539,10 +581,11 @@ impl Rule for UDim2NewInLoop {
             let is_udim2 = visit::is_dot_call(call, "UDim2", "new")
                 || visit::is_dot_call(call, "UDim2", "fromScale")
                 || visit::is_dot_call(call, "UDim2", "fromOffset");
-            if is_udim2 {
+            if is_udim2 && all_args_constant(call) {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
-                    msg: "UDim2 constructor in loop - cache if arguments are loop-invariant".into(),
+                    msg: "UDim2 constructor with constant args in loop - cache outside the loop"
+                        .into(),
                 });
             }
         });

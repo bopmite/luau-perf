@@ -254,11 +254,19 @@ fn instance_new_outside_loop_ok() {
 }
 
 #[test]
-fn vector3_new_in_loop_detected() {
-    let src = "for i = 1, 100 do\n  local v = Vector3.new(0, i, 0)\nend";
+fn vector3_new_constant_in_loop_detected() {
+    let src = "for i = 1, 100 do\n  local v = Vector3.new(0, 1, 0)\nend";
     let ast = parse(src);
     let hits = Vector3NewInLoop.check(src, &ast);
     assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn vector3_new_variable_in_loop_ok() {
+    let src = "for i = 1, 100 do\n  local v = Vector3.new(0, i, 0)\nend";
+    let ast = parse(src);
+    let hits = Vector3NewInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 0);
 }
 
 #[test]
