@@ -544,7 +544,12 @@ impl Rule for ConnectInConnect {
                         .map(|i| inner_pos + i)
                         .unwrap_or(source.len());
                     let inner_line = &source[inner_line_start..inner_line_end].to_lowercase();
-                    let has_cleanup = inner_line.contains("maid")
+                    let inner_prefix_raw = &source[inner_line_start..inner_pos];
+                    let stored = inner_prefix_raw.contains('=')
+                        && !inner_prefix_raw.contains("==")
+                        && !inner_prefix_raw.contains("~=");
+                    let has_cleanup = stored
+                        || inner_line.contains("maid")
                         || inner_line.contains("janitor")
                         || inner_line.contains("trove")
                         || inner_line.contains("givetask")
