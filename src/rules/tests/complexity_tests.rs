@@ -307,22 +307,6 @@ fn typeof_twice_ok() {
 }
 
 #[test]
-fn quadratic_string_build_detected() {
-    let src = "while true do\n  result = result .. chunk\n  task.wait()\nend";
-    let ast = parse(src);
-    let hits = QuadraticStringBuild.check(src, &ast);
-    assert_eq!(hits.len(), 1);
-}
-
-#[test]
-fn string_concat_no_accumulate_ok() {
-    let src = "while true do\n  local msg = prefix .. name\n  task.wait()\nend";
-    let ast = parse(src);
-    let hits = QuadraticStringBuild.check(src, &ast);
-    assert_eq!(hits.len(), 0);
-}
-
-#[test]
 fn get_descendants_in_loop_detected() {
     let src = "while true do\n  local d = workspace:GetDescendants()\n  task.wait()\nend";
     let ast = parse(src);

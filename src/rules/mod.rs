@@ -37,7 +37,6 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(complexity::StringMatchInLoop),
         Box::new(complexity::PromiseChainInLoop),
         Box::new(complexity::RepeatedTypeof),
-        Box::new(complexity::QuadraticStringBuild),
         // cache
         Box::new(cache::MagnitudeOverSquared),
         Box::new(cache::UncachedGetService),
@@ -537,7 +536,6 @@ pub fn rule_level(id: &str) -> crate::lint::Level {
         | "complexity::promise_chain_in_loop"
         | "complexity::accumulating_rebuild"
         | "complexity::one_iteration_loop"
-        | "complexity::quadratic_string_build"
         | "complexity::get_descendants_in_loop"
         | "complexity::table_remove_shift"
         | "complexity::table_sort_in_loop"
@@ -1015,7 +1013,6 @@ fn explain_text(id: &str) -> &'static str {
         "roblox::while_wait_do" => "while wait() do combines yielding and loop condition in a way that obscures control flow. Use while true do ... task.wait() end for explicit timing control with the modern task scheduler.",
         "roblox::get_property_changed_in_loop" => ":GetPropertyChangedSignal() creates a new signal object each call. In a loop, this creates N signal objects that are never garbage collected. Cache the signal outside the loop or use a single .Changed handler.",
         "complexity::accumulating_rebuild" => "{unpack(result), item} in a loop copies the entire growing table each iteration, creating O(n^2) total work. Use table.insert(result, item) for O(1) amortized append.",
-        "complexity::quadratic_string_build" => "str = str .. x in a loop copies the entire accumulated string each iteration, creating O(n^2) total work. Use table.insert(parts, x) then table.concat(parts) for O(n).",
         "complexity::one_iteration_loop" => "A loop that unconditionally returns or breaks on the first iteration executes at most once. Remove the loop wrapper or restructure the logic.",
         "complexity::elseif_chain_over_table" => "Long elseif chains with equality comparisons are O(n) linear scans. A lookup table provides O(1) dispatch: local handlers = {[1] = fn1, [2] = fn2}; handlers[x]()",
         "render::neon_glass_material_in_loop" => "Neon and Glass materials trigger special rendering passes (glow bloom / refraction). Setting these in a loop creates many expensive-to-render parts. Cache the material value outside.",
