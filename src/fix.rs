@@ -637,7 +637,6 @@ fn fix_floor_round_manual(source: &str, pos: usize) -> Option<Fix> {
     if source.get(pos..pos + pattern.len())? != pattern {
         return None;
     }
-    let after = &source[pos + pattern.len()..];
     let close = find_matching_paren(source, pos + pattern.len())?;
     let inner = &source[pos + pattern.len()..close];
     let plus_idx = inner.rfind("+ 0.5").or_else(|| inner.rfind("+0.5"))?;

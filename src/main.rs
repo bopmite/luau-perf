@@ -18,6 +18,10 @@ fn main() {
 
     match args[0].as_str() {
         "--help" | "-h" => return usage(),
+        "--version" | "-V" => {
+            println!("luauperf {}", env!("CARGO_PKG_VERSION"));
+            return;
+        }
         "--list-rules" => return rules::print_all(),
         "--init" => return config::write_default(),
         "--explain" => {
@@ -154,5 +158,6 @@ fn usage() {
     eprintln!("  --list-rules       show all rules");
     eprintln!("  --explain <id>     explain a specific rule");
     eprintln!("  --init             create default luauperf.toml");
+    eprintln!("  -V, --version      print version");
     eprintln!("  -h, --help         this message");
 }
