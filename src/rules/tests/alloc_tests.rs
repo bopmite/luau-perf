@@ -70,6 +70,30 @@ fn closure_in_loop_assignment_detected() {
 }
 
 #[test]
+fn closure_in_loop_variable_name_ok() {
+    let src = "while true do\n  local result = iterator_function()\n  task.wait()\nend";
+    let ast = parse(src);
+    let hits = ClosureInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn closure_in_loop_table_assignment_ok() {
+    let src = "for i = 1, 10 do\n  t[i] = function() return i end\nend";
+    let ast = parse(src);
+    let hits = ClosureInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn closure_in_loop_table_field_ok() {
+    let src = "while true do\n  local opts = {\n    handler = function() end\n  }\n  task.wait()\nend";
+    let ast = parse(src);
+    let hits = ClosureInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
 fn coroutine_wrap_in_loop_detected() {
     let src = "for i = 1, 10 do\n  local co = coroutine.wrap(fn)\nend";
     let ast = parse(src);

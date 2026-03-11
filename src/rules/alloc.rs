@@ -72,6 +72,12 @@ impl Rule for ClosureInLoop {
         func_positions
             .into_iter()
             .filter(|&pos| {
+                if pos > 0 {
+                    let prev = source.as_bytes()[pos - 1];
+                    if prev.is_ascii_alphanumeric() || prev == b'_' {
+                        return false;
+                    }
+                }
                 let line = line_starts.partition_point(|&s| s <= pos).saturating_sub(1);
                 if line >= loop_depth.len() || loop_depth[line] == 0 {
                     return false;
@@ -84,6 +90,17 @@ impl Rule for ClosureInLoop {
                 let before_char = source[..pos].trim_end();
                 if before_char.ends_with('(') || before_char.ends_with(',') {
                     return false;
+                }
+                if let Some(eq_idx) = before_match.rfind('=') {
+                    let lhs = before_match[..eq_idx].trim_end();
+                    if lhs.ends_with(']') || lhs.contains('[') {
+                        return false;
+                    }
+                    if !lhs.starts_with("local ") && !lhs.is_empty()
+                        && lhs.chars().all(|c| c.is_alphanumeric() || c == '_')
+                    {
+                        return false;
+                    }
                 }
                 true
             })
