@@ -257,7 +257,7 @@ impl Rule for RepeatedGsub {
                 }
                 chain_count += 1;
             } else {
-                if chain_count >= 2 {
+                if chain_count >= 3 {
                     if let Some(start) = chain_start {
                         hits.push(Hit {
                             pos: start,
@@ -270,7 +270,7 @@ impl Rule for RepeatedGsub {
             }
             prev_line = line;
         }
-        if chain_count >= 2 {
+        if chain_count >= 3 {
             if let Some(start) = chain_start {
                 hits.push(Hit {
                     pos: start,

@@ -410,10 +410,18 @@ fn tostring_outside_loop_ok() {
 
 #[test]
 fn repeated_gsub_detected() {
-    let src = "local s = str:gsub(\"a\", \"b\")\nlocal t = str:gsub(\"c\", \"d\")";
+    let src = "local s = str:gsub(\"a\", \"b\")\nlocal t = str:gsub(\"c\", \"d\")\nlocal u = str:gsub(\"e\", \"f\")";
     let ast = parse(src);
     let hits = RepeatedGsub.check(src, &ast);
     assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn two_gsub_calls_ok() {
+    let src = "local s = str:gsub(\"a\", \"b\")\nlocal t = str:gsub(\"c\", \"d\")";
+    let ast = parse(src);
+    let hits = RepeatedGsub.check(src, &ast);
+    assert_eq!(hits.len(), 0);
 }
 
 #[test]
