@@ -163,10 +163,9 @@ impl Rule for FloorDivision {
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         for pos in visit::find_pattern_positions(source, "math.floor(") {
-            let after = &source[pos + "math.floor(".len()..];
-            if after.contains('/') {
-                let paren_end = after.find(')').unwrap_or(0);
-                let inside = &after[..paren_end];
+            let inner_start = pos + "math.floor(".len();
+            if let Some(close) = visit::find_balanced_paren(&source[inner_start..]) {
+                let inside = &source[inner_start..inner_start + close];
                 if inside.contains('/') && !inside.contains("//") {
                     hits.push(Hit {
                         pos,
@@ -685,9 +684,9 @@ impl Rule for FloorRoundManual {
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         for pos in visit::find_pattern_positions(source, "math.floor(") {
-            let after = &source[pos + "math.floor(".len()..];
-            if let Some(close) = after.find(')') {
-                let inner = &after[..close];
+            let inner_start = pos + "math.floor(".len();
+            if let Some(close) = visit::find_balanced_paren(&source[inner_start..]) {
+                let inner = &source[inner_start..inner_start + close];
                 if inner.contains("+ 0.5") || inner.contains("+0.5") {
                     hits.push(Hit {
                         pos,
