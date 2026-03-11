@@ -661,7 +661,14 @@ impl Rule for DestroyInLoop {
         Severity::Warn
     }
 
-    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+    fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+        let src_lower = source.to_lowercase();
+        if src_lower.contains("maid")
+            || src_lower.contains("janitor")
+            || src_lower.contains("trove")
+        {
+            return vec![];
+        }
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
             if ctx.in_hot_loop && visit::is_method_call(call, "Destroy") {
