@@ -1383,3 +1383,27 @@ fn connect_callback_no_yield_ok() {
     assert_eq!(hits.len(), 0);
 }
 
+#[test]
+fn while_wait_bare_detected() {
+    let src = "while wait() do\n  print(\"tick\")\nend";
+    let ast = parse(src);
+    let hits = WhileWaitDo.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn while_wait_with_arg_ok() {
+    let src = "while wait(60) do\n  save()\nend";
+    let ast = parse(src);
+    let hits = WhileWaitDo.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn while_task_wait_bare_detected() {
+    let src = "while task.wait() do\n  print(\"tick\")\nend";
+    let ast = parse(src);
+    let hits = WhileWaitDo.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+

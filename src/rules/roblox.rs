@@ -1238,13 +1238,13 @@ impl Rule for WhileWaitDo {
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
-        for pos in visit::find_pattern_positions(source, "while wait(") {
+        for pos in visit::find_pattern_positions(source, "while wait()") {
             hits.push(Hit {
                 pos,
                 msg: "while wait() do is an anti-pattern - use while true do ... task.wait() end for explicit control and modern task scheduler".into(),
             });
         }
-        for pos in visit::find_pattern_positions(source, "while task.wait(") {
+        for pos in visit::find_pattern_positions(source, "while task.wait()") {
             hits.push(Hit {
                 pos,
                 msg: "while task.wait() do combines yielding and looping in the condition - use while true do ... task.wait() end for clarity".into(),
