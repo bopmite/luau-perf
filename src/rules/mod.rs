@@ -564,10 +564,8 @@ pub fn rule_level(id: &str) -> crate::lint::Level {
         | "complexity::table_sort_in_loop"
         | "complexity::get_tagged_in_loop"
         | "complexity::get_players_in_loop"
-        | "complexity::clone_in_loop"
         | "complexity::wait_for_child_in_loop"
         | "complexity::find_first_child_recursive"
-        | "complexity::pairs_in_pairs"
 
         // memory (important but not always bugs)
         | "memory::untracked_task_spawn"
