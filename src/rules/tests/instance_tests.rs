@@ -384,6 +384,22 @@ fn isa_call_ok() {
 }
 
 #[test]
+fn classname_custom_class_ok() {
+    let src = "function Maid.isMaid(value)\n  if type(value) == \"table\" and value.ClassName == \"Maid\" then\n    return true\n  end\nend";
+    let ast = parse(src);
+    let hits = ClassNameOverIsA.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn classname_variable_comparison_ok() {
+    let src = "if obj.ClassName == className then end";
+    let ast = parse(src);
+    let hits = ClassNameOverIsA.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
 fn property_change_signal_wrong_detected() {
     let src = "part.Changed:Connect(function(prop)\n  print(prop)\nend)";
     let ast = parse(src);

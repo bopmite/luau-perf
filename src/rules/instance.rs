@@ -660,6 +660,15 @@ impl Rule for ClassNameOverIsA {
         let patterns = [".ClassName == ", ".ClassName ~= "];
         for pat in &patterns {
             for pos in visit::find_pattern_positions(source, pat) {
+                let after = &source[pos + pat.len()..];
+                if !after.starts_with('"') && !after.starts_with('\'') {
+                    continue;
+                }
+                let fn_start = source[..pos].rfind("function").unwrap_or(0);
+                let context = &source[fn_start..pos];
+                if context.contains("type(") && context.contains("\"table\"") {
+                    continue;
+                }
                 hits.push(Hit {
                     pos,
                     msg: ".ClassName comparison doesn't account for class inheritance - use :IsA() instead which handles subclasses (e.g. MeshPart, WedgePart are also BaseParts)".into(),
