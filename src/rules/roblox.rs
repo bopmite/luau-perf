@@ -25,7 +25,6 @@ pub struct StringValueOverAttribute;
 pub struct TouchedEventUnfiltered;
 pub struct MissingOptimize;
 pub struct DeprecatedRegion3;
-pub struct BindableSameScript;
 pub struct ServerPropertyInHeartbeat;
 pub struct GameLoadedRace;
 pub struct HumanoidStatePolling;
@@ -597,42 +596,6 @@ impl Rule for DeprecatedRegion3 {
     }
 }
 
-impl Rule for BindableSameScript {
-    fn id(&self) -> &'static str {
-        "roblox::bindable_same_script"
-    }
-    fn severity(&self) -> Severity {
-        Severity::Allow
-    }
-
-    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
-        let has_fire = source.contains(":Fire(") || source.contains(":fire(");
-        let has_connect = source.contains(".Event:Connect(") || source.contains(".Event:connect(");
-
-        if has_fire && has_connect {
-            if source.contains("Signal") || source.contains("signal") {
-                return vec![];
-            }
-            if source.contains("self.") || source.contains("self:") {
-                return vec![];
-            }
-            if source.contains("._event")
-                || source.contains("._bindable")
-                || source.contains("._observable")
-            {
-                return vec![];
-            }
-            let fire_positions = visit::find_pattern_positions(source, ":Fire(");
-            if let Some(&pos) = fire_positions.first() {
-                return vec![Hit {
-                    pos,
-                    msg: "BindableEvent:Fire() and .Event:Connect() in same script - use direct function calls instead".into(),
-                }];
-            }
-        }
-        vec![]
-    }
-}
 
 impl Rule for ServerPropertyInHeartbeat {
     fn id(&self) -> &'static str {
@@ -1470,6 +1433,9 @@ impl Rule for YieldInConnectCallback {
                 if depth > 0 {
                     continue;
                 }
+                if inner.starts_with("--") {
+                    continue;
+                }
                 if inner.contains("task.wait(") || inner.contains(":WaitForChild(") {
                     let byte_pos: usize = lines[..j].iter().map(|l| l.len() + 1).sum();
                     hits.push(Hit {
@@ -1945,12 +1911,17 @@ impl Rule for BindToRenderStepNoCleanup {
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
-        let has_unbind = source.contains("UnbindFromRenderStep");
-        if has_unbind {
+        if source.contains("UnbindFromRenderStep") {
             return hits;
         }
 
         for pos in visit::find_pattern_positions(source, ":BindToRenderStep(") {
+            let line_start = source[..pos].rfind('\n').map_or(0, |p| p + 1);
+            let line = &source[line_start..source[pos..].find('\n').map_or(source.len(), |p| pos + p)];
+            let trimmed = line.trim();
+            if trimmed.contains("GiveTask") || trimmed.contains("Add(") || trimmed.contains("maid") || trimmed.contains("Maid") || trimmed.contains("janitor") || trimmed.contains("Janitor") || trimmed.contains("trove") || trimmed.contains("Trove") {
+                continue;
+            }
             hits.push(Hit {
                 pos,
                 msg: ":BindToRenderStep() without matching :UnbindFromRenderStep() - binding will persist and leak if script is reused".into(),

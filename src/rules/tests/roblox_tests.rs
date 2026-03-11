@@ -110,21 +110,6 @@ fn deprecated_region3_whitelist() {
     assert_eq!(hits.len(), 1);
 }
 
-#[test]
-fn bindable_same_script_detected() {
-    let src = "local be = Instance.new(\"BindableEvent\")\nbe.Event:Connect(function() end)\nbe:Fire()";
-    let ast = parse(src);
-    let hits = BindableSameScript.check(src, &ast);
-    assert_eq!(hits.len(), 1);
-}
-
-#[test]
-fn bindable_fire_only_not_flagged() {
-    let src = "be:Fire(data)";
-    let ast = parse(src);
-    let hits = BindableSameScript.check(src, &ast);
-    assert_eq!(hits.len(), 0);
-}
 
 #[test]
 fn server_property_in_heartbeat_detected() {
@@ -238,13 +223,6 @@ fn changed_event_int_value_skip() {
     assert_eq!(hits.len(), 0);
 }
 
-#[test]
-fn bindable_self_field_skip() {
-    let src = "function MyClass:Init()\n  self._event = Instance.new(\"BindableEvent\")\n  self._event.Event:Connect(function() end)\nend\nfunction MyClass:Fire()\n  self._event:Fire()\nend";
-    let ast = parse(src);
-    let hits = BindableSameScript.check(src, &ast);
-    assert_eq!(hits.len(), 0);
-}
 
 #[test]
 fn health_polling_in_loop_detected() {
@@ -449,6 +427,14 @@ fn yield_in_connect_detected() {
 #[test]
 fn no_yield_in_connect_ok() {
     let src = "event:Connect(function()\n  print(\"fired\")\nend)";
+    let ast = parse(src);
+    let hits = YieldInConnectCallback.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn yield_in_connect_commented_out_ok() {
+    let src = "event:Connect(function()\n  -- task.wait(1)\n  print(\"fired\")\nend)";
     let ast = parse(src);
     let hits = YieldInConnectCallback.check(src, &ast);
     assert_eq!(hits.len(), 0);
@@ -673,6 +659,30 @@ fn bind_to_render_step_no_cleanup_detected() {
 #[test]
 fn bind_to_render_step_with_unbind_ok() {
     let src = "RunService:BindToRenderStep(\"Camera\", 200, updateCamera)\nRunService:UnbindFromRenderStep(\"Camera\")";
+    let ast = parse(src);
+    let hits = BindToRenderStepNoCleanup.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn bind_to_render_step_maid_ok() {
+    let src = "maid:GiveTask(RunService:BindToRenderStep(\"Cam\", 200, update))";
+    let ast = parse(src);
+    let hits = BindToRenderStepNoCleanup.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn bind_to_render_step_janitor_ok() {
+    let src = "self._janitor:Add(RunService:BindToRenderStep(\"Cam\", 200, update))";
+    let ast = parse(src);
+    let hits = BindToRenderStepNoCleanup.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn bind_to_render_step_trove_ok() {
+    let src = "self._trove:Add(RunService:BindToRenderStep(\"Cam\", 200, update))";
     let ast = parse(src);
     let hits = BindToRenderStepNoCleanup.check(src, &ast);
     assert_eq!(hits.len(), 0);
