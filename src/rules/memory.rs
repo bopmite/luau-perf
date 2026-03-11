@@ -1086,11 +1086,16 @@ impl Rule for SoundNotDestroyed {
             if !is_sound {
                 continue;
             }
+            let var_name = accessor.split(':').next().unwrap_or("").trim();
+            let is_from_table = !var_name.is_empty()
+                && before.contains(&format!("{var_name} = "))
+                && before.contains('[');
             let is_existing = before.contains("FindFirstChild")
                 || before.contains("FindFirstChildWhichIsA")
                 || before.contains("FindFirstDescendant")
                 || before.contains(": Sound")
-                || dot_count >= 2;
+                || dot_count >= 2
+                || is_from_table;
             if is_existing {
                 continue;
             }
