@@ -773,6 +773,10 @@ impl Rule for FloorToMultiple {
                 .unwrap_or(multiplier_src.len());
             let multiplier = &multiplier_src[..mult_end];
             if !divisor.is_empty() && divisor == multiplier {
+                let before = source[..pos].trim_end();
+                if before.ends_with('-') {
+                    continue;
+                }
                 hits.push(Hit {
                     pos,
                     msg: format!(
