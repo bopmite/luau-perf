@@ -470,7 +470,6 @@ pub fn rule_level(id: &str) -> crate::lint::Level {
         | "math::random_deprecated"
         | "table::foreach_deprecated"
         | "table::getn_deprecated"
-        | "table::maxn_deprecated"
         | "roblox::deprecated_version"
         | "roblox::deprecated_ypcall"
         | "roblox::deprecated_elapsed_time"
@@ -558,7 +557,6 @@ pub fn rule_level(id: &str) -> crate::lint::Level {
         | "complexity::table_remove_shift"
         | "complexity::table_sort_in_loop"
         | "complexity::get_tagged_in_loop"
-        | "complexity::get_players_in_loop"
         | "complexity::wait_for_child_in_loop"
         | "complexity::find_first_child_recursive"
 
@@ -586,7 +584,6 @@ pub fn rule_level(id: &str) -> crate::lint::Level {
         | "instance::property_before_parent"
         | "instance::repeated_find_first_child"
         | "instance::changed_on_moving_part"
-        | "instance::collection_service_in_loop"
         | "instance::destroy_in_loop"
         | "instance::get_children_in_loop"
         | "instance::classname_over_isa"
@@ -594,7 +591,6 @@ pub fn rule_level(id: &str) -> crate::lint::Level {
         | "instance::wait_for_child_chain"
 
         // physics
-        | "physics::spatial_query_in_loop"
         | "physics::move_to_in_loop"
         | "physics::touched_without_debounce"
         | "physics::set_network_owner_in_loop"
@@ -619,7 +615,6 @@ pub fn rule_level(id: &str) -> crate::lint::Level {
         | "roblox::set_attribute_in_loop"
         | "roblox::string_value_over_attribute"
         | "roblox::touched_event_unfiltered"
-        | "roblox::destroy_children_manual"
         | "roblox::server_property_in_heartbeat"
         | "roblox::humanoid_state_polling"
         | "roblox::require_in_connect"
@@ -651,7 +646,6 @@ pub fn rule_level(id: &str) -> crate::lint::Level {
         | "native::pcall_in_native"
 
         // style with real perf impact
-        | "style::dot_method_call"
         | "style::debug_in_hot_path"
         | "style::index_function_metatable"
         | "style::redundant_condition"
@@ -700,7 +694,6 @@ pub fn is_fixable(id: &str) -> bool {
             | "math::fmod_over_modulo"
             | "roblox::missing_optimize"
             | "table::foreach_deprecated"
-            | "table::maxn_deprecated"
             | "style::udim2_prefer_from_offset"
             | "style::udim2_prefer_from_scale"
             | "math::vector3_zero_constant"

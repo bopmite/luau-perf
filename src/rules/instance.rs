@@ -530,7 +530,7 @@ impl Rule for CollectionServiceInLoop {
         "instance::collection_service_in_loop"
     }
     fn severity(&self) -> Severity {
-        Severity::Warn
+        Severity::Allow
     }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {

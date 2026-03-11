@@ -546,7 +546,7 @@ impl Rule for DestroyChildrenManual {
         "roblox::destroy_children_manual"
     }
     fn severity(&self) -> Severity {
-        Severity::Warn
+        Severity::Allow
     }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {

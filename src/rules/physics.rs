@@ -22,7 +22,7 @@ impl Rule for SpatialQueryInLoop {
         "physics::spatial_query_in_loop"
     }
     fn severity(&self) -> Severity {
-        Severity::Warn
+        Severity::Allow
     }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {

@@ -155,7 +155,7 @@ impl Rule for DotMethodCall {
         "style::dot_method_call"
     }
     fn severity(&self) -> Severity {
-        Severity::Warn
+        Severity::Allow
     }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {

@@ -78,7 +78,7 @@ impl Rule for MaxnDeprecated {
         "table::maxn_deprecated"
     }
     fn severity(&self) -> Severity {
-        Severity::Error
+        Severity::Allow
     }
 
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
