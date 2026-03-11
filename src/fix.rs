@@ -638,13 +638,13 @@ fn fix_floor_round_manual(source: &str, pos: usize) -> Option<Fix> {
         return None;
     }
     let after = &source[pos + pattern.len()..];
-    let close = after.find(')')?;
-    let inner = &after[..close];
+    let close = find_matching_paren(source, pos + pattern.len())?;
+    let inner = &source[pos + pattern.len()..close];
     let plus_idx = inner.rfind("+ 0.5").or_else(|| inner.rfind("+0.5"))?;
     let arg = inner[..plus_idx].trim();
     Some(Fix {
         start: pos,
-        end: pos + pattern.len() + close + 1,
+        end: close + 1,
         replacement: format!("math.round({arg})"),
     })
 }
