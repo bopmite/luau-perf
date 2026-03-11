@@ -238,6 +238,22 @@ fn tween_info_at_module_level_ok() {
 }
 
 #[test]
+fn tween_info_variable_args_ok() {
+    let src = "local function animate(duration, style)\n  local info = TweenInfo.new(duration, style)\nend";
+    let ast = parse(src);
+    let hits = TweenInfoInFunction.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn tween_info_enum_args_detected() {
+    let src = "local function animate()\n  local info = TweenInfo.new(0.3, Enum.EasingStyle.Quad)\nend";
+    let ast = parse(src);
+    let hits = TweenInfoInFunction.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
 fn instance_new_in_loop_detected() {
     let src = "while true do\n  local p = Instance.new(\"Part\")\n  task.wait()\nend";
     let ast = parse(src);

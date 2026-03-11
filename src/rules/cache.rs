@@ -21,6 +21,14 @@ fn is_const_expr(expr: &Expression) -> bool {
     if (s.starts_with('"') && s.ends_with('"')) || (s.starts_with('\'') && s.ends_with('\'')) {
         return true;
     }
+    // Enum constant (e.g. Enum.EasingStyle.Linear)
+    if s.starts_with("Enum.") && s.chars().all(|c| c.is_alphanumeric() || c == '.') {
+        return true;
+    }
+    // Boolean/nil
+    if s == "true" || s == "false" || s == "nil" {
+        return true;
+    }
     false
 }
 
@@ -31,7 +39,7 @@ fn all_args_constant(call: &full_moon::ast::FunctionCall) -> bool {
     };
     match args {
         FunctionArgs::Parentheses { arguments, .. } => {
-            arguments.iter().all(|expr| is_const_expr(expr))
+            arguments.iter().all(is_const_expr)
         }
         _ => false,
     }
@@ -183,38 +191,16 @@ impl Rule for TweenInfoInFunction {
         Severity::Warn
     }
 
-    fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_func && visit::is_dot_call(call, "TweenInfo", "new") {
-                let pos = visit::call_pos(call);
-                let call_start = pos + "TweenInfo.new(".len();
-                let call_end = source[call_start..]
-                    .find(')')
-                    .map(|i| call_start + i)
-                    .unwrap_or(call_start);
-                let args = &source[call_start..call_end];
-                let has_variable = args
-                    .split(',')
-                    .next()
-                    .map(|first| {
-                        let first = first.trim();
-                        !first.is_empty()
-                            && first
-                                .chars()
-                                .next()
-                                .map(|c| c.is_ascii_lowercase())
-                                .unwrap_or(false)
-                    })
-                    .unwrap_or(false);
-                let msg = if has_variable {
-                    "TweenInfo.new() with dynamic duration in function - allocates each call, consider caching if inputs are stable"
-                } else {
-                    "TweenInfo.new() in function - cache as module-level constant if arguments are fixed"
-                };
+            if ctx.in_func
+                && visit::is_dot_call(call, "TweenInfo", "new")
+                && all_args_constant(call)
+            {
                 hits.push(Hit {
-                    pos,
-                    msg: msg.into(),
+                    pos: visit::call_pos(call),
+                    msg: "TweenInfo.new() with constant args in function - cache as module-level constant".into(),
                 });
             }
         });
