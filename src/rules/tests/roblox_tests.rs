@@ -1257,21 +1257,6 @@ fn render_stepped_on_client_ok() {
     assert_eq!(hits.len(), 0);
 }
 
-#[test]
-fn touched_event_unfiltered_detected() {
-    let src = "part.Touched:Connect(function(other)\n  other:Destroy()\nend)";
-    let ast = parse(src);
-    let hits = TouchedEventUnfiltered.check(src, &ast);
-    assert_eq!(hits.len(), 1);
-}
-
-#[test]
-fn touched_event_with_isa_ok() {
-    let src = "part.Touched:Connect(function(other)\n  if other:IsA(\"BasePart\") then end\nend)";
-    let ast = parse(src);
-    let hits = TouchedEventUnfiltered.check(src, &ast);
-    assert_eq!(hits.len(), 0);
-}
 
 #[test]
 fn missing_native_detected() {
@@ -1425,11 +1410,4 @@ fn render_stepped_method_name_ok() {
     assert_eq!(hits.len(), 0);
 }
 
-#[test]
-fn touched_dummy_connection_ok() {
-    let src = "local conn = part.Touched:Connect(function() end)\nlocal parts = part:GetTouchingParts()\nconn:Disconnect()";
-    let ast = parse(src);
-    let hits = TouchedEventUnfiltered.check(src, &ast);
-    assert_eq!(hits.len(), 0);
-}
 

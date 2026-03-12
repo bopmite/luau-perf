@@ -98,7 +98,6 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(roblox::DeprecatedPhysicsService),
         Box::new(roblox::SetAttributeInLoop),
         Box::new(roblox::StringValueOverAttribute),
-        Box::new(roblox::TouchedEventUnfiltered),
         Box::new(roblox::MissingOptimize),
         Box::new(roblox::DeprecatedRegion3),
         Box::new(roblox::ServerPropertyInHeartbeat),
@@ -585,7 +584,6 @@ pub fn rule_level(id: &str) -> crate::lint::Level {
         | "roblox::debris_add_item"
         | "roblox::set_attribute_in_loop"
         | "roblox::string_value_over_attribute"
-        | "roblox::touched_event_unfiltered"
         | "roblox::server_property_in_heartbeat"
         | "roblox::humanoid_state_polling"
         | "roblox::require_in_connect"
@@ -894,7 +892,6 @@ fn explain_text(id: &str) -> &'static str {
         "roblox::deprecated_physics_service" => "PhysicsService collision group methods are deprecated. Use BasePart.CollisionGroup string property instead, which is simpler and more performant.",
         "roblox::set_attribute_in_loop" => "Each SetAttribute() call triggers attribute replication. In a loop, this sends N packets. Batch attribute changes or consider alternative data storage.",
         "roblox::string_value_over_attribute" => "Instance.new('StringValue') etc. creates a full Instance for storing a single value. Attributes (:SetAttribute/:GetAttribute) are lighter - no instance overhead.",
-        "roblox::touched_event_unfiltered" => ".Touched fires at physics rate (~240Hz per contact pair). Without debounce/filtering in the handler, your callback runs hundreds of times per second.",
         "roblox::missing_optimize" => "The --!optimize 2 directive enables function inlining and loop unrolling at the bytecode level. Should be paired with --!native for maximum performance.",
         "roblox::deprecated_region3" => "FindPartsInRegion3 and variants are deprecated. Use workspace:GetPartBoundsInBox() with OverlapParams for better control and performance.",
         "roblox::server_property_in_heartbeat" => "Property assignments (.Position, .CFrame) inside Heartbeat/Stepped trigger replication every frame. Use UnreliableRemoteEvent for client-driven updates or batch changes.",

@@ -22,7 +22,6 @@ pub struct InsertServiceLoadAsset;
 pub struct DeprecatedPhysicsService;
 pub struct SetAttributeInLoop;
 pub struct StringValueOverAttribute;
-pub struct TouchedEventUnfiltered;
 pub struct MissingOptimize;
 pub struct DeprecatedRegion3;
 pub struct ServerPropertyInHeartbeat;
@@ -502,44 +501,6 @@ impl Rule for StringValueOverAttribute {
     }
 }
 
-impl Rule for TouchedEventUnfiltered {
-    fn id(&self) -> &'static str {
-        "roblox::touched_event_unfiltered"
-    }
-    fn severity(&self) -> Severity {
-        Severity::Warn
-    }
-
-    fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
-        let mut hits = Vec::new();
-        let patterns = [".Touched:Connect(", ".Touched:connect("];
-        for pat in &patterns {
-        for pos in visit::find_pattern_positions(source, pat) {
-            let after_start = pos + pat.len();
-            let after_end = (after_start + 400).min(source.len());
-            let callback = &source[after_start..after_end];
-            let body: String = callback.lines().take(10).collect::<Vec<_>>().join("\n");
-            let has_guard = body.contains("GetPlayerFromCharacter")
-                || body.contains("debounce")
-                || body.contains("cooldown")
-                || body.contains("if not ")
-                || body.contains("tick()")
-                || body.contains("os.clock()")
-                || body.contains(":IsA(")
-                || body.contains("FindFirstAncestor")
-                || body.contains(":Disconnect()")
-                || body.contains("GetTouchingParts");
-            if !has_guard {
-                hits.push(Hit {
-                    pos,
-                    msg: ".Touched fires at physics rate (~240Hz) - ensure debounce/filtering in handler".into(),
-                });
-            }
-        }
-        }
-        hits
-    }
-}
 
 impl Rule for MissingOptimize {
     fn id(&self) -> &'static str {
@@ -1416,6 +1377,9 @@ impl Rule for YieldInConnectCallback {
         let lines: Vec<&str> = source.lines().collect();
         for (i, line) in lines.iter().enumerate() {
             let trimmed = line.trim();
+            if trimmed.starts_with("--") {
+                continue;
+            }
             if !trimmed.contains(":Connect(function") && !trimmed.contains(":Once(function") {
                 continue;
             }
@@ -1907,6 +1871,13 @@ impl Rule for BindToRenderStepNoCleanup {
     }
     fn severity(&self) -> Severity {
         Severity::Warn
+    }
+
+    fn skip_path(&self, path: &std::path::Path) -> bool {
+        path.file_name()
+            .and_then(|n| n.to_str())
+            .map(|n| n.contains(".spec") || n.contains(".test") || n.contains("_spec") || n.contains("_test"))
+            .unwrap_or(false)
     }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
