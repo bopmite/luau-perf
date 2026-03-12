@@ -384,3 +384,26 @@ fn character_added_wait_ok() {
     assert_eq!(hits.len(), 0);
 }
 
+#[test]
+fn character_added_with_died_ok() {
+    let src = "player.CharacterAdded:Connect(function(char)\n  char:WaitForChild(\"Humanoid\").Died:Connect(function()\n    print(\"died\")\n  end)\nend)";
+    let ast = parse(src);
+    let hits = CharacterAddedNoCleanup.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn connect_in_connect_char_died_ok() {
+    let src = "player.CharacterAdded:Connect(function(char)\n  local hum = char:WaitForChild(\"Humanoid\")\n  hum.Died:connect(function()\n    print(\"died\")\n  end)\nend)";
+    let ast = parse(src);
+    let hits = ConnectInConnect.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn connect_in_connect_player_char_ok() {
+    let src = "Players.PlayerAdded:Connect(function(player)\n  player.CharacterAdded:Connect(function(char)\n    print(char)\n  end)\nend)";
+    let ast = parse(src);
+    let hits = ConnectInConnect.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}

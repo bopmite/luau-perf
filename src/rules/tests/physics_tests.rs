@@ -23,7 +23,7 @@ fn move_to_outside_loop_ok() {
 
 #[test]
 fn touched_without_debounce_detected() {
-    let src = "part.Touched:Connect(function(hit)\n  hit:Destroy()\nend)";
+    let src = "part.Touched:Connect(function(hit)\n  print(hit.Name)\nend)";
     let ast = parse(src);
     let hits = TouchedWithoutDebounce.check(src, &ast);
     assert_eq!(hits.len(), 1);
@@ -34,6 +34,30 @@ fn touched_with_debounce_ok() {
     let src = "part.Touched:Connect(function(hit)\n  if not debounce then\n    debounce = true\n  end\nend)";
     let ast = parse(src);
     let hits = TouchedWithoutDebounce.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn touched_with_find_first_child_ok() {
+    let src = "part.Touched:Connect(function(hit)\n  if hit:FindFirstChild(\"Cash\") == nil then return end\n  print(hit)\nend)";
+    let ast = parse(src);
+    let hits = TouchedWithoutDebounce.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn touched_with_destroy_ok() {
+    let src = "part.Touched:Connect(function(hit)\n  hit:Destroy()\nend)";
+    let ast = parse(src);
+    let hits = TouchedWithoutDebounce.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn cframe_assign_camera_ok() {
+    let src = "while true do\n  workspace.CurrentCamera.CFrame = cf\nend";
+    let ast = parse(src);
+    let hits = CFrameAssignInLoop.check(src, &ast);
     assert_eq!(hits.len(), 0);
 }
 

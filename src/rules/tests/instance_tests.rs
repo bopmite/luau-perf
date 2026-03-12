@@ -137,6 +137,22 @@ fn get_children_outside_loop_ok() {
 }
 
 #[test]
+fn get_children_in_for_header_ok() {
+    let src = "for i = 1, #folder:GetChildren() do\n  print(i)\nend";
+    let ast = parse(src);
+    let hits = GetChildrenInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn get_children_in_for_in_header_ok() {
+    let src = "for i, v in pairs(folder:GetChildren()) do\n  print(v)\nend";
+    let ast = parse(src);
+    let hits = GetChildrenInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
 fn changed_skip_value_base_isa() {
     let src = "assert(instance:IsA(\"ObjectValue\"))\ninstance.Changed:Connect(function() end)";
     let ast = parse(src);
@@ -406,5 +422,52 @@ fn property_change_signal_value_base_ok() {
     let ast = parse(src);
     let hits = PropertyChangeSignalWrong.check(src, &ast);
     assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn get_children_in_loop_lune_path_skipped() {
+    let rule = GetChildrenInLoop;
+    assert!(rule.skip_path(std::path::Path::new("project/.lune/Classes/FileInstance.luau")));
+    assert!(!rule.skip_path(std::path::Path::new("project/src/init.lua")));
+}
+
+#[test]
+fn classname_script_exact_match_ok() {
+    let src = "if child.ClassName == \"Script\" then continue end";
+    let ast = parse(src);
+    let hits = ClassNameOverIsA.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn classname_local_script_exact_match_ok() {
+    let src = "if child.ClassName == \"LocalScript\" then end";
+    let ast = parse(src);
+    let hits = ClassNameOverIsA.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn classname_module_script_exact_match_ok() {
+    let src = "if child.ClassName ~= \"ModuleScript\" then end";
+    let ast = parse(src);
+    let hits = ClassNameOverIsA.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn classname_part_still_detected() {
+    let src = "if obj.ClassName == \"Part\" then end";
+    let ast = parse(src);
+    let hits = ClassNameOverIsA.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn repeated_find_first_child_test_file_skipped() {
+    let rule = RepeatedFindFirstChild;
+    assert!(rule.skip_path(std::path::Path::new("src/forwardRef.spec.lua")));
+    assert!(rule.skip_path(std::path::Path::new("RobloxRenderer.roblox.spec.lua")));
+    assert!(!rule.skip_path(std::path::Path::new("src/init.lua")));
 }
 

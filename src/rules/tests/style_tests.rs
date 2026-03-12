@@ -548,3 +548,43 @@ fn type_check_outside_loop_ok() {
     let hits = TypeCheckInLoop.check(src, &ast);
     assert_eq!(hits.len(), 0);
 }
+
+#[test]
+fn udim2_prefer_from_offset_detected() {
+    let src = "local u = UDim2.new(0, 100, 0, 50)";
+    let ast = parse(src);
+    let hits = UDim2PreferFromOffset.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn udim2_with_scale_ok() {
+    let src = "local u = UDim2.new(0.5, 0, 1, 0)";
+    let ast = parse(src);
+    let hits = UDim2PreferFromOffset.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn udim2_prefer_from_scale_detected() {
+    let src = "local u = UDim2.new(0.5, 0, 1, 0)";
+    let ast = parse(src);
+    let hits = UDim2PreferFromScale.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn udim2_with_offset_ok() {
+    let src = "local u = UDim2.new(0.5, 10, 1, 20)";
+    let ast = parse(src);
+    let hits = UDim2PreferFromScale.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn udim2_from_offset_ok() {
+    let src = "local u = UDim2.fromOffset(100, 50)";
+    let ast = parse(src);
+    let hits = UDim2PreferFromOffset.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}

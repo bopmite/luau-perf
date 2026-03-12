@@ -268,3 +268,35 @@ fn unreliable_remote_outside_heartbeat_ok() {
     let hits = UnreliableRemotePreferred.check(src, &ast);
     assert_eq!(hits.len(), 0);
 }
+
+#[test]
+fn fire_in_while_wait_game_loop_ok() {
+    let src = "while wait(120) do\n  remote:FireAllClients(\"message\")\nend";
+    let ast = parse(src);
+    let hits = FireInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn fire_in_while_true_task_wait_ok() {
+    let src = "while true do\n  task.wait(5)\n  remote:FireAllClients(data)\nend";
+    let ast = parse(src);
+    let hits = FireInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn invoke_client_self_wrapper_ok() {
+    let src = "return self._remoting:InvokeClient(self._memberName, player)";
+    let ast = parse(src);
+    let hits = InvokeClientDangerous.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn invoke_client_direct_still_detected() {
+    let src = "remote:InvokeClient(player, data)";
+    let ast = parse(src);
+    let hits = InvokeClientDangerous.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}

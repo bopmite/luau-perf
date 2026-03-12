@@ -71,7 +71,7 @@ fn require_at_module_level_ok() {
 
 #[test]
 fn find_first_child_recursive_detected() {
-    let src = "local function search()\n  workspace:FindFirstChild(\"Part\", true)\nend";
+    let src = "for i = 1, 10 do\n  workspace:FindFirstChild(\"Part\", true)\nend";
     let ast = parse(src);
     let hits = FindFirstChildRecursive.check(src, &ast);
     assert_eq!(hits.len(), 1);
@@ -384,4 +384,20 @@ fn wait_for_child_outside_loop_ok() {
     let ast = parse(src);
     let hits = WaitForChildInLoop.check(src, &ast);
     assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn filter_then_first_nested_if_return_ok() {
+    let src = "for i,Child in pairs(folder:GetChildren()) do\n  if Child.Name == \"Shards\" then\n    if Player.Shards.Value < Cost then\n      return false\n    end\n  end\nend";
+    let ast = parse(src);
+    let hits = FilterThenFirst.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn filter_then_first_direct_return_detected() {
+    let src = "for _, desc in workspace:GetDescendants() do\n  if desc.Name == \"Target\" then\n    return desc\n  end\nend";
+    let ast = parse(src);
+    let hits = FilterThenFirst.check(src, &ast);
+    assert_eq!(hits.len(), 1);
 }

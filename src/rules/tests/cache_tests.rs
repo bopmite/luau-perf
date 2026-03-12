@@ -500,3 +500,27 @@ fn vector2_new_outside_loop_ok() {
     let hits = Vector2NewInLoop.check(src, &ast);
     assert_eq!(hits.len(), 0);
 }
+
+#[test]
+fn vector2_new_constant_in_loop_detected() {
+    let src = "while true do\n  local v = Vector2.new(1, 2)\nend";
+    let ast = parse(src);
+    let hits = Vector2NewInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn udim2_from_scale_in_loop_detected() {
+    let src = "while true do\n  local u = UDim2.fromScale(0.5, 1)\nend";
+    let ast = parse(src);
+    let hits = UDim2NewInLoop.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn repeated_color3_different_args_ok() {
+    let src = "a.Color = Color3.fromRGB(255, 0, 0)\nb.Color = Color3.fromRGB(0, 255, 0)\nc.Color = Color3.fromRGB(0, 0, 255)";
+    let ast = parse(src);
+    let hits = RepeatedColor3.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}

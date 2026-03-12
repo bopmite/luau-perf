@@ -476,3 +476,27 @@ fn sqrt_assignment_ok() {
     let hits = SqrtOverSquared.check(src, &ast);
     assert_eq!(hits.len(), 0);
 }
+
+#[test]
+fn vector3_one_constant_detected() {
+    let src = "local v = Vector3.new(1, 1, 1)";
+    let ast = parse(src);
+    let hits = Vector3ZeroConstant.check(src, &ast);
+    assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn vector3_non_zero_ok() {
+    let src = "local v = Vector3.new(1, 0, 0)";
+    let ast = parse(src);
+    let hits = Vector3ZeroConstant.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn vector2_non_zero_ok() {
+    let src = "local v = Vector2.new(1, 0)";
+    let ast = parse(src);
+    let hits = Vector2ZeroConstant.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
