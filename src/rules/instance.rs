@@ -370,6 +370,17 @@ impl Rule for RepeatedFindFirstChild {
         Severity::Warn
     }
 
+    fn skip_path(&self, path: &std::path::Path) -> bool {
+        path.file_name()
+            .and_then(|n| n.to_str())
+            .map(|n| {
+                let lower = n.to_ascii_lowercase();
+                lower.contains(".spec") || lower.contains(".test")
+                    || lower.contains("_spec") || lower.contains("_test")
+            })
+            .unwrap_or(false)
+    }
+
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let positions = visit::find_pattern_positions(source, ":FindFirstChild(");
         if positions.len() < 2 {
@@ -603,15 +614,31 @@ impl Rule for GetChildrenInLoop {
         Severity::Warn
     }
 
-    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+    fn skip_path(&self, path: &std::path::Path) -> bool {
+        path.components().any(|c| {
+            c.as_os_str()
+                .to_str()
+                .map(|s| s == ".lune" || s == "lune")
+                .unwrap_or(false)
+        })
+    }
+
+    fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
             if ctx.in_hot_loop
                 && (visit::is_method_call(call, "GetChildren")
                     || visit::is_method_call(call, "GetDescendants"))
             {
+                let pos = visit::call_pos(call);
+                let line_start = source[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
+                let line = &source[line_start..source[pos..].find('\n').map(|i| pos + i).unwrap_or(source.len())];
+                let trimmed = line.trim();
+                if trimmed.starts_with("for ") {
+                    return;
+                }
                 hits.push(Hit {
-                    pos: visit::call_pos(call),
+                    pos,
                     msg: ":GetChildren/:GetDescendants in loop allocates a new table each call - cache outside the loop".into(),
                 });
             }
@@ -638,6 +665,12 @@ impl Rule for ClassNameOverIsA {
             for pos in visit::find_pattern_positions(source, pat) {
                 let after = &source[pos + pat.len()..];
                 if !after.starts_with('"') && !after.starts_with('\'') {
+                    continue;
+                }
+                let after_quote = &source[pos + pat.len() + 1..];
+                let class_end = after_quote.find(|c: char| c == '"' || c == '\'').unwrap_or(0);
+                let class_name = &after_quote[..class_end];
+                if matches!(class_name, "Script" | "LocalScript" | "ModuleScript") {
                     continue;
                 }
                 let ctx_start = pos.saturating_sub(500);

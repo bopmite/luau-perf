@@ -77,7 +77,12 @@ impl Rule for TouchedWithoutDebounce {
                     || early_body.contains("if enabled")
                     || early_body.contains("tick()")
                     || early_body.contains("os.clock()")
-                    || early_body.contains("task.wait");
+                    || early_body.contains("task.wait")
+                    || early_body.contains("FindFirstChild")
+                    || early_body.contains("== nil")
+                    || early_body.contains("~= nil")
+                    || early_body.contains(":Destroy()")
+                    || early_body.contains("HasTag");
                 if !has_debounce {
                     hits.push(Hit {
                         pos,
@@ -230,6 +235,11 @@ impl Rule for CFrameAssignInLoop {
         for pos in positions {
             let line = line_starts.partition_point(|&s| s <= pos).saturating_sub(1);
             if line < loop_depth.len() && loop_depth[line] > 0 {
+                let line_start = line_starts[line];
+                let line_text = &source[line_start..pos];
+                if line_text.contains("Camera") || line_text.contains("camera") {
+                    continue;
+                }
                 hits.push(Hit {
                     pos,
                     msg: ".CFrame assignment in loop - each triggers physics + replication, use workspace:BulkMoveTo() to batch".into(),

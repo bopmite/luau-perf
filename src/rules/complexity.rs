@@ -186,7 +186,7 @@ impl Rule for FindFirstChildRecursive {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_func
+            if ctx.in_loop
                 && visit::is_method_call(call, "FindFirstChild")
                 && visit::nth_arg_is_true(call, 1)
             {
@@ -555,14 +555,21 @@ impl Rule for FilterThenFirst {
                         break;
                     }
                     let mut found_collect = false;
+                    let mut has_nested_if = false;
                     for k in (j + 1)..lines.len().min(j + 5) {
                         let deeper = lines[k].trim();
+                        if deeper.starts_with("if ") {
+                            has_nested_if = true;
+                        }
                         if deeper.starts_with("table.insert") || deeper.contains("[#") {
                             found_collect = true;
                         }
                         if (deeper.starts_with("return ") || deeper.starts_with("break"))
                             && !found_collect
                         {
+                            if has_nested_if {
+                                break;
+                            }
                             let byte_pos: usize = lines[..i].iter().map(|l| l.len() + 1).sum();
                             hits.push(Hit {
                                 pos: byte_pos,

@@ -22,7 +22,7 @@ impl Rule for FireInLoop {
         Severity::Error
     }
 
-    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+    fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
             if !ctx.in_loop_direct {
@@ -31,8 +31,20 @@ impl Rule for FireInLoop {
             let is_remote_fire = visit::is_method_call(call, "FireServer")
                 || visit::is_method_call(call, "FireAllClients");
             if is_remote_fire {
+                let pos = visit::call_pos(call);
+                let ctx_start = pos.saturating_sub(1000);
+                let ctx_end = (pos + 1000).min(source.len());
+                let context = &source[ctx_start..ctx_end];
+                let has_yield = context.contains("task.wait")
+                    || context.contains("wait(")
+                    || context.contains("task.wait(");
+                if has_yield
+                    && (context.contains("while ") || context.contains("repeat"))
+                {
+                    return;
+                }
                 hits.push(Hit {
-                    pos: visit::call_pos(call),
+                    pos,
                     msg: "remote event fired in loop - batch into a single call".into(),
                 });
             }
@@ -308,6 +320,10 @@ impl Rule for InvokeClientDangerous {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, _ctx| {
             if visit::is_method_call(call, "InvokeClient") {
+                let src = format!("{call}");
+                if src.starts_with("self.") || src.starts_with("self:") {
+                    return;
+                }
                 hits.push(Hit {
                     pos: visit::call_pos(call),
                     msg: ":InvokeClient() yields the server thread until client responds - a malicious/lagging client can stall the server indefinitely, use FireClient instead".into(),
@@ -388,6 +404,13 @@ impl Rule for JsonDeepClone {
     }
     fn severity(&self) -> Severity {
         Severity::Warn
+    }
+
+    fn skip_path(&self, path: &std::path::Path) -> bool {
+        path.file_name()
+            .and_then(|n| n.to_str())
+            .map(|n| n.contains(".spec") || n.contains(".test") || n.contains("_spec") || n.contains("_test"))
+            .unwrap_or(false)
     }
 
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {

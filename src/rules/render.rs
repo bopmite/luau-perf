@@ -21,6 +21,16 @@ impl Rule for GuiCreationInLoop {
         Severity::Warn
     }
 
+    fn skip_path(&self, path: &std::path::Path) -> bool {
+        path.file_name()
+            .and_then(|n| n.to_str())
+            .map(|n| {
+                n.contains(".story") || n.contains(".spec") || n.contains(".test")
+                    || n.contains("_spec") || n.contains("_test")
+            })
+            .unwrap_or(false)
+    }
+
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
@@ -250,7 +260,16 @@ impl Rule for SurfaceGuiInLoop {
         let line_starts = visit::line_start_offsets(source);
         for pos in visit::find_pattern_positions(source, "\"SurfaceGui\"") {
             let line = line_starts.partition_point(|&s| s <= pos).saturating_sub(1);
-            if line < loop_depth.len() && loop_depth[line] > 0 {
+            if line >= loop_depth.len() || loop_depth[line] == 0 {
+                continue;
+            }
+            let line_start = line_starts[line];
+            let line_text = &source[line_start
+                ..source[line_start..]
+                    .find('\n')
+                    .map(|p| line_start + p)
+                    .unwrap_or(source.len())];
+            if line_text.contains("Instance.new") {
                 hits.push(Hit {
                     pos,
                     msg: "SurfaceGui creation in loop allocates a 3D-to-2D rendering context per iteration - pre-create and use :Clone()".into(),

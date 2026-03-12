@@ -424,7 +424,14 @@ impl Rule for ConnectInConnect {
                                 outer_line.trim().split(['.', ':']).next().unwrap_or("");
                             inner_obj != outer_obj
                         };
-                        if !skip {
+                        let is_char_lifecycle = outer_line.contains("CharacterAdded")
+                            && (inner_line.contains(".died")
+                                || inner_line.contains("destroying")
+                                || inner_line.contains("ancestrychanged"));
+                        let is_player_char = outer_line.contains("PlayerAdded")
+                            && (inner_line.contains("characteradded")
+                                || inner_line.contains(".died"));
+                        if !skip && !is_char_lifecycle && !is_player_char {
                             hits.push(Hit {
                                 pos: inner_pos,
                                 msg: ":Connect() nested inside another :Connect() callback - inner connection leaks on every outer fire".into(),
@@ -458,8 +465,9 @@ impl Rule for CharacterAddedNoCleanup {
         let has_disconnect = source.contains(":Disconnect()") || source.contains("Disconnect()");
         let has_cleanup =
             source.contains("Maid") || source.contains("Trove") || source.contains("Janitor");
+        let has_died = source.contains("Died:Connect") || source.contains("Died:connect");
 
-        if !has_char_removing && !has_disconnect && !has_cleanup {
+        if !has_char_removing && !has_disconnect && !has_cleanup && !has_died {
             let pos = positions.first().or(positions_lc.first()).copied().unwrap_or(0);
             return vec![Hit {
                 pos,

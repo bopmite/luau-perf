@@ -192,7 +192,7 @@ impl Rule for ManualCopyLoop {
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         for pos in visit::find_pattern_positions(source, "in pairs(") {
-            let context_start = visit::floor_char(source, pos.saturating_sub(30));
+            let context_start = visit::floor_char(source, pos.saturating_sub(60));
             let before = &source[context_start..pos];
             if !before.contains("for ") {
                 continue;
@@ -237,6 +237,25 @@ impl Rule for ManualCopyLoop {
             {
                 if bracket_content.contains('.') || bracket_content.contains(':') {
                     continue;
+                }
+            }
+            // Check for key/value swap (reverse lookup table) - not a copy
+            let for_header = &before[before.rfind("for ").unwrap_or(0)..];
+            let vars_part = for_header
+                .strip_prefix("for ")
+                .and_then(|s| s.split(" in ").next())
+                .unwrap_or("");
+            let vars: Vec<&str> = vars_part.split(',').map(|v| v.trim()).collect();
+            if vars.len() == 2 {
+                let key_var = vars[0];
+                let val_var = vars[1];
+                if let Some(bracket) =
+                    line.split('[').nth(1).and_then(|s| s.split(']').next())
+                {
+                    let rhs = line.split(" = ").nth(1).unwrap_or("").trim();
+                    if bracket.trim() == val_var && rhs == key_var {
+                        continue;
+                    }
                 }
             }
             hits.push(Hit {

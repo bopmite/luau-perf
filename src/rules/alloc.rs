@@ -743,6 +743,13 @@ impl Rule for UnnecessaryClosure {
         Severity::Warn
     }
 
+    fn skip_path(&self, path: &std::path::Path) -> bool {
+        path.file_name()
+            .and_then(|n| n.to_str())
+            .map(|n| n.contains(".spec") || n.contains(".test") || n.contains("_spec") || n.contains("_test"))
+            .unwrap_or(false)
+    }
+
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         let lines: Vec<&str> = source.lines().collect();

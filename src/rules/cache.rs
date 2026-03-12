@@ -226,6 +226,18 @@ impl Rule for RaycastParamsInFunction {
                 if is_in_factory_function(source, pos, "RaycastParams") {
                     return;
                 }
+                let line_start = source[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
+                let line_prefix = &source[line_start..pos];
+                if line_prefix.contains("return") {
+                    return;
+                }
+                let window_end = (pos + 500).min(source.len());
+                let window = &source[pos..window_end];
+                if window.contains("FilterDescendantsInstances")
+                    || window.contains("FilterType")
+                {
+                    return;
+                }
                 hits.push(Hit {
                     pos,
                     msg: "RaycastParams.new() in function - cache and reuse".into(),
@@ -353,6 +365,17 @@ impl Rule for OverlapParamsInFunction {
             if ctx.in_func && visit::is_dot_call(call, "OverlapParams", "new") {
                 let pos = visit::call_pos(call);
                 if is_in_factory_function(source, pos, "OverlapParams") {
+                    return;
+                }
+                let line_start = source[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
+                let line_prefix = &source[line_start..pos];
+                if line_prefix.contains("return") {
+                    return;
+                }
+                let window = &source[pos..(pos + 300).min(source.len())];
+                if window.contains("FilterDescendantsInstances")
+                    || window.contains("FilterType")
+                {
                     return;
                 }
                 hits.push(Hit {
