@@ -319,10 +319,10 @@ impl Rule for GetRankInGroupUncached {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_func && visit::is_method_call(call, "GetRankInGroup") {
+            if ctx.in_hot_loop && visit::is_method_call(call, "GetRankInGroup") {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
-                    msg: "GetRankInGroup() is an HTTP call - cache result per player at join time"
+                    msg: "GetRankInGroup() is an HTTP call in hot loop - cache result per player at join time"
                         .into(),
                 });
             }
@@ -342,10 +342,10 @@ impl Rule for InsertServiceLoadAsset {
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_func && visit::is_method_call(call, "LoadAsset") {
+            if ctx.in_loop && visit::is_method_call(call, "LoadAsset") {
                 hits.push(Hit {
                     pos: visit::call_pos(call),
-                    msg: "InsertService:LoadAsset() in function - HTTP + deserialization, cache the result".into(),
+                    msg: "InsertService:LoadAsset() in loop - HTTP + deserialization, cache the result".into(),
                 });
             }
         });

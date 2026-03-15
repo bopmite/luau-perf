@@ -256,15 +256,38 @@ impl Rule for InstanceNewInLoop {
         Severity::Warn
     }
 
-    fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
+    fn skip_path(&self, path: &std::path::Path) -> bool {
+        let in_ui = path.components().any(|c| {
+            c.as_os_str()
+                .to_str()
+                .map(|s| s == "Components" || s == "RadialUI")
+                .unwrap_or(false)
+        });
+        if in_ui {
+            return true;
+        }
+        path.file_name()
+            .and_then(|n| n.to_str())
+            .map(|n| n.contains(".story") || n.contains(".spec") || n.contains(".test"))
+            .unwrap_or(false)
+    }
+
+    fn check(&self, source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
-            if ctx.in_hot_loop && visit::is_dot_call(call, "Instance", "new") {
-                hits.push(Hit {
-                    pos: visit::call_pos(call),
-                    msg: "Instance.new() in loop - consider Clone() or pre-allocation".into(),
-                });
+            if !ctx.in_hot_loop || !visit::is_dot_call(call, "Instance", "new") {
+                return;
             }
+            let pos = visit::call_pos(call);
+            let line_start = source[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
+            let line = &source[line_start..source[pos..].find('\n').map(|i| pos + i).unwrap_or(source.len())];
+            if line.trim().starts_with("for ") {
+                return;
+            }
+            hits.push(Hit {
+                pos,
+                msg: "Instance.new() in loop - consider Clone() or pre-allocation".into(),
+            });
         });
         hits
     }

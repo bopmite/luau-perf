@@ -999,10 +999,26 @@ fn pcall_outside_loop_ok() {
 
 #[test]
 fn get_rank_in_group_uncached_detected() {
-    let src = "function checkRank(player)\n  local rank = player:GetRankInGroup(123)\nend";
+    let src = "while true do\n  local rank = player:GetRankInGroup(123)\nend";
     let ast = parse(src);
     let hits = GetRankInGroupUncached.check(src, &ast);
     assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn get_rank_in_group_in_for_in_ok() {
+    let src = "for _, player in players do\n  local rank = player:GetRankInGroup(123)\nend";
+    let ast = parse(src);
+    let hits = GetRankInGroupUncached.check(src, &ast);
+    assert_eq!(hits.len(), 0);
+}
+
+#[test]
+fn get_rank_in_group_in_function_ok() {
+    let src = "function checkRank(player)\n  local rank = player:GetRankInGroup(123)\nend";
+    let ast = parse(src);
+    let hits = GetRankInGroupUncached.check(src, &ast);
+    assert_eq!(hits.len(), 0);
 }
 
 #[test]
@@ -1211,10 +1227,18 @@ fn instance_new_part_ok() {
 
 #[test]
 fn insert_service_load_asset_detected() {
-    let src = "function loadModel()\n  local model = InsertService:LoadAsset(id)\nend";
+    let src = "for _, id in ids do\n  local model = InsertService:LoadAsset(id)\nend";
     let ast = parse(src);
     let hits = InsertServiceLoadAsset.check(src, &ast);
     assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn insert_service_load_asset_in_function_ok() {
+    let src = "function loadModel()\n  local model = InsertService:LoadAsset(id)\nend";
+    let ast = parse(src);
+    let hits = InsertServiceLoadAsset.check(src, &ast);
+    assert_eq!(hits.len(), 0);
 }
 
 #[test]

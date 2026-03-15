@@ -222,6 +222,15 @@ impl Rule for SetParentInLoop {
         Severity::Warn
     }
 
+    fn skip_path(&self, path: &std::path::Path) -> bool {
+        path.components().any(|c| {
+            c.as_os_str()
+                .to_str()
+                .map(|s| s == "Components" || s == "RadialUI")
+                .unwrap_or(false)
+        })
+    }
+
     fn check(&self, source: &str, _ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let parent_positions = visit::find_pattern_positions(source, ".Parent =");
         if parent_positions.is_empty() {

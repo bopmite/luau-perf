@@ -430,6 +430,7 @@ impl Rule for ConnectInConnect {
                                 || inner_line.contains("ancestrychanged"));
                         let is_player_char = outer_line.contains("PlayerAdded")
                             && (inner_line.contains("characteradded")
+                                || inner_line.contains("characterremoving")
                                 || inner_line.contains(".died"));
                         if !skip && !is_char_lifecycle && !is_player_char {
                             hits.push(Hit {

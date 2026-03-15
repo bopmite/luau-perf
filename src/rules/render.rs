@@ -22,6 +22,15 @@ impl Rule for GuiCreationInLoop {
     }
 
     fn skip_path(&self, path: &std::path::Path) -> bool {
+        let in_ui_dir = path.components().any(|c| {
+            c.as_os_str()
+                .to_str()
+                .map(|s| s == "Components" || s == "RadialUI")
+                .unwrap_or(false)
+        });
+        if in_ui_dir {
+            return true;
+        }
         path.file_name()
             .and_then(|n| n.to_str())
             .map(|n| {
