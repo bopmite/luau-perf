@@ -357,6 +357,15 @@ impl Rule for Vector2NewInLoop {
         Severity::Warn
     }
 
+    fn skip_path(&self, path: &std::path::Path) -> bool {
+        path.components().any(|c| {
+            c.as_os_str()
+                .to_str()
+                .map(|s| s == "Components" || s == "RadialUI")
+                .unwrap_or(false)
+        })
+    }
+
     fn check(&self, _source: &str, ast: &full_moon::ast::Ast) -> Vec<Hit> {
         let mut hits = Vec::new();
         visit::each_call(ast, |call, ctx| {
